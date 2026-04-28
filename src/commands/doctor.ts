@@ -98,10 +98,11 @@ async function fixProjectStructure(
   const configFileMissing = missingItems.some(item => item.path.endsWith("config.json"));
   const templatesDirMissing = missingItems.some(item => item.path.endsWith("templates"));
 
-  // 先创建所有目录
+  // 先创建所有目录（除了 templates 目录，它需要从 git 克隆）
   for (const item of missingItems) {
     try {
-      if (item.type === "directory") {
+      const isTemplatesDir = item.path.includes(".prdkit/templates") || item.path.includes(".prdkit\\templates");
+      if (item.type === "directory" && !isTemplatesDir) {
         mkdirSync(item.path, { recursive: true });
         const relativePath = relative(process.cwd(), item.path);
         success(`创建目录: ${relativePath}`);
@@ -111,6 +112,8 @@ async function fixProjectStructure(
       fail(`修复失败 ${relativePath}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
+
+  let config: PrdkitConfig | undefined = undefined;
 
   // 如果配置文件缺失，创建配置文件
   if (configFileMissing) {
@@ -138,21 +141,35 @@ async function fixProjectStructure(
         });
       }
 
-      const config = createDefaultConfig(projectName, author);
+      config = createDefaultConfig(projectName, author);
 
       const configPath = join(projectRoot, ".prdkit", "config.json");
       writeFileSync(configPath, JSON.stringify(config, null, 2));
       const relativeConfigPath = relative(process.cwd(), configPath);
       success(`创建配置文件: ${relativeConfigPath}`);
-
-      // 如果模板目录缺失，拉取模板
-      if (templatesDirMissing) {
-        info("\n正在拉取模板仓库...");
-        await ensureTemplateRepo(config.templateRepo, projectRoot);
-        success("模板仓库拉取完成");
-      }
     } catch (error) {
       fail(`创建配置文件失败: ${error instanceof Error ? error.message : String(error)}`);
+      return;
+    }
+  }
+
+  // 如果模板目录缺失，拉取模板仓库
+  if (templatesDirMissing) {
+    try {
+      // 如果配置文件刚创建，使用刚创建的 config；否则从文件读取
+      if (!config) {
+        config = await loadConfig(projectRoot);
+        if (!config) {
+          fail("无法读取配置文件，请先运行 prdkit init");
+          return;
+        }
+      }
+
+      info("\n正在拉取模板仓库...");
+      await ensureTemplateRepo(config.templateRepo, projectRoot);
+      success("模板仓库拉取完成");
+    } catch (error) {
+      fail(`拉取模板仓库失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
