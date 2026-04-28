@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:publish": "tsc && vite build --config vite.config.publish.ts",
     "preview": "vite preview"
   },
   "dependencies": {

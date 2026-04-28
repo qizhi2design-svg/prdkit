@@ -125,6 +125,7 @@ async function startDevMode(options: { port: number; prototypesDir: string; open
   const viteProcess = spawn('pnpm', ['dev', '--port', port.toString()], {
     cwd: viewerDir,
     stdio: 'inherit',
+    shell: true,
     env: {
       ...process.env,
       API_PORT: apiPort.toString()

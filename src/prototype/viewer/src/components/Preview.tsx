@@ -18,6 +18,7 @@ interface PreviewProps {
   onMarkSelect: (markId: string) => void;
   onMarkCancel: () => void;
   onToggleMarkPanel?: () => void;
+  isReadonly?: boolean;
 }
 
 type SelectedElement = ElementInfo;
@@ -33,7 +34,8 @@ export default function Preview({
   onMarkPrepare,
   onMarkSelect,
   onMarkCancel,
-  onToggleMarkPanel
+  onToggleMarkPanel,
+  isReadonly = false
 }: PreviewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [wsConnected, setWsConnected] = useState(false);
@@ -46,6 +48,9 @@ export default function Preview({
   const [marksVisible, setMarksVisible] = useState(true); // 标记是否可见
 
   useEffect(() => {
+    // 只读模式下不建立 WebSocket 连接
+    if (isReadonly) return;
+
     let ws: WebSocket | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let reconnectAttempt = 0;

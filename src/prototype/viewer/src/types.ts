@@ -1,6 +1,15 @@
 // 视图模式类型
 export type ViewMode = 'preview' | 'inspect' | 'mark';
 
+// 原型节点类型
+export interface PrototypeNode {
+  id: string;
+  name: string;
+  type: 'file' | 'folder';
+  path: string;
+  children?: PrototypeNode[];
+}
+
 // 标记数据结构
 export interface Mark {
   id: string;

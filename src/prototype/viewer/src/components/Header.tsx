@@ -1,4 +1,4 @@
-import { MenuFoldOutlined, MenuUnfoldOutlined, FileOutlined } from '@ant-design/icons';
+import { MenuFoldOutlined, MenuUnfoldOutlined, FileOutlined, ExportOutlined } from '@ant-design/icons';
 import { Button, Tooltip, Segmented } from 'antd';
 import type { ViewMode } from '../types';
 import './Header.css';
@@ -11,9 +11,11 @@ interface HeaderProps {
   totalFiles: number;
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
+  isReadonly?: boolean;
+  onPublish?: () => void;
 }
 
-export default function Header({ collapsed, onToggle, currentFile, currentIndex, totalFiles, viewMode, onViewModeChange }: HeaderProps) {
+export default function Header({ collapsed, onToggle, currentFile, currentIndex, totalFiles, viewMode, onViewModeChange, isReadonly = false, onPublish }: HeaderProps) {
   // 从路径中提取文件名（去掉父级目录）
   const getFileName = (path: string | null) => {
     if (!path) return null;
@@ -51,7 +53,7 @@ export default function Header({ collapsed, onToggle, currentFile, currentIndex,
       </div>
 
       <Segmented
-        options={['预览模式', '编辑模式', '标记模式']}
+        options={isReadonly ? ['预览模式', '标记模式'] : ['预览模式', '编辑模式', '标记模式']}
         value={viewMode === 'preview' ? '预览模式' : viewMode === 'inspect' ? '编辑模式' : '标记模式'}
         onChange={(value) => {
           const newMode: ViewMode =
@@ -62,6 +64,17 @@ export default function Header({ collapsed, onToggle, currentFile, currentIndex,
         }}
         className="header-mode-segmented"
       />
+
+      {!isReadonly && onPublish && (
+        <Button
+          type="primary"
+          icon={<ExportOutlined />}
+          onClick={onPublish}
+          style={{ marginLeft: '12px' }}
+        >
+          发布
+        </Button>
+      )}
 
       <img src="/logo.svg" alt="PRDKit" className="header-logo" />
     </div>

@@ -53,5 +53,13 @@ export const COPY = {
 说明：
   启动本地预览服务器，支持实时预览和热更新。
   自动选择可用端口并打开浏览器。
+`,
+  updateDescription: "检查并更新 prdkit 到最新版本",
+  updateHelpAfter: `
+示例：
+  prdkit update
+
+说明：
+  检查 npm 上的最新版本，如果有更新则自动安装。
 `
 } as const;
