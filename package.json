@@ -1,5 +1,5 @@
 {
-  "name": "@qizhi2design-svg/prdkit-cli",
+  "name": "@huangqz/prdkit-cli",
   "version": "0.1.0",
   "description": "CLI for initializing product project scaffolds and creating document templates.",
   "type": "module",
