@@ -1,0 +1,200 @@
+.file-tree-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.file-tree-toolbar {
+  padding: 8px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+}
+
+.file-tree-search-icon {
+  font-size: 14px;
+  cursor: pointer;
+  color: #8c8c8c;
+  transition: all 0.2s;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-tree-search-icon:hover {
+  color: #1890ff;
+  background-color: #f5f5f5;
+}
+
+.file-tree-search-spacer {
+  flex: 1;
+}
+
+.file-tree-search-input {
+  flex: 1;
+}
+
+.file-tree-nav-icon {
+  font-size: 14px;
+  cursor: pointer;
+  color: #8c8c8c;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+}
+
+.file-tree-nav-icon:hover {
+  color: #1890ff;
+  background-color: #f5f5f5;
+}
+
+.file-tree-project-name {
+  padding: 8px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+}
+
+.file-tree-project-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+}
+
+.file-tree-content {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 4px;
+}
+
+.file-tree-node-title {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 24px;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+}
+
+.file-tree-loading {
+  padding: 12px;
+}
+
+/* 覆盖 Ant Design Tree 的默认样式，防止换行 */
+.file-tree-content .ant-tree-title {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.file-tree-content .ant-tree-node-content-wrapper {
+  max-width: calc(100% - 24px);
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  line-height: 24px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.file-tree-content .ant-tree-node-content-wrapper:hover {
+  background-color: #f5f5f5;
+}
+
+.file-tree-content .ant-tree-node-selected .ant-tree-node-content-wrapper {
+  background-color: #e6f7ff !important;
+}
+
+.file-tree-content .ant-tree-treenode {
+  width: 100%;
+  padding: 1px 0;
+}
+
+.file-tree-content .ant-tree-indent {
+  flex-shrink: 0;
+}
+
+.file-tree-content .ant-tree-indent-unit {
+  width: 20px;
+}
+
+.file-tree-content .ant-tree-iconEle {
+  width: 16px;
+  height: 16px !important;
+  line-height: 16px;
+  margin-right: 4px;
+  font-size: 16px;
+  font-weight: normal;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.file-tree-content .ant-tree-switcher {
+  width: 16px;
+  height: 28px;
+  line-height: 28px;
+  margin-right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.file-tree-content .ant-tree-switcher .ant-tree-switcher-icon {
+  font-size: 10px;
+}
+
+.file-tree-content .ant-tree-switcher-noop {
+  width: 16px;
+  height: 28px;
+  line-height: 28px;
+  margin-right: 4px;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.file-tree-content .ant-tree {
+  font-size: 13px;
+}
+
+.file-tree-content .ant-tree-treenode-selected {
+  background-color: transparent !important;
+}
+
+/* 确保所有节点的布局一致 */
+.file-tree-content .ant-tree-treenode {
+  display: flex;
+  align-items: center;
+}
+
+/* 移除 switcher 内部元素的默认样式 */
+.file-tree-content .ant-tree-switcher > * {
+  margin: 0;
+  padding: 0;
+}

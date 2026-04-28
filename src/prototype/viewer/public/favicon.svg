@@ -1,0 +1,14 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 圆角背景 -->
+  <rect width="32" height="32" rx="6" fill="#1890ff"/>
+
+  <!-- P 字母 - 与 logo 保持一致的字体样式 -->
+  <text x="4" y="25"
+        font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
+        font-size="24"
+        font-weight="900"
+        font-style="italic"
+        fill="white">
+    P
+  </text>
+</svg>

@@ -1,0 +1,46 @@
+<svg width="200" height="32" viewBox="0 0 200 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- PRD 部分 - 蓝色 -->
+  <text x="2" y="22"
+        font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
+        font-size="20"
+        font-weight="900"
+        font-style="italic"
+        fill="#1890ff"
+        letter-spacing="0.5">
+    PRD
+  </text>
+
+  <!-- kit 部分 - 黑色 -->
+  <text x="50" y="22"
+        font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
+        font-size="20"
+        font-weight="900"
+        font-style="italic"
+        fill="#262626"
+        letter-spacing="0.5">
+    kit
+  </text>
+
+  <!-- Design 部分 - D 蓝色，其他黑色 -->
+  <!-- D - 蓝色 -->
+  <text x="90" y="22"
+        font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
+        font-size="20"
+        font-weight="900"
+        font-style="italic"
+        fill="#1890ff"
+        letter-spacing="0.5">
+    D
+  </text>
+
+  <!-- esign - 黑色 -->
+  <text x="106" y="22"
+        font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
+        font-size="20"
+        font-weight="900"
+        font-style="italic"
+        fill="#262626"
+        letter-spacing="0.5">
+    esign
+  </text>
+</svg>

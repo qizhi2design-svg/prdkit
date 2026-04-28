@@ -1,0 +1,57 @@
+{
+  "name": "@qizhi2design-svg/prdkit-cli",
+  "version": "0.1.0",
+  "description": "CLI for initializing product project scaffolds and creating document templates.",
+  "type": "module",
+  "keywords": [
+    "prdkit",
+    "cli",
+    "product-management",
+    "templates",
+    "scaffold"
+  ],
+  "author": "purity3",
+  "license": "MIT",
+  "bin": {
+    "prdkit": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "prdkit": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^7.2.1",
+    "chalk": "^5.4.1",
+    "chokidar": "^5.0.0",
+    "commander": "^13.0.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "gray-matter": "^4.0.3",
+    "open": "^11.0.0",
+    "ora": "^8.1.1",
+    "ws": "^8.20.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.10.5",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.19.0"
+}

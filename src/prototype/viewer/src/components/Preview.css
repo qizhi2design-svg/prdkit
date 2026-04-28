@@ -1,0 +1,220 @@
+.preview-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.preview-inspect-banner {
+  height: 48px;
+  padding: 0 16px;
+  background: #ffffff;
+  border-bottom: 1px solid #e8e8e8;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 930px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.preview-inspect-banner-text {
+  font-size: 13px;
+  color: #262626;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.preview-inspect-banner-controls {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.preview-inspect-banner-count {
+  font-size: 12px;
+  color: #1890ff;
+  padding: 2px 8px;
+  background: #e6f7ff;
+  border-radius: 4px;
+  border: 1px solid #91d5ff;
+}
+
+.preview-ws-disconnected {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 12px;
+  background: #ff4d4f;
+  color: white;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 1000;
+}
+
+.preview-ws-disconnected.with-banner {
+  top: 48px;
+}
+
+.preview-iframe {
+  width: 100%;
+  flex: 1;
+  border: none;
+}
+
+.preview-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.preview-element-highlight {
+  position: absolute;
+  border: 2px solid #1890ff;
+  background-color: rgba(24, 144, 255, 0.1);
+  pointer-events: none;
+  z-index: 9999;
+  box-sizing: border-box;
+}
+
+.preview-element-highlight.selected {
+  border-color: #52c41a;
+  background-color: rgba(82, 196, 26, 0.1);
+}
+
+.preview-element-tag {
+  position: absolute;
+  top: -22px;
+  left: 0;
+  padding: 2px 6px;
+  background: #1890ff;
+  color: white;
+  font-size: 11px;
+  font-family: monospace;
+  border-radius: 2px 2px 0 0;
+  white-space: nowrap;
+}
+
+.preview-element-tag.selected {
+  background: #52c41a;
+}
+
+/* 元素高亮覆盖层 */
+.preview-highlight-overlay {
+  position: absolute;
+  border: 2px solid #1890ff;
+  background-color: rgba(24, 144, 255, 0.1);
+  pointer-events: none;
+  z-index: 9999;
+  box-sizing: border-box;
+}
+
+.preview-highlight-tag {
+  position: absolute;
+  top: -22px;
+  left: 0;
+  padding: 2px 6px;
+  background: #1890ff;
+  color: white;
+  font-size: 11px;
+  font-family: monospace;
+  border-radius: 2px 2px 0 0;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+/* 选中状态的绿色样式 */
+.preview-highlight-overlay.selected {
+  border-color: #52c41a;
+  background-color: rgba(82, 196, 26, 0.1);
+}
+
+.preview-highlight-tag.selected {
+  background: #52c41a;
+}
+
+/* 标记模式样式 */
+.preview-inspect-banner.mark-mode {
+  /* 背景色与编辑模式保持一致 */
+  border-bottom-color: #e8e8e8;
+}
+
+.preview-highlight-overlay.mark-mode {
+  border-color: #52c41a;
+  background-color: rgba(82, 196, 26, 0.15);
+}
+
+.preview-highlight-tag.mark-mode {
+  background: #52c41a;
+}
+
+/* 标记高亮框样式 */
+.preview-mark-highlight {
+  position: absolute;
+  border: 2px solid #52c41a;
+  background-color: rgba(82, 196, 26, 0.1);
+  cursor: pointer;
+  z-index: 1000; /* 降低默认值，避免覆盖弹窗 */
+  box-sizing: border-box;
+  transition: all 0.2s;
+  pointer-events: none; /* 让鼠标事件穿透 */
+}
+
+.preview-mark-highlight:hover {
+  border-color: #1890ff;
+  background-color: rgba(24, 144, 255, 0.1);
+}
+
+.preview-mark-highlight.selected {
+  border-color: #1890ff;
+  border-width: 3px;
+  background-color: rgba(24, 144, 255, 0.15);
+}
+
+/* 待创建标记的高亮框样式 */
+.preview-mark-highlight.pending {
+  border-color: #faad14;
+  background-color: rgba(250, 173, 20, 0.15);
+  pointer-events: none;
+}
+
+.preview-mark-number {
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  background: #52c41a;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
+  pointer-events: auto; /* 数字标签可点击 */
+  cursor: pointer;
+}
+
+.preview-mark-highlight:hover .preview-mark-number {
+  background: #1890ff;
+}
+
+.preview-mark-highlight.selected .preview-mark-number {
+  background: #1890ff;
+}
+
+/* 待创建标记的数字标签样式 */
+.preview-mark-number.pending {
+  background: #faad14;
+  pointer-events: none;
+  cursor: default;
+}
+
+

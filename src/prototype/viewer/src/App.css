@@ -1,0 +1,51 @@
+.app-layout {
+  height: 100vh;
+}
+
+.app-content-layout {
+  position: relative;
+  height: calc(100vh - 48px);
+}
+
+.app-sider {
+  border-right: 1px solid #f0f0f0;
+  min-width: 200px;
+  max-width: 600px;
+}
+
+.app-resize-handle {
+  width: 4px;
+  cursor: col-resize;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 10;
+  transition: background-color 0.2s;
+}
+
+.app-resize-handle.mark-panel-resize {
+  left: 0;
+  right: auto;
+}
+
+.app-resize-handle.resizing {
+  background-color: #1890ff;
+  transition: none;
+}
+
+.app-resize-handle:hover {
+  background-color: #f0f0f0;
+}
+
+.app-content {
+  position: relative;
+  /* pointer-events 和 margin-right 需要根据状态动态设置，保留内联样式 */
+}
+
+.mark-panel-container {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 5;
+}
