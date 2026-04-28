@@ -50,10 +50,10 @@ export default function PublishDrawer({ open, onClose, prototypes }: PublishDraw
     return nodes.map(node => ({
       title: node.name,
       key: node.path,
-      icon: node.type === 'directory' ? <FolderOutlined /> : <FileOutlined />,
+      icon: node.type === 'folder' ? <FolderOutlined /> : <FileOutlined />,
       children: node.children ? convertToTreeData(node.children) : undefined,
       isLeaf: node.type === 'file',
-      checkable: node.type === 'directory', // 只允许选择目录
+      checkable: true, // 允许选择文件夹和文件
     }));
   };
 
