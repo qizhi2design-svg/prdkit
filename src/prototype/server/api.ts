@@ -3,7 +3,6 @@ import path from 'path';
 import fs from 'fs';
 import matter from 'gray-matter';
 import { scanPrototypes } from './scanner.js';
-import { publishPrototypes } from '../publisher.js';
 
 /** 从 markdown 正文中去除开头的 # Title 标题 */
 function stripMarkdownTitle(content: string): string {
@@ -212,97 +211,6 @@ export function createApiRouter(prototypesDir: string): Router {
       console.error('删除标记失败:', error);
       res.status(500).json({
         error: '删除标记失败',
-        message: error instanceof Error ? error.message : String(error)
-      });
-    }
-  });
-
-  // 发布原型 - 选择输出目录
-  router.post('/select-directory', async (req: Request, res: Response) => {
-    try {
-      // 使用 osascript (macOS) 或其他方式选择目录
-      const { exec } = await import('child_process');
-      const { promisify } = await import('util');
-      const execAsync = promisify(exec);
-
-      let selectedPath = '';
-
-      if (process.platform === 'darwin') {
-        // macOS
-        const script = `osascript -e 'POSIX path of (choose folder with prompt "选择输出目录")'`;
-        try {
-          const { stdout } = await execAsync(script);
-          selectedPath = stdout.trim();
-        } catch (error) {
-          // 用户取消选择
-          return res.json({ path: null });
-        }
-      } else if (process.platform === 'win32') {
-        // Windows - 使用 PowerShell
-        const script = `powershell -Command "Add-Type -AssemblyName System.Windows.Forms; $dialog = New-Object System.Windows.Forms.FolderBrowserDialog; $dialog.Description = '选择输出目录'; $result = $dialog.ShowDialog(); if ($result -eq 'OK') { $dialog.SelectedPath }"`;
-        try {
-          const { stdout } = await execAsync(script);
-          selectedPath = stdout.trim();
-        } catch (error) {
-          return res.json({ path: null });
-        }
-      } else {
-        // Linux - 使用 zenity
-        const script = `zenity --file-selection --directory --title="选择输出目录"`;
-        try {
-          const { stdout } = await execAsync(script);
-          selectedPath = stdout.trim();
-        } catch (error) {
-          return res.json({ path: null });
-        }
-      }
-
-      res.json({ path: selectedPath || null });
-    } catch (error) {
-      console.error('选择目录失败:', error);
-      res.status(500).json({
-        error: '选择目录失败',
-        message: error instanceof Error ? error.message : String(error)
-      });
-    }
-  });
-
-  // 发布原型 - 执行打包
-  router.post('/publish', async (req: Request, res: Response) => {
-    try {
-      const { prototypes, outputPath } = req.body;
-
-      if (!prototypes || !Array.isArray(prototypes) || prototypes.length === 0) {
-        return res.status(400).json({ error: '请选择要发布的原型' });
-      }
-
-      if (!outputPath) {
-        return res.status(400).json({ error: '请选择输出路径' });
-      }
-
-      // 获取项目配置
-      const projectRoot = path.dirname(path.dirname(prototypesDir));
-      const configPath = path.join(projectRoot, '.prdkit', 'config.json');
-      let projectName = 'PRDKit';
-
-      if (fs.existsSync(configPath)) {
-        const configContent = fs.readFileSync(configPath, 'utf-8');
-        const config = JSON.parse(configContent);
-        projectName = config.projectName || 'PRDKit';
-      }
-
-      // 执行打包
-      await publishPrototypes(prototypesDir, prototypes, outputPath, projectName);
-
-      res.json({
-        success: true,
-        message: '发布成功',
-        outputPath
-      });
-    } catch (error) {
-      console.error('发布失败:', error);
-      res.status(500).json({
-        error: '发布失败',
         message: error instanceof Error ? error.message : String(error)
       });
     }

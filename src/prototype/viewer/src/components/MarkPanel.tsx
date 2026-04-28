@@ -27,7 +27,6 @@ interface MarkPanelProps {
   projectName?: string;
   filePath?: string | null;
   prototypesDir?: string;
-  isReadonly?: boolean;
 }
 
 export default function MarkPanel({
@@ -44,7 +43,6 @@ export default function MarkPanel({
   projectName = '',
   filePath = null,
   prototypesDir = '',
-  isReadonly = false,
 }: MarkPanelProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
@@ -510,44 +508,42 @@ DOM 路径: ${domPath}`;
               </div>
             )}
           </div>
-          {!isReadonly && (
-            <div className="mark-panel-actions">
-              {isEditing ? (
-                <>
-                  <Button onClick={handleCancelEdit} style={{ padding: '4px 16px' }}>
-                    取消
-                  </Button>
-                  <Button
-                    type="primary"
-                    onClick={handleSaveEdit}
-                    disabled={!editContent.trim()}
-                    style={{ padding: '4px 16px' }}
-                  >
-                    保存
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    danger
-                    icon={<DeleteOutlined />}
-                    onClick={handleDeleteMark}
-                    style={{ padding: '4px 16px' }}
-                  >
-                    删除
-                  </Button>
-                  <Button
-                    type="primary"
-                    icon={<EditOutlined />}
-                    onClick={handleStartEdit}
-                    style={{ padding: '4px 16px' }}
-                  >
-                    编辑
-                  </Button>
-                </>
-              )}
-            </div>
-          )}
+          <div className="mark-panel-actions">
+            {isEditing ? (
+              <>
+                <Button onClick={handleCancelEdit} style={{ padding: '4px 16px' }}>
+                  取消
+                </Button>
+                <Button
+                  type="primary"
+                  onClick={handleSaveEdit}
+                  disabled={!editContent.trim()}
+                  style={{ padding: '4px 16px' }}
+                >
+                  保存
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={handleDeleteMark}
+                  style={{ padding: '4px 16px' }}
+                >
+                  删除
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<EditOutlined />}
+                  onClick={handleStartEdit}
+                  style={{ padding: '4px 16px' }}
+                >
+                  编辑
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </>
     );

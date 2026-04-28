@@ -57,7 +57,7 @@ export function startServer(options: ServerOptions) {
   app.use('/api', createApiRouter(prototypesDir));
 
   // 原型文件静态服务
-  app.use('/preview', express.static(prototypesDir));
+  app.use('/prototypes', express.static(prototypesDir));
 
   // React 应用静态服务（如果提供了）
   if (viewerDir) {

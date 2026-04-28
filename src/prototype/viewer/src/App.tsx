@@ -4,14 +4,10 @@ import FileTree from './components/FileTree';
 import Preview from './components/Preview';
 import Header from './components/Header';
 import MarkPanel from './components/MarkPanel';
-import PublishDrawer from './components/PublishDrawer';
 import type { ViewMode, Mark, PendingMarkInfo, PrototypeNode } from './types';
 import './App.css';
 
 const { Sider, Content } = Layout;
-
-// 检测是否为只读模式
-const isReadonlyMode = import.meta.env.VITE_READONLY_MODE === 'true';
 
 function App() {
   // 从 URL query 参数读取初始文件路径
@@ -41,79 +37,48 @@ function App() {
   const [isResizingMarkPanel, setIsResizingMarkPanel] = useState(false);
   const [markPanelCollapsed, setMarkPanelCollapsed] = useState(false);
   const [savedMarkPanelWidth, setSavedMarkPanelWidth] = useState(250);
-  const [publishDrawerOpen, setPublishDrawerOpen] = useState(false);
-  const [prototypeTree, setPrototypeTree] = useState<PrototypeNode[]>([]);
   const siderRef = useRef<HTMLDivElement>(null);
   const markPanelRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const loadMarksRef = useRef<() => void>(() => {});
+  const [wsConnected, setWsConnected] = useState(false);
+  const [reloadVersion, setReloadVersion] = useState(0);
 
   // 获取文件列表
   useEffect(() => {
     const loadData = async () => {
       try {
-        // 根据模式选择数据源
-        if (isReadonlyMode) {
-          // 只读模式：从内联数据加载
-          const response = await fetch('/data.json');
-          const data = await response.json();
+        // 从 API 加载配置和原型数据
+        const configRes = await fetch('/api/config', { cache: 'no-store' });
+        const configData = await configRes.json();
+        const loadedProjectName = configData.projectName || 'PRDKit';
+        setProjectName(loadedProjectName);
+        setPrototypesDir(configData.prototypesDir || '');
 
-          setProjectName(data.config.projectName || 'PRDKit');
-          setPrototypesDir('');
+        const prototypesRes = await fetch('/api/prototypes', { cache: 'no-store' });
+        const prototypesData: PrototypeNode = await prototypesRes.json();
 
-          // 提取文件列表
-          const files: string[] = [];
-          const extractFiles = (nodes: PrototypeNode[]) => {
-            nodes.forEach(node => {
-              if (node.type === 'file' && node.path) {
-                files.push(node.path);
-              }
-              if (node.children) {
-                extractFiles(node.children);
-              }
-            });
-          };
-          if (data.prototypes.children) {
-            extractFiles(data.prototypes.children);
-          }
-          setFileList(files);
+        const files: string[] = [];
+        const extractFiles = (nodes: PrototypeNode[]) => {
+          nodes.forEach(node => {
+            if (node.type === 'file' && node.path) {
+              files.push(node.path);
+            }
+            if (node.children) {
+              extractFiles(node.children);
+            }
+          });
+        };
+        if (prototypesData.children) {
+          extractFiles(prototypesData.children);
+        }
+        setFileList(files);
 
-          // 如果没有选中文件且有文件列表，自动选中第一个
-          if (!selectedFile && files.length > 0) {
-            handleFileSelect(files[0]);
-          }
-        } else {
-          // 开发模式：从 API 加载
-          const configRes = await fetch('/api/config');
-          const configData = await configRes.json();
-          setProjectName(configData.projectName || 'PRDKit');
-          setPrototypesDir(configData.prototypesDir || '');
-
-          const prototypesRes = await fetch('/api/prototypes');
-          const prototypesData: PrototypeNode = await prototypesRes.json();
-
-          // 保存原型树用于发布功能
-          setPrototypeTree(prototypesData.children || []);
-
-          const files: string[] = [];
-          const extractFiles = (nodes: PrototypeNode[]) => {
-            nodes.forEach(node => {
-              if (node.type === 'file' && node.path) {
-                files.push(node.path);
-              }
-              if (node.children) {
-                extractFiles(node.children);
-              }
-            });
-          };
-          if (prototypesData.children) {
-            extractFiles(prototypesData.children);
-          }
-          setFileList(files);
-
-          // 如果没有选中文件且有文件列表，自动选中第一个
-          if (!selectedFile && files.length > 0) {
-            handleFileSelect(files[0]);
-          }
+        // 如果 URL 中没有指定文件且有文件列表，自动选中第一个
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlFile = urlParams.get('p');
+        if (!urlFile && files.length > 0) {
+          setSelectedFile(files[0]);
         }
       } catch (error) {
         console.error('加载数据失败:', error);
@@ -276,73 +241,99 @@ function App() {
     const prototypeName = selectedFile.split('/')[0];
 
     try {
-      if (isReadonlyMode) {
-        // 只读模式：从内联数据加载
-        const response = await fetch('/data.json');
-        const data = await response.json();
-        setMarks(data.marks[prototypeName] || []);
-      } else {
-        // 开发模式：从 API 加载
-        const response = await fetch(`/api/marks/${prototypeName}`);
-        const data = await response.json();
-        setMarks(data.marks || []);
-      }
+      // 从 API 加载
+      const response = await fetch(`/api/marks/${prototypeName}?t=${Date.now()}`, {
+        cache: 'no-store'
+      });
+      const data = await response.json();
+      setMarks(data.marks || []);
     } catch (error) {
       console.error('加载标记失败:', error);
       setMarks([]);
     }
   }, [selectedFile, viewMode]);
 
+  useEffect(() => {
+    loadMarksRef.current = loadMarks;
+  }, [loadMarks]);
+
   // 加载标记数据
   useEffect(() => {
     loadMarks();
-  }, [selectedFile, viewMode]);
+  }, [loadMarks]);
 
   // WebSocket 连接用于文件热重载
   useEffect(() => {
-    // 只读模式下不建立 WebSocket 连接
-    if (isReadonlyMode) return;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let reconnectAttempt = 0;
+    let unmounted = false;
 
-    // 在开发模式下，使用 /ws 代理路径；在生产模式下，使用根路径
-    const isDev = import.meta.env.DEV;
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = isDev
-      ? `${protocol}//${window.location.host}/ws`
-      : `${protocol}//${window.location.host}`;
-
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      console.log('WebSocket 已连接');
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        if (message.type === 'reload') {
-          console.log('检测到文件变更，重新加载标记数据');
-          // 重新加载标记数据（如果当前在 mark 模式）
-          loadMarks();
-        }
-      } catch (error) {
-        console.error('解析 WebSocket 消息失败:', error);
+    const wsUrl = (() => {
+      if (!import.meta.env.DEV) {
+        return `${protocol}//${window.location.host}`;
       }
+
+      const currentPort = parseInt(window.location.port, 10) || 3000;
+      const apiPort = currentPort + 1;
+      return `${protocol}//${window.location.hostname}:${apiPort}`;
+    })();
+
+    const connect = () => {
+      if (unmounted) return;
+
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log('WebSocket 已连接');
+        setWsConnected(true);
+        reconnectAttempt = 0;
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          if (message.type === 'reload') {
+            console.log('检测到文件变更，刷新预览并重新加载标记数据');
+            setReloadVersion(prev => prev + 1);
+            loadMarksRef.current();
+          }
+        } catch (error) {
+          console.error('解析 WebSocket 消息失败:', error);
+        }
+      };
+
+      ws.onerror = () => {
+        // onerror 之后通常会进入 onclose，这里不重复输出噪音日志
+      };
+
+      ws.onclose = () => {
+        setWsConnected(false);
+        wsRef.current = null;
+
+        if (!unmounted) {
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempt), 30000);
+          reconnectAttempt += 1;
+          reconnectTimer = setTimeout(connect, delay);
+        }
+      };
     };
 
-    ws.onerror = (error) => {
-      console.error('WebSocket 错误:', error);
-    };
-
-    ws.onclose = () => {
-      console.log('WebSocket 已断开');
-    };
+    connect();
 
     return () => {
-      ws.close();
-      wsRef.current = null;
+      unmounted = true;
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+      }
+      if (wsRef.current) {
+        wsRef.current.onclose = null;
+        wsRef.current.close();
+        wsRef.current = null;
+      }
     };
-  }, [loadMarks]); // 依赖 loadMarks，确保使用最新版本
+  }, []);
 
   // 切换页面时，退出创建视图和详情视图
   useEffect(() => {
@@ -378,9 +369,6 @@ function App() {
 
   // 处理标记更新
   const handleMarkUpdate = (markId: string, title: string, description: string) => {
-    // 只读模式下禁用编辑
-    if (isReadonlyMode) return;
-
     const prototypeName = selectedFile?.split('/')[0];
     if (!prototypeName) return;
 
@@ -401,9 +389,6 @@ function App() {
 
   // 处理标记删除
   const handleMarkDelete = (markId: string) => {
-    // 只读模式下禁用删除
-    if (isReadonlyMode) return;
-
     const prototypeName = selectedFile?.split('/')[0];
     if (!prototypeName) return;
 
@@ -424,8 +409,6 @@ function App() {
 
   // 处理新增标记
   const handleMarkCreate = (title: string, description: string) => {
-    // 只读模式下禁用创建
-    if (isReadonlyMode) return;
     if (!pendingMarkInfo) return;
 
     const prototypeName = selectedFile?.split('/')[0];
@@ -458,8 +441,6 @@ function App() {
 
   // 处理准备创建标记
   const handleMarkPrepare = (info: PendingMarkInfo) => {
-    // 只读模式下禁用创建
-    if (isReadonlyMode) return;
     setPendingMarkInfo(info);
   };
 
@@ -471,16 +452,6 @@ function App() {
   // 处理切换 MarkPanel 折叠状态
   const handleToggleMarkPanel = () => {
     setMarkPanelCollapsed(prev => !prev);
-  };
-
-  // 处理打开发布 Drawer
-  const handleOpenPublish = () => {
-    setPublishDrawerOpen(true);
-  };
-
-  // 处理关闭发布 Drawer
-  const handleClosePublish = () => {
-    setPublishDrawerOpen(false);
   };
 
   const currentIndex = selectedFile ? fileList.indexOf(selectedFile) + 1 : 0;
@@ -495,8 +466,6 @@ function App() {
         totalFiles={fileList.length}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
-        isReadonly={isReadonlyMode}
-        onPublish={handleOpenPublish}
       />
       <Layout className="app-content-layout">
         <Sider
@@ -536,6 +505,8 @@ function App() {
             viewMode={viewMode}
             projectName={projectName}
             prototypesDir={prototypesDir}
+            wsConnected={wsConnected}
+            reloadVersion={reloadVersion}
             marks={marks}
             selectedMarkId={selectedMarkId}
             pendingMarkInfo={pendingMarkInfo}
@@ -543,7 +514,6 @@ function App() {
             onMarkSelect={handleMarkSelect}
             onMarkCancel={handleMarkCancel}
             onToggleMarkPanel={handleToggleMarkPanel}
-            isReadonly={isReadonlyMode}
           />
         </Content>
         {viewMode === 'mark' && (
@@ -567,17 +537,10 @@ function App() {
               projectName={projectName}
               filePath={selectedFile}
               prototypesDir={prototypesDir}
-              isReadonly={isReadonlyMode}
             />
           </div>
         )}
       </Layout>
-
-      <PublishDrawer
-        open={publishDrawerOpen}
-        onClose={handleClosePublish}
-        prototypes={prototypeTree}
-      />
     </Layout>
   );
 }

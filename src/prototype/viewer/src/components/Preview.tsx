@@ -11,6 +11,8 @@ interface PreviewProps {
   viewMode: ViewMode;
   projectName: string;
   prototypesDir: string;
+  wsConnected: boolean;
+  reloadVersion: number;
   marks: Mark[];
   selectedMarkId: string | null;
   pendingMarkInfo: PendingMarkInfo | null;
@@ -18,7 +20,6 @@ interface PreviewProps {
   onMarkSelect: (markId: string) => void;
   onMarkCancel: () => void;
   onToggleMarkPanel?: () => void;
-  isReadonly?: boolean;
   htmlContent?: string; // 用于发布模式的 HTML 内容
 }
 
@@ -29,6 +30,8 @@ export default function Preview({
   viewMode,
   projectName,
   prototypesDir,
+  wsConnected,
+  reloadVersion,
   marks,
   selectedMarkId,
   pendingMarkInfo,
@@ -36,10 +39,8 @@ export default function Preview({
   onMarkSelect,
   onMarkCancel,
   onToggleMarkPanel,
-  isReadonly = false
 }: PreviewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [wsConnected, setWsConnected] = useState(false);
   const [hoveredElement, setHoveredElement] = useState<{
     element: HTMLElement;
     rect: DOMRect;
@@ -49,77 +50,15 @@ export default function Preview({
   const [marksVisible, setMarksVisible] = useState(true); // 标记是否可见
 
   useEffect(() => {
-    // 只读模式下不建立 WebSocket 连接
-    if (isReadonly) return;
+    if (reloadVersion === 0 || !iframeRef.current) return;
 
-    let ws: WebSocket | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    let reconnectAttempt = 0;
-    let unmounted = false;
-
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const isDev = import.meta.env?.MODE === 'development';
-    const currentPort = parseInt(window.location.port) || 3000;
-    const port = isDev ? currentPort + 1 : currentPort;
-    const host = `${window.location.hostname}:${port}`;
-    const wsUrl = `${protocol}//${host}`;
-
-    function connect() {
-      if (unmounted) return;
-
-      ws = new WebSocket(wsUrl);
-
-      ws.onopen = () => {
-        console.log('WebSocket 已连接');
-        setWsConnected(true);
-        // 重置重连计数
-        reconnectAttempt = 0;
-      };
-
-      ws.onmessage = (event) => {
-        const message = JSON.parse(event.data);
-        if (message.type === 'reload' && iframeRef.current) {
-          console.log('收到刷新通知，重新加载预览');
-          try {
-            iframeRef.current.contentWindow?.location.reload();
-          } catch {
-            iframeRef.current.src = iframeRef.current.src;
-          }
-        }
-      };
-
-      ws.onclose = () => {
-        console.log('WebSocket 已断开');
-        setWsConnected(false);
-        ws = null;
-        // 自动重连（指数退避：1s, 2s, 4s, 8s, ... 最大 30s）
-        if (!unmounted) {
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttempt), 30000);
-          reconnectAttempt += 1;
-          console.log(`WebSocket 将在 ${delay / 1000}s 后重连（第 ${reconnectAttempt} 次尝试）`);
-          reconnectTimer = setTimeout(connect, delay);
-        }
-      };
-
-      ws.onerror = () => {
-        // onerror 总是会紧接着触发 onclose，因此重连逻辑放在 onclose 中
-        // 这里只做静默处理，避免浏览器输出无意义的错误信息
-      };
+    console.log('收到刷新通知，重新加载预览');
+    try {
+      iframeRef.current.contentWindow?.location.reload();
+    } catch {
+      iframeRef.current.src = iframeRef.current.src;
     }
-
-    connect();
-
-    return () => {
-      unmounted = true;
-      if (reconnectTimer) {
-        clearTimeout(reconnectTimer);
-      }
-      if (ws) {
-        ws.onclose = null; // 避免触发重连
-        ws.close();
-      }
-    };
-  }, []);
+  }, [reloadVersion]);
 
   // 元素检查模式和标记模式
   useEffect(() => {
@@ -491,7 +430,8 @@ export default function Preview({
     );
   }
 
-  const previewUrl = `/preview/${filePath}/index.html`;
+  const previewBasePath = import.meta.env.DEV ? '/preview' : '/prototypes';
+  const previewUrl = `${previewBasePath}/${filePath}/index.html`;
 
   return (
     <div className="preview-container">
