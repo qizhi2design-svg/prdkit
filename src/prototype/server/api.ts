@@ -104,8 +104,6 @@ export function createApiRouter(prototypesDir: string): Router {
       const protoName = Array.isArray(prototypeName) ? prototypeName[0] : prototypeName;
       const mark = req.body;
 
-      console.log('接收到的标记数据:', JSON.stringify(mark, null, 2));
-
       const marksDir = path.join(prototypesDir, protoName, 'marks');
 
       // 确保 marks 目录存在
@@ -128,15 +126,11 @@ export function createApiRouter(prototypesDir: string): Router {
         timestamp: mark.timestamp
       };
 
-      console.log('构建的 frontmatter:', JSON.stringify(frontmatter, null, 2));
-
       // 将 title 写入 markdown 正文作为 # 标题
       const descriptionWithTitle = mark.title
         ? `# ${mark.title}\n\n${mark.description || ''}`
         : (mark.description || '');
       const fileContent = matter.stringify(descriptionWithTitle, frontmatter);
-
-      console.log('生成的文件内容:', fileContent);
 
       // 保存文件
       fs.writeFileSync(markFile, fileContent, 'utf-8');
