@@ -41,13 +41,15 @@ export default function Preview({
   onToggleMarkPanel,
 }: PreviewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [hoveredElement, setHoveredElement] = useState<{
-    element: HTMLElement;
-    rect: DOMRect;
-  } | null>(null);
+  const [hoveredElement, setHoveredElement] = useState<HTMLElement | null>(null);
   const [selectionMode, setSelectionMode] = useState<'single' | 'multiple'>('single');
   const [selectedElements, setSelectedElements] = useState<SelectedElement[]>([]);
   const [marksVisible, setMarksVisible] = useState(true); // 标记是否可见
+  const [, setOverlayRefreshTick] = useState(0);
+
+  const requestOverlayRefresh = () => {
+    setOverlayRefreshTick(prev => prev + 1);
+  };
 
   useEffect(() => {
     if (reloadVersion === 0 || !iframeRef.current) return;
@@ -59,6 +61,142 @@ export default function Preview({
       iframeRef.current.src = iframeRef.current.src;
     }
   }, [reloadVersion]);
+
+  // 当预览容器、iframe 尺寸或 iframe 内部滚动/重排变化时，强制重绘 overlay
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    const container = iframe?.parentElement;
+    if (!iframe || !container) return;
+
+    let frameId: number | null = null;
+    let transitionLoopId: number | null = null;
+    let iframeObserversCleanup: (() => void) | null = null;
+
+    const scheduleRefresh = () => {
+      if (frameId !== null) return;
+      frameId = requestAnimationFrame(() => {
+        frameId = null;
+        requestOverlayRefresh();
+      });
+    };
+
+    const cleanupIframeObservers = () => {
+      if (iframeObserversCleanup) {
+        iframeObserversCleanup();
+        iframeObserversCleanup = null;
+      }
+    };
+
+    const stopTransitionLoop = () => {
+      if (transitionLoopId !== null) {
+        cancelAnimationFrame(transitionLoopId);
+        transitionLoopId = null;
+      }
+    };
+
+    const startTransitionLoop = () => {
+      if (transitionLoopId !== null) return;
+
+      const tick = () => {
+        scheduleRefresh();
+        transitionLoopId = requestAnimationFrame(tick);
+      };
+
+      tick();
+    };
+
+    const setupIframeObservers = () => {
+      cleanupIframeObservers();
+
+      const iframeWindow = iframe.contentWindow;
+      const iframeDoc = iframe.contentDocument || iframeWindow?.document;
+      if (!iframeWindow || !iframeDoc) return;
+
+      const resizeObserver = new ResizeObserver(() => {
+        scheduleRefresh();
+      });
+      resizeObserver.observe(iframeDoc.documentElement);
+      if (iframeDoc.body) {
+        resizeObserver.observe(iframeDoc.body);
+      }
+
+      const mutationObserver = new MutationObserver(() => {
+        scheduleRefresh();
+      });
+      mutationObserver.observe(iframeDoc.documentElement, {
+        attributes: true,
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
+
+      iframeWindow.addEventListener('scroll', scheduleRefresh, { passive: true });
+      iframeWindow.addEventListener('resize', scheduleRefresh);
+
+      iframeObserversCleanup = () => {
+        resizeObserver.disconnect();
+        mutationObserver.disconnect();
+        iframeWindow.removeEventListener('scroll', scheduleRefresh);
+        iframeWindow.removeEventListener('resize', scheduleRefresh);
+      };
+
+      scheduleRefresh();
+    };
+
+    const outerResizeObserver = new ResizeObserver(() => {
+      scheduleRefresh();
+    });
+    outerResizeObserver.observe(container);
+    outerResizeObserver.observe(iframe);
+
+    const transitionTargets = [
+      container,
+      iframe,
+      container.closest('.app-content') as HTMLElement | null,
+      container.closest('.app-content-layout') as HTMLElement | null,
+      container.closest('.app-layout') as HTMLElement | null,
+    ].filter((target): target is HTMLElement => Boolean(target));
+
+    const handleTransitionRun = () => {
+      startTransitionLoop();
+    };
+
+    const handleTransitionStop = () => {
+      stopTransitionLoop();
+      scheduleRefresh();
+    };
+
+    transitionTargets.forEach((target) => {
+      target.addEventListener('transitionrun', handleTransitionRun);
+      target.addEventListener('transitionstart', handleTransitionRun);
+      target.addEventListener('transitionend', handleTransitionStop);
+      target.addEventListener('transitioncancel', handleTransitionStop);
+    });
+
+    window.addEventListener('resize', scheduleRefresh);
+    window.addEventListener('scroll', scheduleRefresh, { passive: true });
+    iframe.addEventListener('load', setupIframeObservers);
+
+    setupIframeObservers();
+
+    return () => {
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
+      }
+      stopTransitionLoop();
+      cleanupIframeObservers();
+      outerResizeObserver.disconnect();
+      transitionTargets.forEach((target) => {
+        target.removeEventListener('transitionrun', handleTransitionRun);
+        target.removeEventListener('transitionstart', handleTransitionRun);
+        target.removeEventListener('transitionend', handleTransitionStop);
+        target.removeEventListener('transitioncancel', handleTransitionStop);
+      });
+      window.removeEventListener('resize', scheduleRefresh);
+      window.removeEventListener('scroll', scheduleRefresh);
+      iframe.removeEventListener('load', setupIframeObservers);
+    };
+  }, [filePath]);
 
   // 元素检查模式和标记模式
   useEffect(() => {
@@ -87,8 +225,7 @@ export default function Preview({
     const handleMouseMove = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (target && target !== iframeDoc.body && target !== iframeDoc.documentElement) {
-        const rect = target.getBoundingClientRect();
-        setHoveredElement({ element: target, rect });
+        setHoveredElement(target);
       } else {
         // 鼠标移到 body 或 documentElement 时清除高亮
         setHoveredElement(null);
@@ -576,13 +713,15 @@ export default function Preview({
         const iframe = iframeRef.current;
         if (!iframe) return null;
 
+        const hoveredRect = hoveredElement.getBoundingClientRect();
+
         // 获取 iframe 相对于外部视口的位置
         const iframeRect = iframe.getBoundingClientRect();
         const containerRect = iframe.parentElement?.getBoundingClientRect();
         if (!containerRect) return null;
 
-        const highlightLeft = hoveredElement.rect.left + iframeRect.left - containerRect.left;
-        const highlightTop = hoveredElement.rect.top + iframeRect.top - containerRect.top;
+        const highlightLeft = hoveredRect.left + iframeRect.left - containerRect.left;
+        const highlightTop = hoveredRect.top + iframeRect.top - containerRect.top;
 
         return (
           <div
@@ -590,14 +729,14 @@ export default function Preview({
             style={{
               left: highlightLeft,
               top: highlightTop,
-              width: hoveredElement.rect.width,
-              height: hoveredElement.rect.height,
+              width: hoveredRect.width,
+              height: hoveredRect.height,
             }}
           >
             <div className={`preview-highlight-tag ${viewMode === 'mark' ? 'mark-mode' : ''}`}>
-              {hoveredElement.element.tagName.toLowerCase()}
-              {hoveredElement.element.id && `#${hoveredElement.element.id}`}
-              {hoveredElement.element.className && `.${hoveredElement.element.className.split(' ')[0]}`}
+              {hoveredElement.tagName.toLowerCase()}
+              {hoveredElement.id && `#${hoveredElement.id}`}
+              {hoveredElement.className && `.${hoveredElement.className.split(' ')[0]}`}
             </div>
           </div>
         );
