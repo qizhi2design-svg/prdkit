@@ -241,7 +241,7 @@ export function registerList(program: Command): void {
           throw new Error("未找到 .prdkit/config.json，请先运行 prdkit init 初始化项目");
         }
 
-        const prototypesDir = path.join(projectRoot, "prototypes");
+        const prototypesDir = path.join(projectRoot, "workspace", "prototypes");
 
         // 如果指定了 --prototypes，列出所有原型
         if (options.prototypes) {
