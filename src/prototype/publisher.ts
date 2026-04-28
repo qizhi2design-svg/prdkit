@@ -1,8 +1,14 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import { execSync } from 'child_process';
 import matter from 'gray-matter';
+import archiver from 'archiver';
 import { scanPrototypes, flattenPrototypes, type PrototypeNode } from './server/scanner.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 interface Mark {
   id: string;
@@ -19,6 +25,7 @@ interface Mark {
 interface PublishData {
   prototypes: PrototypeNode;
   marks: Record<string, Mark[]>;
+  htmlContents: Record<string, string>; // 原型路径 -> HTML 内容
   config: {
     projectName: string;
   };
@@ -47,9 +54,22 @@ function collectPrototypeData(
     }
   }
 
+  // 收集 HTML 内容
+  const htmlContents: Record<string, string> = {};
+  for (const prototypePath of selectedPrototypes) {
+    const htmlPath = path.join(prototypesDir, prototypePath, 'index.html');
+    if (fs.existsSync(htmlPath)) {
+      let htmlContent = fs.readFileSync(htmlPath, 'utf-8');
+      // 转换资源路径为相对于根目录的路径
+      htmlContent = transformResourcePaths(htmlContent, prototypePath);
+      htmlContents[prototypePath] = htmlContent;
+    }
+  }
+
   return {
     prototypes: filteredPrototypes,
     marks,
+    htmlContents,
     config: {
       projectName
     }
@@ -86,6 +106,30 @@ function filterPrototypes(
   }
 
   return filtered;
+}
+
+/**
+ * 转换 HTML 中的资源路径为相对于根目录的路径
+ */
+function transformResourcePaths(html: string, prototypePath: string): string {
+  // 转换相对路径为绝对路径（相对于打包根目录）
+  // 例如：./assets/image.png -> prototypes/xxx/assets/image.png
+
+  // 替换 src 属性
+  html = html.replace(/src=["']\.\/([^"']+)["']/g, `src="prototypes/${prototypePath}/$1"`);
+  html = html.replace(/src=["']([^"':\/][^"']*)["']/g, `src="prototypes/${prototypePath}/$1"`);
+
+  // 替换 href 属性
+  html = html.replace(/href=["']\.\/([^"']+)["']/g, `href="prototypes/${prototypePath}/$1"`);
+  html = html.replace(/href=["']([^"':\/][^"']*)["']/g, (match, p1) => {
+    // 跳过 # 开头的锚点链接和 http(s):// 开头的外部链接
+    if (p1.startsWith('#') || p1.startsWith('http://') || p1.startsWith('https://')) {
+      return match;
+    }
+    return `href="prototypes/${prototypePath}/${p1}"`;
+  });
+
+  return html;
 }
 
 /**
@@ -138,7 +182,7 @@ async function buildReadonlyViewer(
   try {
     // 2. 执行构建
     console.log('正在构建只读版本...');
-    execSync('pnpm build:publish', {
+    execSync('npm run build:publish', {
       cwd: viewerDir,
       stdio: 'inherit'
     });
@@ -216,6 +260,49 @@ function copyDirectory(source: string, target: string): void {
 }
 
 /**
+ * 创建 ZIP 文件
+ */
+async function createZipFile(sourceDir: string, outputPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // 确保输出目录存在
+    const outputDir = path.dirname(outputPath);
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    // 如果目标文件已存在，先删除
+    if (fs.existsSync(outputPath)) {
+      fs.unlinkSync(outputPath);
+    }
+
+    // 创建输出流
+    const output = fs.createWriteStream(outputPath);
+    const archive = archiver('zip', {
+      zlib: { level: 9 } // 最高压缩级别
+    });
+
+    // 监听事件
+    output.on('close', () => {
+      console.log(`ZIP 文件已创建: ${archive.pointer()} 字节`);
+      resolve();
+    });
+
+    archive.on('error', (err) => {
+      reject(err);
+    });
+
+    // 连接输出流
+    archive.pipe(output);
+
+    // 添加目录内容到 ZIP
+    archive.directory(sourceDir, false);
+
+    // 完成打包
+    archive.finalize();
+  });
+}
+
+/**
  * 发布原型
  */
 export async function publishPrototypes(
@@ -233,21 +320,17 @@ export async function publishPrototypes(
   const data = collectPrototypeData(prototypesDir, selectedPrototypes, projectName);
 
   // 2. 构建只读版本的 viewer
-  const viewerDir = path.resolve(__dirname, '../viewer');
+  const viewerDir = path.resolve(__dirname, '../../src/prototype/viewer');
   const buildOutputDir = await buildReadonlyViewer(viewerDir, data);
 
   // 3. 复制原型文件
   console.log('复制原型文件...');
   copyPrototypeFiles(prototypesDir, selectedPrototypes, buildOutputDir);
 
-  // 4. 复制构建产物到目标路径
-  console.log('复制到目标路径...');
-  if (fs.existsSync(outputPath)) {
-    // 如果目标路径存在，先清空
-    fs.rmSync(outputPath, { recursive: true, force: true });
-  }
-  copyDirectory(buildOutputDir, outputPath);
+  // 4. 创建 ZIP 文件
+  console.log('创建 ZIP 文件...');
+  await createZipFile(buildOutputDir, outputPath);
 
   console.log('打包完成！');
-  console.log('输出目录:', outputPath);
+  console.log('输出文件:', outputPath);
 }

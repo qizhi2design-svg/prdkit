@@ -23,8 +23,21 @@ export default defineConfig({
           });
         }
       }
+    },
+    // 移除 type="module" 和 crossorigin 以支持 file:// 协议
+    {
+      name: 'remove-module-type',
+      transformIndexHtml(html) {
+        // 移除 type="module" 和 crossorigin 属性
+        return html
+          .replace(/type="module"\s+crossorigin/g, '')
+          .replace(/crossorigin\s+/g, '')
+          .replace(/\s+crossorigin/g, '');
+      }
     }
   ],
+  // 使用相对路径避免 CORS 问题
+  base: './',
   define: {
     // 注入只读模式标志
     'import.meta.env.VITE_READONLY_MODE': JSON.stringify('true')
@@ -37,11 +50,10 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
-        // 优化代码分割
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom'],
-          'antd-vendor': ['antd', '@ant-design/icons']
-        }
+        // 使用 iife 格式以支持 file:// 协议
+        format: 'iife',
+        // 单文件输出，避免 ES modules 的 CORS 问题
+        inlineDynamicImports: true
       }
     }
   }

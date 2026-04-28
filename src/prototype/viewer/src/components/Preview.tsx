@@ -19,6 +19,7 @@ interface PreviewProps {
   onMarkCancel: () => void;
   onToggleMarkPanel?: () => void;
   isReadonly?: boolean;
+  htmlContent?: string; // 用于发布模式的 HTML 内容
 }
 
 type SelectedElement = ElementInfo;

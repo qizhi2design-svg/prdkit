@@ -61,5 +61,20 @@ export const COPY = {
 
 说明：
   检查 npm 上的最新版本，如果有更新则自动安装。
+`,
+  listMarksDescription: "列出原型下的所有标记或原型列表",
+  listMarksHelpAfter: `
+示例：
+  prdkit list my-prototype                    # 列出标记（表格格式）
+  prdkit list my-prototype --format simple    # 简单列表
+  prdkit list my-prototype --format detailed  # 详细列表
+  prdkit list my-prototype --format json      # JSON 格式
+  prdkit list --prototypes                    # 列出所有原型
+  prdkit list --prototypes --format tree      # 树形格式
+
+说明：
+  列出指定原型目录下 marks 文件夹中的所有标记文件。
+  使用 --prototypes 选项可以列出所有原型。
+  支持多种输出格式：table（表格）、simple（简单列表）、detailed（详细列表）、json（JSON）、tree（树形，仅原型列表）。
 `
 } as const;

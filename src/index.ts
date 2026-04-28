@@ -10,6 +10,7 @@ import { registerDoctor } from "./commands/doctor.js";
 import { registerInit } from "./commands/init.js";
 import { registerServe } from "./commands/serve.js";
 import { registerUpdate } from "./commands/update.js";
+import { registerList } from "./commands/list.js";
 import { fail } from "./ui.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -42,6 +43,7 @@ registerCreate(program);
 registerDoctor(program);
 registerServe(program);
 registerUpdate(program);
+registerList(program);
 
 program.parseAsync(process.argv).catch((error: unknown) => {
   if (error instanceof Error && error.message.includes("force closed the prompt")) {
