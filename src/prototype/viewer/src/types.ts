@@ -15,7 +15,6 @@ export interface Mark {
   id: string;
   title: string; // 标记标题
   selector: string; // CSS 选择器，用于定位元素
-  elementInfo: string; // 元素信息（标签名、类名等）
   domPath: string; // DOM 层级路径（如 div > section > input#username）
   description: string; // Markdown 描述内容
   position: {
@@ -39,7 +38,6 @@ export interface MarksResponse {
 // 待创建标记的元素信息
 export interface PendingMarkInfo {
   selector: string;
-  elementInfo: string;
   domPath: string; // DOM 层级路径
   position: {
     x: number;

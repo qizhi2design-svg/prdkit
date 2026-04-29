@@ -1,16 +1,15 @@
 import express, { Router, Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
-import matter from 'gray-matter';
+import open from 'open';
 import { scanPrototypes } from './scanner.js';
-
-/** 从 markdown 正文中去除开头的 # Title 标题 */
-function stripMarkdownTitle(content: string): string {
-  return content.replace(/^#\s+.*(\r?\n|$)/, '').trimStart();
-}
+import { createMarkSync, deleteMarkSync, readPrototypeMarksSync, stripMarkdownTitle, updateMarkSync } from './marks.js';
+import { buildDefaultPublishDirName, publishArtifacts } from '../publisher.js';
+import { selectDirectory } from '../../system-dialog.js';
 
 export function createApiRouter(prototypesDir: string): Router {
   const router = express.Router();
+  const projectRoot = path.dirname(path.dirname(prototypesDir));
 
   // 添加 JSON 解析中间件
   router.use(express.json());
@@ -32,8 +31,6 @@ export function createApiRouter(prototypesDir: string): Router {
   // 获取项目配置
   router.get('/config', (req: Request, res: Response) => {
     try {
-      // 从 prototypesDir 向上查找 .prdkit/config.json
-      const projectRoot = path.dirname(path.dirname(prototypesDir));
       const configPath = path.join(projectRoot, '.prdkit', 'config.json');
 
       let config: any = { projectName: 'PRDKit' };
@@ -53,39 +50,130 @@ export function createApiRouter(prototypesDir: string): Router {
     }
   });
 
+  router.get('/publish/options', (req: Request, res: Response) => {
+    try {
+      const configPath = path.join(projectRoot, '.prdkit', 'config.json');
+      let projectName = 'PRDKit';
+
+      if (fs.existsSync(configPath)) {
+        const configContent = fs.readFileSync(configPath, 'utf-8');
+        const config = JSON.parse(configContent) as { projectName?: string };
+        projectName = config.projectName || projectName;
+      }
+
+      const defaultOutputRoot = path.join(projectRoot, 'dist', 'publish');
+      const suggestedArtifactName = buildDefaultPublishDirName(projectName);
+      const suggestedOutputPath = path.join(defaultOutputRoot, suggestedArtifactName);
+
+      res.json({
+        projectName,
+        defaultOutputRoot,
+        suggestedArtifactName,
+        suggestedOutputPath
+      });
+    } catch (error) {
+      console.error('读取发布配置失败:', error);
+      res.status(500).json({
+        error: '读取发布配置失败',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  router.post('/system/select-directory', async (req: Request, res: Response) => {
+    try {
+      const { defaultPath } = req.body as { defaultPath?: string };
+      const selectedPath = await selectDirectory({ defaultPath });
+      res.json({
+        success: true,
+        canceled: selectedPath === null,
+        path: selectedPath
+      });
+    } catch (error) {
+      console.error('打开目录选择器失败:', error);
+      res.status(500).json({
+        error: '打开目录选择器失败',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  router.post('/system/open-path', async (req: Request, res: Response) => {
+    try {
+      const { targetPath } = req.body as { targetPath?: string };
+
+      if (!targetPath || typeof targetPath !== 'string') {
+        return res.status(400).json({ error: '缺少 targetPath' });
+      }
+
+      await open(targetPath);
+
+      res.json({
+        success: true,
+        targetPath
+      });
+    } catch (error) {
+      console.error('打开路径失败:', error);
+      res.status(500).json({
+        error: '打开路径失败',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  router.post('/publish', async (req: Request, res: Response) => {
+    try {
+      const { outputPath, entryFiles, projectName } = req.body as {
+        outputPath?: string;
+        entryFiles?: string[];
+        projectName?: string;
+      };
+
+      if (!outputPath || typeof outputPath !== 'string') {
+        return res.status(400).json({ error: '缺少输出路径 outputPath' });
+      }
+
+      if (!Array.isArray(entryFiles) || entryFiles.length === 0) {
+        return res.status(400).json({ error: '请至少选择一个需要发布的页面' });
+      }
+
+      const configPath = path.join(projectRoot, '.prdkit', 'config.json');
+      let resolvedProjectName = projectName || 'PRDKit';
+
+      if (fs.existsSync(configPath)) {
+        const configContent = fs.readFileSync(configPath, 'utf-8');
+        const config = JSON.parse(configContent) as { projectName?: string };
+        resolvedProjectName = config.projectName || resolvedProjectName;
+      }
+
+      const result = await publishArtifacts({
+        projectRoot,
+        prototypesDir,
+        outputDir: path.resolve(outputPath),
+        projectName: resolvedProjectName,
+        entryFiles
+      });
+
+      res.json({
+        success: true,
+        outputDir: result.outputDir,
+        entryCount: result.manifest.entryFiles.length
+      });
+    } catch (error) {
+      console.error('发布产物失败:', error);
+      res.status(500).json({
+        error: '发布产物失败',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   // 获取标记列表
   router.get('/marks/:prototypeName', (req: Request, res: Response) => {
     try {
       const { prototypeName } = req.params;
       const protoName = Array.isArray(prototypeName) ? prototypeName[0] : prototypeName;
-      const marksDir = path.join(prototypesDir, protoName, 'marks');
-
-      if (!fs.existsSync(marksDir)) {
-        return res.json({ marks: [] });
-      }
-
-      // 读取所有 .md 文件
-      const files = fs.readdirSync(marksDir).filter(f => f.endsWith('.md'));
-      const marks = files.map(file => {
-        const filePath = path.join(marksDir, file);
-        const content = fs.readFileSync(filePath, 'utf-8');
-        const { data, content: description } = matter(content);
-
-        return {
-          id: data.id,
-          title: data.title || '标记',
-          selector: data.selector,
-          elementInfo: data.elementInfo,
-          domPath: data.domPath,
-          description: description.trim(),
-          position: data.position,
-          rect: data.rect,
-          timestamp: data.timestamp
-        };
-      });
-
-      // 按时间戳排序
-      marks.sort((a, b) => a.timestamp - b.timestamp);
+      const marks = readPrototypeMarksSync(prototypesDir, protoName).map(({ fileName, ...mark }) => mark);
 
       res.json({ marks });
     } catch (error) {
@@ -104,38 +192,24 @@ export function createApiRouter(prototypesDir: string): Router {
       const protoName = Array.isArray(prototypeName) ? prototypeName[0] : prototypeName;
       const mark = req.body;
 
-      const marksDir = path.join(prototypesDir, protoName, 'marks');
-
-      // 确保 marks 目录存在
-      if (!fs.existsSync(marksDir)) {
-        fs.mkdirSync(marksDir, { recursive: true });
+      if (!mark?.title || typeof mark.title !== 'string') {
+        return res.status(400).json({ error: '缺少 title' });
       }
 
-      // 创建 markdown 文件
-      const markFile = path.join(marksDir, `${mark.id}.md`);
+      if (!mark?.selector || typeof mark.selector !== 'string') {
+        return res.status(400).json({ error: '缺少 selector' });
+      }
 
-      // 构建 frontmatter
-      const frontmatter = {
-        id: mark.id,
+      const createdMark = createMarkSync(prototypesDir, protoName, {
         title: mark.title,
+        description: mark.description || '',
         selector: mark.selector,
-        elementInfo: mark.elementInfo,
         domPath: mark.domPath,
         position: mark.position,
-        rect: mark.rect,
-        timestamp: mark.timestamp
-      };
+        rect: mark.rect
+      });
 
-      // 将 title 写入 markdown 正文作为 # 标题
-      const descriptionWithTitle = mark.title
-        ? `# ${mark.title}\n\n${mark.description || ''}`
-        : (mark.description || '');
-      const fileContent = matter.stringify(descriptionWithTitle, frontmatter);
-
-      // 保存文件
-      fs.writeFileSync(markFile, fileContent, 'utf-8');
-
-      res.json({ success: true, mark });
+      res.json({ success: true, mark: createdMark });
     } catch (error) {
       console.error('创建标记失败:', error);
       res.status(500).json({
@@ -153,34 +227,16 @@ export function createApiRouter(prototypesDir: string): Router {
       const markIdStr = Array.isArray(markId) ? markId[0] : markId;
       const { title, description } = req.body;
 
-      const marksDir = path.join(prototypesDir, protoName, 'marks');
-      const markFile = path.join(marksDir, `${markIdStr}.md`);
+      const updatedMark = updateMarkSync(prototypesDir, protoName, markIdStr, {
+        title,
+        description: description === undefined ? undefined : stripMarkdownTitle(description)
+      });
 
-      if (!fs.existsSync(markFile)) {
-        return res.status(404).json({ error: '标记文件不存在' });
-      }
-
-      // 读取现有文件
-      const content = fs.readFileSync(markFile, 'utf-8');
-      const { data } = matter(content);
-
-      // 更新 title（如果提供）
-      if (title !== undefined) {
-        data.title = title;
-      }
-
-      // 将 title 写入 markdown 正文作为 # 标题
-      const finalTitle = title !== undefined ? title : (data.title || '标记');
-      const descriptionWithTitle = `# ${finalTitle}\n\n${stripMarkdownTitle(description)}`;
-
-      // 更新描述，保持其他 frontmatter 不变
-      const fileContent = matter.stringify(descriptionWithTitle, data);
-
-      // 保存文件
-      fs.writeFileSync(markFile, fileContent, 'utf-8');
-
-      res.json({ success: true });
+      res.json({ success: true, mark: updatedMark });
     } catch (error) {
+      if (error instanceof Error && error.message === '标记文件不存在') {
+        return res.status(404).json({ error: error.message });
+      }
       console.error('更新标记失败:', error);
       res.status(500).json({
         error: '更新标记失败',
@@ -195,19 +251,13 @@ export function createApiRouter(prototypesDir: string): Router {
       const { prototypeName, markId } = req.params;
       const protoName = Array.isArray(prototypeName) ? prototypeName[0] : prototypeName;
       const markIdStr = Array.isArray(markId) ? markId[0] : markId;
-
-      const marksDir = path.join(prototypesDir, protoName, 'marks');
-      const markFile = path.join(marksDir, `${markIdStr}.md`);
-
-      if (!fs.existsSync(markFile)) {
-        return res.status(404).json({ error: '标记文件不存在' });
-      }
-
-      // 删除文件
-      fs.unlinkSync(markFile);
+      deleteMarkSync(prototypesDir, protoName, markIdStr);
 
       res.json({ success: true });
     } catch (error) {
+      if (error instanceof Error && error.message === '标记文件不存在') {
+        return res.status(404).json({ error: error.message });
+      }
       console.error('删除标记失败:', error);
       res.status(500).json({
         error: '删除标记失败',

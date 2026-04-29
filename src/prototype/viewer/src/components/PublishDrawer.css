@@ -1,0 +1,253 @@
+.publish-dialog .ant-modal-content {
+  padding: 0;
+  overflow: hidden;
+  height: 620px;
+  display: flex;
+  flex-direction: column;
+}
+
+.publish-dialog .ant-modal-header {
+  margin: 0;
+  padding: 12px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fff;
+}
+
+.publish-dialog .ant-modal-title {
+  text-align: center;
+  font-weight: 700;
+  color: #1f1f1f;
+}
+
+.publish-dialog .ant-modal-body {
+  padding: 0;
+  background: #fafafa;
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.publish-dialog-layout {
+  display: flex;
+  background: #fafafa;
+  height: 100%;
+}
+
+.publish-dialog-layout.with-page-panel .publish-dialog-main {
+  width: 420px;
+  border-right: 1px solid #f0f0f0;
+}
+
+.publish-dialog-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #fafafa;
+}
+
+.publish-dialog-content {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.publish-dialog-footer {
+  padding: 16px 24px 24px;
+  background: #fafafa;
+  border-top: 1px solid #f0f0f0;
+}
+
+.publish-dialog-section + .publish-dialog-section {
+  margin-top: 22px;
+}
+
+.publish-dialog-mode-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.publish-dialog-mode-title {
+  font-size: 26px;
+  line-height: 1.15;
+  font-weight: 700;
+  color: #1f1f1f;
+}
+
+.publish-dialog-mode-subtitle {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #8c8c8c;
+}
+
+.publish-dialog-summary-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #262626;
+  font-weight: 600;
+  padding: 12px;
+}
+
+.publish-dialog-toggle-button.ant-btn {
+  border: none;
+  background: transparent;
+  color: #595959;
+  box-shadow: none;
+}
+
+.publish-dialog-toggle-button.ant-btn:hover,
+.publish-dialog-toggle-button.ant-btn:focus {
+  color: #262626;
+}
+
+.publish-dialog-toggle-button.ant-btn.ant-btn-background-ghost {
+  border-color: #d9d9d9;
+  color: #595959;
+}
+
+.publish-dialog-label {
+  display: inline-block;
+  margin-bottom: 10px;
+  font-size: 14px;
+  color: #262626 !important;
+}
+
+.publish-dialog-path-row {
+  display: flex;
+  align-items: center;
+}
+
+.publish-dialog-path-input {
+  flex: 1;
+  border-radius: 8px 0 0 8px;
+  border-right: none;
+}
+
+.publish-dialog-path-input .ant-input {
+  height: 44px;
+  border-radius: 12px;
+  font-size: 15px;
+}
+
+.publish-dialog-folder-button {
+  border-radius: 0 8px 8px 0;
+}
+
+.publish-dialog-default-link {
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #1677ff;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.publish-dialog-open-checkbox {
+  margin-bottom: 16px;
+}
+
+.publish-dialog-submit.ant-btn {
+  height: 46px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.publish-dialog-page-panel {
+  width: 560px;
+  padding: 12px;
+  background: #fff;
+}
+
+.publish-dialog-page-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.publish-dialog-page-panel-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f1f1f;
+}
+
+.publish-dialog-page-panel-subtitle {
+  font-size: 13px;
+  color: #8c8c8c;
+}
+
+.publish-dialog-page-panel-count {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #f5f5f5;
+  color: #595959;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.publish-dialog-page-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.publish-dialog-search {
+  margin-bottom: 14px;
+}
+
+.publish-dialog-search .ant-input-affix-wrapper {
+  height: 40px;
+  border-radius: 10px;
+}
+
+.publish-dialog-tree-shell {
+  min-height: 360px;
+  max-height: 460px;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid #f0f0f0;
+  border-radius: 14px;
+  background: #fafafa;
+}
+
+.publish-dialog-tree .ant-tree-treenode {
+  width: 100%;
+  padding: 2px 0;
+}
+
+.publish-dialog-tree .ant-tree-node-content-wrapper {
+  border-radius: 8px;
+}
+
+.publish-dialog-tree .ant-tree-node-content-wrapper:hover {
+  background: #f0f7ff;
+}
+
+.publish-dialog-tree .ant-tree-checkbox {
+  margin-top: 4px;
+}
+
+.publish-dialog-tree .ant-tree-title {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.publish-dialog-empty {
+  color: #8c8c8c;
+  text-align: center;
+  padding: 36px 0;
+}

@@ -1,9 +1,10 @@
-import { Layout } from 'antd';
+import { Layout, message } from 'antd';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import FileTree from './components/FileTree';
 import Preview from './components/Preview';
 import Header from './components/Header';
 import MarkPanel from './components/MarkPanel';
+import PublishDrawer from './components/PublishDrawer';
 import type { ViewMode, Mark, PendingMarkInfo, PrototypeNode } from './types';
 import './App.css';
 
@@ -43,6 +44,10 @@ function App() {
   const loadMarksRef = useRef<() => void>(() => {});
   const [wsConnected, setWsConnected] = useState(false);
   const [reloadVersion, setReloadVersion] = useState(0);
+  const [publishDrawerOpen, setPublishDrawerOpen] = useState(false);
+  const [publishLoading, setPublishLoading] = useState(false);
+  const [publishSubmitting, setPublishSubmitting] = useState(false);
+  const [defaultPublishPath, setDefaultPublishPath] = useState('');
 
   // 获取文件列表
   useEffect(() => {
@@ -414,22 +419,20 @@ function App() {
     const prototypeName = selectedFile?.split('/')[0];
     if (!prototypeName) return;
 
-    const mark: Mark = {
-      id: `mark-${Date.now()}`,
+    const markPayload = {
       title,
       ...pendingMarkInfo,
       description,
-      timestamp: Date.now(),
     };
 
     fetch(`/api/marks/${prototypeName}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(mark),
+      body: JSON.stringify(markPayload),
     })
       .then(res => res.json())
-      .then(() => {
-        setSelectedMarkId(mark.id);
+      .then((data) => {
+        setSelectedMarkId(data?.mark?.id || null);
         setPendingMarkInfo(null);
         // 重新加载标记数据以确保与文件系统同步
         loadMarks();
@@ -454,6 +457,103 @@ function App() {
     setMarkPanelCollapsed(prev => !prev);
   };
 
+  const handleOpenPublish = async () => {
+    setPublishDrawerOpen(true);
+    setPublishLoading(true);
+
+    try {
+      const response = await fetch(`/api/publish/options?t=${Date.now()}`, { cache: 'no-store' });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || '读取发布配置失败');
+      }
+
+      setDefaultPublishPath(data.suggestedOutputPath || '');
+    } catch (error) {
+      console.error('读取发布配置失败:', error);
+      message.error(error instanceof Error ? error.message : '读取发布配置失败');
+    } finally {
+      setPublishLoading(false);
+    }
+  };
+
+  const handlePublishSubmit = async ({
+    outputPath,
+    entryFiles,
+    openAfterPublish,
+  }: {
+    outputPath: string;
+    entryFiles: string[];
+    openAfterPublish: boolean;
+  }) => {
+    setPublishSubmitting(true);
+
+    try {
+      const response = await fetch('/api/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          outputPath,
+          entryFiles,
+          projectName,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || '发布失败');
+      }
+
+      if (openAfterPublish) {
+        const openResponse = await fetch('/api/system/open-path', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetPath: data.outputDir }),
+        });
+
+        if (!openResponse.ok) {
+          const openData = await openResponse.json().catch(() => null);
+          throw new Error(openData?.message || openData?.error || '发布成功，但打开输出目录失败');
+        }
+      }
+
+      message.success(`发布完成：${data.outputDir}`);
+      setPublishDrawerOpen(false);
+    } catch (error) {
+      console.error('发布失败:', error);
+      message.error(error instanceof Error ? error.message : '发布失败');
+    } finally {
+      setPublishSubmitting(false);
+    }
+  };
+
+  const handlePickPublishDirectory = async (currentOutputPath: string) => {
+    try {
+      const response = await fetch('/api/system/select-directory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaultPath: currentOutputPath || defaultPublishPath }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || '打开目录选择器失败');
+      }
+
+      if (data.canceled || !data.path) {
+        return null;
+      }
+
+      const currentName = extractPathBasename(currentOutputPath || defaultPublishPath || 'prototype-artifact');
+      return joinPathSegments(data.path, currentName);
+    } catch (error) {
+      console.error('打开目录选择器失败:', error);
+      message.error(error instanceof Error ? error.message : '打开目录选择器失败');
+      return null;
+    }
+  };
+
   const currentIndex = selectedFile ? fileList.indexOf(selectedFile) + 1 : 0;
 
   return (
@@ -466,6 +566,7 @@ function App() {
         totalFiles={fileList.length}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
+        onOpenPublish={handleOpenPublish}
       />
       <Layout className="app-content-layout">
         <Sider
@@ -541,8 +642,32 @@ function App() {
           </div>
         )}
       </Layout>
+      <PublishDrawer
+        open={publishDrawerOpen}
+        loading={publishLoading}
+        submitting={publishSubmitting}
+        projectName={projectName}
+        currentFile={selectedFile}
+        fileList={fileList}
+        defaultOutputPath={defaultPublishPath}
+        onClose={() => setPublishDrawerOpen(false)}
+        onPickOutputDirectory={handlePickPublishDirectory}
+        onSubmit={handlePublishSubmit}
+      />
     </Layout>
   );
 }
 
 export default App;
+
+function extractPathBasename(targetPath: string): string {
+  const normalized = targetPath.replace(/[\\/]+$/, '');
+  const segments = normalized.split(/[\\/]/).filter(Boolean);
+  return segments[segments.length - 1] || normalized;
+}
+
+function joinPathSegments(directoryPath: string, entryName: string): string {
+  const separator = directoryPath.includes('\\') ? '\\' : '/';
+  const trimmedPath = directoryPath.replace(/[\\/]+$/, '');
+  return `${trimmedPath}${separator}${entryName}`;
+}

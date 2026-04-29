@@ -5,12 +5,14 @@ import { fileURLToPath } from "node:url";
 import chalk from "chalk";
 import { Command } from "commander";
 import { COPY } from "./command-text.js";
-import { registerCreate } from "./commands/create.js";
 import { registerDoctor } from "./commands/doctor.js";
 import { registerInit } from "./commands/init.js";
+import { registerMark } from "./commands/mark.js";
+import { registerPrd } from "./commands/prd.js";
+import { registerPrototype } from "./commands/prototype.js";
 import { registerServe } from "./commands/serve.js";
 import { registerUpdate } from "./commands/update.js";
-import { registerList } from "./commands/list.js";
+import { registerPublish } from "./commands/publish.js";
 import { fail } from "./ui.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -39,11 +41,13 @@ program
   .addHelpText("after", `\n${COPY.rootHelpAfter.trim()}\n`);
 
 registerInit(program);
-registerCreate(program);
+registerPrd(program);
+registerPrototype(program);
+registerMark(program);
 registerDoctor(program);
 registerServe(program);
 registerUpdate(program);
-registerList(program);
+registerPublish(program);
 
 program.parseAsync(process.argv).catch((error: unknown) => {
   if (error instanceof Error && error.message.includes("force closed the prompt")) {

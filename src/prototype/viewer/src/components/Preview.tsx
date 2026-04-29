@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Empty, message, Segmented, Button } from 'antd';
+import { Empty, message, Segmented, Button, Select } from 'antd';
+import { DesktopOutlined, MobileOutlined } from '@ant-design/icons';
 import './Preview.css';
 import { getElementInfo, getElementPath, formatMultipleElementsInfo, generateUniqueSelector, type ElementInfo } from '../utils/domUtils';
 import { getModifierKey } from '../utils/platform';
@@ -24,6 +25,20 @@ interface PreviewProps {
 }
 
 type SelectedElement = ElementInfo;
+type PreviewViewport = 'desktop' | 'mobile';
+
+const VIEWPORT_DIMENSIONS: Record<PreviewViewport, { width: number; height: number }> = {
+  desktop: { width: 1440, height: 900 },
+  mobile: { width: 390, height: 844 },
+};
+
+const ZOOM_OPTIONS = [
+  { label: '50%', value: 50 },
+  { label: '75%', value: 75 },
+  { label: '100%', value: 100 },
+  { label: '125%', value: 125 },
+  { label: '150%', value: 150 },
+];
 
 export default function Preview({
   filePath,
@@ -41,32 +56,56 @@ export default function Preview({
   onToggleMarkPanel,
 }: PreviewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const [hoveredElement, setHoveredElement] = useState<HTMLElement | null>(null);
   const [selectionMode, setSelectionMode] = useState<'single' | 'multiple'>('single');
   const [selectedElements, setSelectedElements] = useState<SelectedElement[]>([]);
   const [marksVisible, setMarksVisible] = useState(true); // 标记是否可见
+  const [previewViewport, setPreviewViewport] = useState<PreviewViewport>('desktop');
+  const [zoomPercent, setZoomPercent] = useState(100);
+  const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const [, setOverlayRefreshTick] = useState(0);
+  const [iframeReloadToken, setIframeReloadToken] = useState(0);
 
   const requestOverlayRefresh = () => {
     setOverlayRefreshTick(prev => prev + 1);
   };
 
   useEffect(() => {
-    if (reloadVersion === 0 || !iframeRef.current) return;
-
+    if (reloadVersion === 0) return;
     console.log('收到刷新通知，重新加载预览');
-    try {
-      iframeRef.current.contentWindow?.location.reload();
-    } catch {
-      iframeRef.current.src = iframeRef.current.src;
-    }
+    setIframeReloadToken(Date.now());
   }, [reloadVersion]);
+
+  useEffect(() => {
+    requestOverlayRefresh();
+  }, [previewViewport, zoomPercent]);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const updateStageSize = () => {
+      setStageSize({
+        width: stage.clientWidth,
+        height: stage.clientHeight,
+      });
+    };
+
+    const resizeObserver = new ResizeObserver(updateStageSize);
+    resizeObserver.observe(stage);
+    updateStageSize();
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
 
   // 当预览容器、iframe 尺寸或 iframe 内部滚动/重排变化时，强制重绘 overlay
   useEffect(() => {
     const iframe = iframeRef.current;
-    const container = iframe?.parentElement;
-    if (!iframe || !container) return;
+    const stage = stageRef.current;
+    if (!iframe || !stage) return;
 
     let frameId: number | null = null;
     let transitionLoopId: number | null = null;
@@ -146,15 +185,15 @@ export default function Preview({
     const outerResizeObserver = new ResizeObserver(() => {
       scheduleRefresh();
     });
-    outerResizeObserver.observe(container);
+    outerResizeObserver.observe(stage);
     outerResizeObserver.observe(iframe);
 
     const transitionTargets = [
-      container,
+      stage,
       iframe,
-      container.closest('.app-content') as HTMLElement | null,
-      container.closest('.app-content-layout') as HTMLElement | null,
-      container.closest('.app-layout') as HTMLElement | null,
+      stage.closest('.app-content') as HTMLElement | null,
+      stage.closest('.app-content-layout') as HTMLElement | null,
+      stage.closest('.app-layout') as HTMLElement | null,
     ].filter((target): target is HTMLElement => Boolean(target));
 
     const handleTransitionRun = () => {
@@ -256,13 +295,11 @@ export default function Preview({
 
         // 如果没有标记，准备创建新标记
         const rect = target.getBoundingClientRect();
-        const info = getElementInfo(target, projectName, prototypesDir, filePath);
         const domPath = getElementPath(target);
 
         // 调用 onMarkPrepare 传递待创建标记信息
         onMarkPrepare({
           selector: selector,
-          elementInfo: info,
           domPath: domPath,
           position: {
             x: e.clientX,
@@ -568,7 +605,44 @@ export default function Preview({
   }
 
   const previewBasePath = import.meta.env.DEV ? '/preview' : '/prototypes';
-  const previewUrl = `${previewBasePath}/${filePath}/index.html`;
+  const previewUrl = `${previewBasePath}/${filePath}/index.html${iframeReloadToken ? `?t=${iframeReloadToken}` : ''}`;
+  const stageHasBanner = viewMode !== 'preview';
+  const viewportSize = VIEWPORT_DIMENSIONS[previewViewport];
+  const horizontalPadding = previewViewport === 'mobile' ? 64 : 48;
+  const verticalPadding = 96;
+  const availableWidth = Math.max(stageSize.width - horizontalPadding, 0);
+  const availableHeight = Math.max(stageSize.height - verticalPadding, 0);
+  const fitScale = stageSize.width && stageSize.height
+    ? Math.min(
+        availableWidth / viewportSize.width,
+        availableHeight / viewportSize.height
+      )
+    : 1;
+  const canvasScale = Math.max(fitScale, 0.1) * (zoomPercent / 100);
+  const scaledCanvasWidth = viewportSize.width * canvasScale;
+  const scaledCanvasHeight = viewportSize.height * canvasScale;
+
+  const getOverlayRect = (element: Element) => {
+    const iframe = iframeRef.current;
+    const stage = stageRef.current;
+    if (!iframe || !stage) return null;
+
+    const elementRect = element.getBoundingClientRect();
+    const iframeRect = iframe.getBoundingClientRect();
+    const stageRect = stage.getBoundingClientRect();
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    const iframeViewportWidth = iframeDoc?.documentElement.clientWidth || iframe.clientWidth || viewportSize.width;
+    const iframeViewportHeight = iframeDoc?.documentElement.clientHeight || iframe.clientHeight || viewportSize.height;
+    const scaleX = iframeViewportWidth > 0 ? iframeRect.width / iframeViewportWidth : 1;
+    const scaleY = iframeViewportHeight > 0 ? iframeRect.height / iframeViewportHeight : 1;
+
+    return {
+      left: iframeRect.left - stageRect.left + (elementRect.left * scaleX),
+      top: iframeRect.top - stageRect.top + (elementRect.top * scaleY),
+      width: elementRect.width * scaleX,
+      height: elementRect.height * scaleY,
+    };
+  };
 
   return (
     <div className="preview-container">
@@ -657,206 +731,190 @@ export default function Preview({
         </div>
       )}
 
+      <div className="preview-floating-toolbar">
+        <div className="preview-stage-toolbar-group">
+          <Segmented
+            size="small"
+            value={previewViewport}
+            onChange={(value) => setPreviewViewport(value as PreviewViewport)}
+            options={[
+              { label: 'PC端', value: 'desktop', icon: <DesktopOutlined /> },
+              { label: '移动端', value: 'mobile', icon: <MobileOutlined /> },
+            ]}
+          />
+          <Select
+            size="small"
+            value={zoomPercent}
+            onChange={setZoomPercent}
+            options={ZOOM_OPTIONS}
+            className="preview-zoom-select"
+            suffixIcon={null}
+          />
+        </div>
+      </div>
+
       {!wsConnected && (
-        <div className={`preview-ws-disconnected ${viewMode !== 'preview' ? 'with-banner' : ''}`}>
-          热更新已断开
+        <div className="preview-floating-status">
+          <div className="preview-ws-disconnected">
+            热更新已断开
+          </div>
         </div>
       )}
 
-      <iframe
-        ref={iframeRef}
-        src={previewUrl}
-        className="preview-iframe"
-        title="原型预览"
-      />
-
-      {/* 选中元素的高亮覆盖层（绿色） */}
-      {viewMode === 'inspect' && selectionMode === 'multiple' && selectedElements.map(({ element }, index) => {
-        try {
-          // 获取元素相对于 iframe 视口的位置
-          const rect = element.getBoundingClientRect();
-
-          // 检查模式提示条的高度
-          const bannerHeight = 48;
-
-          // 元素相对于 preview-container 的位置
-          // iframe 的顶部距离 preview-container 顶部是 bannerHeight
-          const left = rect.left;
-          const top = rect.top + bannerHeight;
-
-          return (
-            <div
-              key={index}
-              className="preview-highlight-overlay selected"
-              style={{
-                left: left,
-                top: top,
-                width: rect.width,
-                height: rect.height,
-              }}
-            >
-              <div className="preview-highlight-tag selected">
-                {element.tagName.toLowerCase()}
-                {element.id && `#${element.id}`}
-                {element.className && `.${element.className.split(' ')[0]}`}
-              </div>
-            </div>
-          );
-        } catch (error) {
-          console.error('Error rendering selected element:', error);
-          return null;
-        }
-      })}
-
-      {/* 悬停元素的高亮覆盖层（编辑模式：蓝色，标记模式：绿色） */}
-      {((viewMode === 'inspect') || (viewMode === 'mark' && marksVisible)) && hoveredElement && !pendingMarkInfo && (() => {
-        const iframe = iframeRef.current;
-        if (!iframe) return null;
-
-        const hoveredRect = hoveredElement.getBoundingClientRect();
-
-        // 获取 iframe 相对于外部视口的位置
-        const iframeRect = iframe.getBoundingClientRect();
-        const containerRect = iframe.parentElement?.getBoundingClientRect();
-        if (!containerRect) return null;
-
-        const highlightLeft = hoveredRect.left + iframeRect.left - containerRect.left;
-        const highlightTop = hoveredRect.top + iframeRect.top - containerRect.top;
-
-        return (
+      <div
+        ref={stageRef}
+        className={`preview-stage ${stageHasBanner ? 'with-banner' : ''} ${previewViewport}`}
+      >
+        <div
+          className="preview-canvas"
+          style={{
+            width: scaledCanvasWidth,
+            height: scaledCanvasHeight,
+          }}
+        >
           <div
-            className={`preview-highlight-overlay ${viewMode === 'mark' ? 'mark-mode' : ''}`}
+            className={`preview-frame-shell ${previewViewport}`}
             style={{
-              left: highlightLeft,
-              top: highlightTop,
-              width: hoveredRect.width,
-              height: hoveredRect.height,
+              width: viewportSize.width,
+              height: viewportSize.height,
+              transform: `scale(${canvasScale})`,
             }}
           >
-            <div className={`preview-highlight-tag ${viewMode === 'mark' ? 'mark-mode' : ''}`}>
-              {hoveredElement.tagName.toLowerCase()}
-              {hoveredElement.id && `#${hoveredElement.id}`}
-              {hoveredElement.className && `.${hoveredElement.className.split(' ')[0]}`}
-            </div>
+            <iframe
+              ref={iframeRef}
+              src={previewUrl}
+              className="preview-iframe"
+              title="原型预览"
+            />
           </div>
-        );
-      })()}
+        </div>
 
-      {/* 待创建标记的高亮框 */}
-      {viewMode === 'mark' && marksVisible && pendingMarkInfo && (() => {
-        try {
-          const iframe = iframeRef.current;
-          if (!iframe) return null;
+        {/* 选中元素的高亮覆盖层（绿色） */}
+        {viewMode === 'inspect' && selectionMode === 'multiple' && selectedElements.map(({ element }, index) => {
+          try {
+            const overlayRect = getOverlayRect(element);
+            if (!overlayRect) return null;
 
-          const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-          if (!iframeDoc) return null;
+            return (
+              <div
+                key={index}
+                className="preview-highlight-overlay selected"
+                style={overlayRect}
+              >
+                <div className="preview-highlight-tag selected">
+                  {element.tagName.toLowerCase()}
+                  {element.id && `#${element.id}`}
+                  {element.className && `.${element.className.split(' ')[0]}`}
+                </div>
+              </div>
+            );
+          } catch (error) {
+            console.error('Error rendering selected element:', error);
+            return null;
+          }
+        })}
 
-          // 通过选择器查询元素
-          const element = iframeDoc.querySelector(pendingMarkInfo.selector);
-          if (!element) return null;
-
-          // 获取元素相对于 iframe 视口的位置
-          const elementRect = element.getBoundingClientRect();
-
-          // 获取 iframe 相对于外部视口的位置
-          const iframeRect = iframe.getBoundingClientRect();
-
-          // 获取 preview-container 相对于外部视口的位置
-          const containerRect = iframe.parentElement?.getBoundingClientRect();
-          if (!containerRect) return null;
-
-          // 元素相对于外部视口的位置 = iframe位置 + 元素在iframe中的位置
-          // 高亮框相对于container的位置 = 元素相对于外部视口的位置 - container位置
-          const highlightLeft = elementRect.left + iframeRect.left - containerRect.left;
-          const highlightTop = elementRect.top + iframeRect.top - containerRect.top;
-
-          // 获取元素的 computed z-index，严格跟随元素层级
-          const computedStyle = iframeDoc.defaultView?.getComputedStyle(element);
-          const elementZIndex = computedStyle?.zIndex;
-          const zIndexValue = elementZIndex && elementZIndex !== 'auto'
-            ? parseInt(elementZIndex, 10)
-            : 1;
+        {/* 悬停元素的高亮覆盖层（编辑模式：蓝色，标记模式：绿色） */}
+        {((viewMode === 'inspect') || (viewMode === 'mark' && marksVisible)) && hoveredElement && !pendingMarkInfo && (() => {
+          const overlayRect = getOverlayRect(hoveredElement);
+          if (!overlayRect) return null;
 
           return (
             <div
-              className="preview-mark-highlight pending"
-              style={{
-                left: highlightLeft,
-                top: highlightTop,
-                width: elementRect.width,
-                height: elementRect.height,
-                zIndex: zIndexValue,
-              }}
+              className={`preview-highlight-overlay ${viewMode === 'mark' ? 'mark-mode' : ''}`}
+              style={overlayRect}
             >
-              <div className="preview-mark-number pending">
-                {marks.length + 1}
+              <div className={`preview-highlight-tag ${viewMode === 'mark' ? 'mark-mode' : ''}`}>
+                {hoveredElement.tagName.toLowerCase()}
+                {hoveredElement.id && `#${hoveredElement.id}`}
+                {hoveredElement.className && `.${hoveredElement.className.split(' ')[0]}`}
               </div>
             </div>
           );
-        } catch (error) {
-          console.error('Error rendering pending mark highlight:', error);
-          return null;
-        }
-      })()}
+        })()}
 
-      {/* 标记高亮框覆盖层 */}
-      {viewMode === 'mark' && marksVisible && marks.map((mark) => {
-        try {
-          const iframe = iframeRef.current;
-          if (!iframe) return null;
+        {/* 待创建标记的高亮框 */}
+        {viewMode === 'mark' && marksVisible && pendingMarkInfo && (() => {
+          try {
+            const iframe = iframeRef.current;
+            if (!iframe) return null;
 
-          const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-          if (!iframeDoc) return null;
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+            if (!iframeDoc) return null;
 
-          // 通过选择器查询元素
-          const element = iframeDoc.querySelector(mark.selector);
-          if (!element) return null;
+            const element = iframeDoc.querySelector(pendingMarkInfo.selector);
+            if (!element) return null;
 
-          // 获取元素相对于 iframe 视口的位置
-          const elementRect = element.getBoundingClientRect();
+            const overlayRect = getOverlayRect(element);
+            if (!overlayRect) return null;
 
-          // 获取 iframe 相对于外部视口的位置
-          const iframeRect = iframe.getBoundingClientRect();
+            const computedStyle = iframeDoc.defaultView?.getComputedStyle(element);
+            const elementZIndex = computedStyle?.zIndex;
+            const zIndexValue = elementZIndex && elementZIndex !== 'auto'
+              ? parseInt(elementZIndex, 10)
+              : 1;
 
-          // 获取 preview-container 相对于外部视口的位置
-          const containerRect = iframe.parentElement?.getBoundingClientRect();
-          if (!containerRect) return null;
-
-          // 元素相对于外部视口的位置 = iframe位置 + 元素在iframe中的位置
-          // 高亮框相对于container的位置 = 元素相对于外部视口的位置 - container位置
-          const highlightLeft = elementRect.left + iframeRect.left - containerRect.left;
-          const highlightTop = elementRect.top + iframeRect.top - containerRect.top;
-
-          // 获取元素的 computed z-index，严格跟随元素层级
-          const computedStyle = iframeDoc.defaultView?.getComputedStyle(element);
-          const elementZIndex = computedStyle?.zIndex;
-          const zIndexValue = elementZIndex && elementZIndex !== 'auto'
-            ? parseInt(elementZIndex, 10)
-            : 1;
-
-          return (
-            <div
-              key={mark.id}
-              className={`preview-mark-highlight ${selectedMarkId === mark.id ? 'selected' : ''}`}
-              style={{
-                left: highlightLeft,
-                top: highlightTop,
-                width: elementRect.width,
-                height: elementRect.height,
-                zIndex: zIndexValue,
-              }}
-              onClick={() => onMarkSelect(mark.id)}
-            >
-              <div className="preview-mark-number">
-                {marks.indexOf(mark) + 1}
+            return (
+              <div
+                className="preview-mark-highlight pending"
+                style={{
+                  ...overlayRect,
+                  zIndex: zIndexValue,
+                }}
+              >
+                <div className="preview-mark-number pending">
+                  {marks.length + 1}
+                </div>
               </div>
-            </div>
-          );
-        } catch (error) {
-          console.error('Error rendering mark:', error);
-          return null;
-        }
-      })}
+            );
+          } catch (error) {
+            console.error('Error rendering pending mark highlight:', error);
+            return null;
+          }
+        })()}
+
+        {/* 标记高亮框覆盖层 */}
+        {viewMode === 'mark' && marksVisible && marks.map((mark) => {
+          try {
+            const iframe = iframeRef.current;
+            if (!iframe) return null;
+
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+            if (!iframeDoc) return null;
+
+            const element = iframeDoc.querySelector(mark.selector);
+            if (!element) return null;
+
+            const overlayRect = getOverlayRect(element);
+            if (!overlayRect) return null;
+
+            const computedStyle = iframeDoc.defaultView?.getComputedStyle(element);
+            const elementZIndex = computedStyle?.zIndex;
+            const zIndexValue = elementZIndex && elementZIndex !== 'auto'
+              ? parseInt(elementZIndex, 10)
+              : 1;
+
+            return (
+              <div
+                key={mark.id}
+                className={`preview-mark-highlight ${selectedMarkId === mark.id ? 'selected' : ''}`}
+                style={{
+                  ...overlayRect,
+                  zIndex: zIndexValue,
+                }}
+                onClick={() => onMarkSelect(mark.id)}
+              >
+                <div className="preview-mark-number">
+                  {marks.indexOf(mark) + 1}
+                </div>
+              </div>
+            );
+          } catch (error) {
+            console.error('Error rendering mark:', error);
+            return null;
+          }
+        })}
+      </div>
     </div>
   );
 }
