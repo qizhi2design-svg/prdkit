@@ -95,6 +95,9 @@
   flex: 1;
   overflow-y: auto;
   padding: 8px;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.72) transparent;
 }
 
 .mark-list-item {
@@ -195,6 +198,33 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.72) transparent;
+}
+
+.mark-panel-content::-webkit-scrollbar,
+.mark-panel-view::-webkit-scrollbar {
+  width: 10px;
+}
+
+.mark-panel-content::-webkit-scrollbar-track,
+.mark-panel-view::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mark-panel-content::-webkit-scrollbar-thumb,
+.mark-panel-view::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.68);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.mark-panel-content::-webkit-scrollbar-thumb:hover,
+.mark-panel-view::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.86);
+  background-clip: content-box;
 }
 
 .mark-panel-view h3 {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeFileStem, suggestedFileName } from "../src/files.js";
+import { resolveOutputPath, sanitizeFileStem, suggestedFileName } from "../src/files.js";
 
 describe("files", () => {
   it("sanitizes titles into file stems", () => {
@@ -9,5 +9,17 @@ describe("files", () => {
 
   it("builds default names with template id", () => {
     expect(suggestedFileName("支付流程优化", "prd")).toBe("支付流程优化-prd.md");
+  });
+
+  it("uses folder names for directory templates", async () => {
+    const output = await resolveOutputPath({
+      cwd: "/tmp/demo",
+      dir: "workspace/prototypes",
+      title: "移动验证页",
+      templateId: "prototype-mobile",
+      isDirectoryTemplate: true
+    });
+
+    expect(output).toBe("/tmp/demo/workspace/prototypes/移动验证页");
   });
 });

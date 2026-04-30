@@ -21,6 +21,10 @@ export default defineConfig({
         target: `http://localhost:${apiPort}`,
         changeOrigin: true,
       },
+      '/checkpoint-preview': {
+        target: `http://localhost:${apiPort}`,
+        changeOrigin: true,
+      },
       // WebSocket 代理
       '/ws': {
         target: `ws://localhost:${apiPort}`,

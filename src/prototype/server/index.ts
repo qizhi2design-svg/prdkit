@@ -5,6 +5,7 @@ import path from 'path';
 import chalk from 'chalk';
 import { createApiRouter } from './api.js';
 import { createWatcher, broadcastReload } from './watcher.js';
+import { checkpointStoreRoot } from '../checkpoint/store.js';
 
 export interface ServerOptions {
   port: number;
@@ -27,6 +28,7 @@ function logConnectionStatus(count: number) {
 
 export function startServer(options: ServerOptions) {
   const { port, prototypesDir, viewerDir } = options;
+  const projectRoot = path.dirname(path.dirname(prototypesDir));
 
   const app = express();
   const server = createServer(app);
@@ -58,6 +60,8 @@ export function startServer(options: ServerOptions) {
 
   // 原型文件静态服务
   app.use('/prototypes', express.static(prototypesDir));
+  app.use('/preview', express.static(prototypesDir));
+  app.use('/checkpoint-preview', express.static(path.join(checkpointStoreRoot(projectRoot), 'previews')));
 
   // React 应用静态服务（如果提供了）
   if (viewerDir) {

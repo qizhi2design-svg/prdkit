@@ -94,24 +94,23 @@ export function updateMarkSync(
 
   const nextTitle = patch.title ?? currentTitle;
   const nextDescription = patch.description ?? currentDescription;
-
-  const nextData = compactObject({
+  const metadata = compactObject({
     ...data,
     title: nextTitle
-  });
+  }) as Record<string, unknown>;
 
   const body = buildMarkBody(nextTitle, nextDescription);
-  fs.writeFileSync(filePath, matter.stringify(body, nextData), "utf8");
+  fs.writeFileSync(filePath, matter.stringify(body, metadata), "utf8");
 
   return {
     id: markId,
     title: String(nextTitle),
-    selector: nextData.selector,
-    domPath: nextData.domPath,
+    selector: metadata.selector as string | undefined,
+    domPath: metadata.domPath as string | undefined,
     description: body.trim(),
-    position: nextData.position,
-    rect: nextData.rect,
-    timestamp: Number(nextData.timestamp || 0),
+    position: metadata.position,
+    rect: metadata.rect,
+    timestamp: Number(metadata.timestamp || 0),
     fileName: path.basename(filePath)
   };
 }

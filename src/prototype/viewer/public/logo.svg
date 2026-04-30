@@ -1,46 +1,38 @@
-<svg width="200" height="32" viewBox="0 0 200 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="90" height="32" viewBox="0 0 90 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      @font-face {
+        font-family: 'Orbitron';
+        src: url(data:font/woff2;charset=utf-8;base64,d09GMgABAAAAAAN0AA8AAAAAB0wAAAMcAAIAQgAAAAAAAAAAAAAAAAAAAAAAAAAAG3wcKgZgP1NUQVQqAFwRCAqDOIJyATYCJAMcCxAABCAFhDAHIAwHG/IFAB6D4248r7OUxWSz5O/bEWRLNrv3R+uyCl2q5R0aJMSDxxFsNxZh8bhWLEZ0yVu132fP7nuf9ghAMTlmdSwJSAF7SKKiEHUkkLrahTkdsZ7MAFix3E6gCilQViCjLu2VvhGfuJz+78LwL5oWQRpwImMNLNqLxgZMrOt8gcxBYWDZmBjgCzbobVGJ25ECDPAyFWvTc/NROqjpakGJAnwdivYbOlqQAU9QMA1BhoUEjHJRNzQXpQC3SmOI7r9U6ZHanFPpaQrS6efn99HGy/sAQJMH3E0S8pQVI2Ir3U3sYhrlCHiD+F+R/xz8ouWU350xlG/fCCBb9gLzYgjRITAlCqbFDpuauwggERCVu4kgQQFT4ghMScgUMUKH0Uj14IlM5XQSwF+Wt/JGXsstuSkXEas/PXUSpiBoASNgEJzgCtAASAznviGzEbMabaKaTQjVdOrtW+TxmzeGWuOpNeIDqwajyeVS3Uo9xF2Nb44SoOemhaIApWYbClKFUkkkIEIrmCgSyN9GbscAcfrsifJAMEwmSvbbeE7wS/TxTfS78mNCm+N3PH/EPcqhch2xCOWNsH5qRU/yvfP1XeCzDhJbXjd+6GvmwXh/uL18EfxMjj13ukyd6cDP5RxWxC7Xy55+XAr69jc0Bi3lxin7hBvff+TTOHv5dfarB4vM9+LsgCNRkJL/P72PqzKN/c1w/h1uuXG4CB+ueUsyTWqqMf+EHgwQ8GQZ614LysOP0rdKZr3xx1RJxrbYWpcoa39YylGsxC2WRUGvPEkpEv0XSwT6dYijRg/4I88hXv45jEk4cLjo8GtU2nFUDlHL1vCKbi4ChmIfoMuziDNsInchi0wkcYCpsYk18EKCwI2FJXNYiAE8sBAF4jjAnsshIRYbaJM4HHe2rZERkcxGu1hDHKIblf4W0iCGyIWIYIRmTe3oA/44ZA6eIBuyeBAPXBCDA1wxdGgLVNffqWq4J/dZUDIC44Bo+FnEqxqlYVimhsZnc+2dq5ursx1oNxgLfAtZbPJsClv9CMC7/HbKtbDEBYK6bSyIvw45cqXMAAA=) format('woff2');
+        font-weight: 800;
+        font-style: normal;
+      }
+    </style>
+  </defs>
+
   <!-- PRD 部分 - 蓝色 -->
   <text x="2" y="22"
-        font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
-        font-size="20"
-        font-weight="900"
+        font-family="'Orbitron', 'Arial Black', sans-serif"
+        font-size="22"
+        font-weight="800"
         font-style="italic"
         fill="#1890ff"
-        letter-spacing="0.5">
+        stroke="#1890ff"
+        stroke-width="0.5"
+        letter-spacing="0.6">
     PRD
   </text>
 
   <!-- kit 部分 - 黑色 -->
-  <text x="50" y="22"
-        font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
-        font-size="20"
-        font-weight="900"
+  <text x="58" y="22"
+        font-family="'Orbitron', 'Arial Black', sans-serif"
+        font-size="22"
+        font-weight="800"
         font-style="italic"
         fill="#262626"
-        letter-spacing="0.5">
+        stroke="#262626"
+        stroke-width="0.5"
+        letter-spacing="0.6">
     kit
-  </text>
-
-  <!-- Design 部分 - D 蓝色，其他黑色 -->
-  <!-- D - 蓝色 -->
-  <text x="90" y="22"
-        font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
-        font-size="20"
-        font-weight="900"
-        font-style="italic"
-        fill="#1890ff"
-        letter-spacing="0.5">
-    D
-  </text>
-
-  <!-- esign - 黑色 -->
-  <text x="106" y="22"
-        font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
-        font-size="20"
-        font-weight="900"
-        font-style="italic"
-        fill="#262626"
-        letter-spacing="0.5">
-    esign
   </text>
 </svg>

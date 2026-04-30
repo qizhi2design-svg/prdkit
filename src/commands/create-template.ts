@@ -100,6 +100,7 @@ export async function runCreateTemplate(
     });
   }
 
+  const isDirectory = await isTemplateDirectory(repoDir, template);
   const outputPath = await resolveOutputPath({
     cwd: projectRoot,
     output: options.output,
@@ -107,12 +108,12 @@ export async function runCreateTemplate(
     defaultDir: config?.defaultCreateDirs?.[template.id] ?? ".",
     title,
     templateId: template.id,
-    outputSuggestion: template.output_suggestion
+    outputSuggestion: template.output_suggestion,
+    isDirectoryTemplate: isDirectory
   });
 
   await assertFileDoesNotExist(outputPath);
 
-  const isDirectory = await isTemplateDirectory(repoDir, template);
   if (isDirectory) {
     await copyTemplateDirectory(repoDir, template, outputPath, {
       title,

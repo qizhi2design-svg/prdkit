@@ -6,6 +6,10 @@ import { scanPrototypes } from './scanner.js';
 import { createMarkSync, deleteMarkSync, readPrototypeMarksSync, stripMarkdownTitle, updateMarkSync } from './marks.js';
 import { buildDefaultPublishDirName, publishArtifacts } from '../publisher.js';
 import { selectDirectory } from '../../system-dialog.js';
+import { buildInitialCheckpointSummary, diffCheckpoints } from '../checkpoint/diff.js';
+import { findCheckpointRecord, listCheckpointRecords, readCheckpointData } from '../checkpoint/store.js';
+import { materializeCheckpointPreview } from '../checkpoint/preview.js';
+import { restoreCheckpoint } from '../checkpoint/restore.js';
 
 export function createApiRouter(prototypesDir: string): Router {
   const router = express.Router();
@@ -75,6 +79,83 @@ export function createApiRouter(prototypesDir: string): Router {
       console.error('读取发布配置失败:', error);
       res.status(500).json({
         error: '读取发布配置失败',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  router.get('/checkpoints', (req: Request, res: Response) => {
+    try {
+      const prototypePathRaw = req.query.prototypePath;
+      const prototypePath = Array.isArray(prototypePathRaw) ? prototypePathRaw[0] : prototypePathRaw;
+      const records = listCheckpointRecords(projectRoot, typeof prototypePath === 'string' && prototypePath ? prototypePath : undefined)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+      res.json({ checkpoints: records });
+    } catch (error) {
+      console.error('读取 checkpoint 列表失败:', error);
+      res.status(500).json({
+        error: '读取 checkpoint 列表失败',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  router.get('/checkpoints/:checkpointId', async (req: Request, res: Response) => {
+    try {
+      const checkpointId = Array.isArray(req.params.checkpointId) ? req.params.checkpointId[0] : req.params.checkpointId;
+      const record = findCheckpointRecord(projectRoot, checkpointId);
+      if (!record) {
+        return res.status(404).json({ error: 'checkpoint 不存在' });
+      }
+
+      const data = readCheckpointData(projectRoot, checkpointId);
+      const summary = record.baseCheckpointId
+        ? diffCheckpoints(projectRoot, record.baseCheckpointId, checkpointId)
+        : buildInitialCheckpointSummary(checkpointId, data.files, data.marks);
+      await materializeCheckpointPreview(projectRoot, checkpointId);
+
+      res.json({
+        checkpoint: data.manifest,
+        files: data.files,
+        marks: data.marks,
+        summary,
+        previewUrl: `/checkpoint-preview/${encodeURIComponent(checkpointId)}/index.html`
+      });
+    } catch (error) {
+      console.error('读取 checkpoint 详情失败:', error);
+      res.status(500).json({
+        error: '读取 checkpoint 详情失败',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  router.post('/checkpoints/:checkpointId/restore', async (req: Request, res: Response) => {
+    try {
+      const checkpointId = Array.isArray(req.params.checkpointId) ? req.params.checkpointId[0] : req.params.checkpointId;
+      const { force } = req.body as { force?: boolean };
+      const result = await restoreCheckpoint({
+        projectRoot,
+        prototypesDir,
+        checkpointId,
+        force: Boolean(force)
+      });
+
+      res.json({
+        success: true,
+        restoredTo: result.target.id,
+        prototypePath: result.target.prototypePath,
+        preRestore: result.preRestore.id,
+        summary: result.summary
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('未归档变更')) {
+        return res.status(409).json({ error: error.message });
+      }
+      console.error('还原 checkpoint 失败:', error);
+      res.status(500).json({
+        error: '还原 checkpoint 失败',
         message: error instanceof Error ? error.message : String(error)
       });
     }

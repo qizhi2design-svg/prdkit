@@ -22,6 +22,8 @@ interface PreviewProps {
   onMarkCancel: () => void;
   onToggleMarkPanel?: () => void;
   htmlContent?: string; // 用于发布模式的 HTML 内容
+  previewUrlOverride?: string | null;
+  previewReadonly?: boolean;
 }
 
 type SelectedElement = ElementInfo;
@@ -54,6 +56,8 @@ export default function Preview({
   onMarkSelect,
   onMarkCancel,
   onToggleMarkPanel,
+  previewUrlOverride = null,
+  previewReadonly = false,
 }: PreviewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -293,6 +297,11 @@ export default function Preview({
           return;
         }
 
+        if (previewReadonly) {
+          message.info('历史版本预览中不可新增标记，请先还原到该版本');
+          return;
+        }
+
         // 如果没有标记，准备创建新标记
         const rect = target.getBoundingClientRect();
         const domPath = getElementPath(target);
@@ -372,7 +381,7 @@ export default function Preview({
         currentCleanup();
       }
     };
-  }, [viewMode, filePath, projectName, prototypesDir, selectionMode, marksVisible, onMarkPrepare]);
+  }, [viewMode, filePath, projectName, prototypesDir, selectionMode, marksVisible, onMarkPrepare, previewReadonly, marks, onMarkSelect]);
 
   // 清理选中元素（当切换模式时）
   useEffect(() => {
@@ -605,7 +614,9 @@ export default function Preview({
   }
 
   const previewBasePath = import.meta.env.DEV ? '/preview' : '/prototypes';
-  const previewUrl = `${previewBasePath}/${filePath}/index.html${iframeReloadToken ? `?t=${iframeReloadToken}` : ''}`;
+  const previewUrl = previewUrlOverride
+    ? `${previewUrlOverride}${iframeReloadToken ? `${previewUrlOverride.includes('?') ? '&' : '?'}t=${iframeReloadToken}` : ''}`
+    : `${previewBasePath}/${filePath}/index.html${iframeReloadToken ? `?t=${iframeReloadToken}` : ''}`;
   const stageHasBanner = viewMode !== 'preview';
   const viewportSize = VIEWPORT_DIMENSIONS[previewViewport];
   const horizontalPadding = previewViewport === 'mobile' ? 64 : 48;
@@ -703,7 +714,9 @@ export default function Preview({
       {viewMode === 'mark' && (
         <div className="preview-inspect-banner mark-mode">
           <span className="preview-inspect-banner-text">
-            {marksVisible ? '点击页面元素创建标记' : '预览模式（标记已隐藏）'}
+            {previewReadonly
+              ? (marksVisible ? '历史版本预览中，仅支持查看标记' : '历史版本预览中（标记已隐藏）')
+              : (marksVisible ? '点击页面元素创建标记' : '预览模式（标记已隐藏）')}
             {marks.length > 0 && marksVisible && (
               <>
                 <Hotkey keys={['↑']} description="上一个" />

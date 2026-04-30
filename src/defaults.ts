@@ -17,7 +17,9 @@ export function createDefaultConfig(
     templateRepo: templateRepo ?? DEFAULT_TEMPLATE_REPO,
     defaultCreateDirs: {
       prd: "workspace/prds",
-      prototype: "workspace/prototypes"
+      prototype: "workspace/prototypes",
+      "prototype-mobile": "workspace/prototypes",
+      "prototype-admin": "workspace/prototypes"
     }
   };
 }

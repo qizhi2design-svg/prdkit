@@ -84,23 +84,21 @@ describe("Marks API - title 写入 markdown", () => {
 
   it("POST 创建标记时 title 应写入 markdown 正文 # 标题", async () => {
     const mark = {
-      id: "mark-test001",
       title: "登录按钮优化",
       selector: "button.login",
-      elementInfo: "button.login",
       domPath: "body > button.login",
       description: "这是描述内容，支持 **Markdown**。",
       position: { x: 100, y: 200 },
-      rect: { top: 200, left: 100, width: 80, height: 40 },
-      timestamp: 1234567890,
+      rect: { top: 200, left: 100, width: 80, height: 40 }
     };
 
     const res = await makeRequest(app, "POST", "/api/marks/test-proto", mark);
     expect(res.status).toBe(200);
     expect(res.data.success).toBe(true);
+    expect(res.data.mark.id).toMatch(/^mark-\d+$/);
 
     // 检查磁盘文件
-    const fileContent = readMarkFile("test-proto", "mark-test001");
+    const fileContent = readMarkFile("test-proto", res.data.mark.id);
     console.log("=== POST 生成的文件内容 ===");
     console.log(fileContent);
     console.log("=========================");
@@ -116,15 +114,12 @@ describe("Marks API - title 写入 markdown", () => {
   it("GET 读取标记应返回 frontmatter 中的 title", async () => {
     // 先创建
     const mark = {
-      id: "mark-test002",
       title: "导航栏样式",
       selector: ".navbar",
-      elementInfo: "nav.navbar",
       domPath: "body > nav.navbar",
       description: "需要调整间距。",
       position: { x: 50, y: 50 },
-      rect: { top: 50, left: 50, width: 300, height: 60 },
-      timestamp: 1234567891,
+      rect: { top: 50, left: 50, width: 300, height: 60 }
     };
     await makeRequest(app, "POST", "/api/marks/test-proto2", mark);
 
@@ -148,27 +143,25 @@ describe("Marks API - title 写入 markdown", () => {
   it("PUT 更新标记时 title 应同步更新 markdown 正文 # 标题", async () => {
     // 先创建
     const mark = {
-      id: "mark-test003",
       title: "原始标题",
       selector: ".old",
-      elementInfo: "div.old",
       domPath: "body > div.old",
       description: "原始描述。",
       position: { x: 10, y: 10 },
-      rect: { top: 10, left: 10, width: 50, height: 30 },
-      timestamp: 1234567892,
+      rect: { top: 10, left: 10, width: 50, height: 30 }
     };
-    await makeRequest(app, "POST", "/api/marks/test-proto3", mark);
+    const createRes = await makeRequest(app, "POST", "/api/marks/test-proto3", mark);
+    const markId = createRes.data.mark.id;
 
     // 更新 title 和 description
-    const updateRes = await makeRequest(app, "PUT", "/api/marks/test-proto3/mark-test003", {
+    const updateRes = await makeRequest(app, "PUT", `/api/marks/test-proto3/${markId}`, {
       title: "更新后的标题",
       description: "更新后的描述，有 **新内容**。",
     });
     expect(updateRes.status).toBe(200);
 
     // 检查磁盘文件
-    const fileContent = readMarkFile("test-proto3", "mark-test003");
+    const fileContent = readMarkFile("test-proto3", markId);
     console.log("=== PUT 更新后的文件内容 ===");
     console.log(fileContent);
     console.log("===========================");

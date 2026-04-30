@@ -216,6 +216,11 @@ export default function FileTree({ onSelect, selectedFile, onNavigate }: FileTre
           selectedKeys={selectedFile ? [selectedFile] : []}
         />
       </div>
+
+      <div className="file-tree-brand">
+        <span className="file-tree-brand-label">Powered by</span>
+        <img src="/logo.svg" alt="PRDKit Design" className="file-tree-brand-logo" />
+      </div>
     </div>
   );
 }

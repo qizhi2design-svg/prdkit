@@ -84,6 +84,28 @@
   padding: 8px 4px;
 }
 
+.file-tree-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px;
+  border-top: 1px solid #f0f0f0;
+  background: #fff;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.file-tree-brand-label {
+  color: #8c8c8c;
+  white-space: nowrap;
+}
+
+.file-tree-brand-logo {
+  height: 20px;
+  width: auto;
+  flex-shrink: 0;
+}
+
 .file-tree-node-title {
   max-width: 200px;
   overflow: hidden;

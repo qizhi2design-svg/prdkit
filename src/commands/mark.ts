@@ -87,7 +87,12 @@ function buildRect(options: {
   if (values.some((value) => value === undefined)) {
     throw new Error("--top、--left、--width、--height 需要同时提供");
   }
-  return { top, left, width, height };
+  return {
+    top: top as number,
+    left: left as number,
+    width: width as number,
+    height: height as number
+  };
 }
 
 function formatMarks(marks: ReturnType<typeof readPrototypeMarksSync>): string {

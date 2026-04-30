@@ -4,7 +4,7 @@ export const COPY = {
 常用流程
   1. prdkit init ./my-product --name "My Product" --author "Alice"
   2. prdkit prd create "支付流程优化"
-  3. prdkit prototype create "首页原型"
+  3. prdkit prototype create "首页原型" --template mobile
   4. prdkit mark list --prototype dashboard
 `,
   initDescription: "初始化产品项目",
@@ -21,6 +21,7 @@ export const COPY = {
 示例：
   prdkit create "支付流程优化" --template prd
   prdkit create "首页原型" --template prototype --dir ./workspace/prototypes
+  prdkit create "工作台" --template prototype-admin --dir ./workspace/prototypes
   prdkit create --template prd --non-interactive --name "My Product" --author "Alice" "结算改版"
 
 说明：
@@ -42,10 +43,12 @@ export const COPY = {
   prototypeCreateHelpAfter: `
 示例：
   prdkit prototype create "首页原型"
-  prdkit prototype create "登录页" --dir ./workspace/prototypes
+  prdkit prototype create "移动首页" --template mobile
+  prdkit prototype create "运营后台" --template admin --dir ./workspace/prototypes
 
 说明：
-  默认使用 prototype 模板创建内容，输出目录默认来自项目配置中的 workspace/prototypes。
+  默认使用 web 原型模板创建内容，输出目录默认来自项目配置中的 workspace/prototypes。
+  可通过 --template 选择 web、mobile、admin 三种原型骨架。
 `,
   prototypeListDescription: "列出当前项目中的所有原型",
   prototypeListHelpAfter: `
@@ -56,6 +59,109 @@ export const COPY = {
 说明：
   输出 workspace/prototypes 下的所有原型入口页面路径。
 `,
+  checkpointDescription: "checkpoint 存储、对比与恢复",
+  checkpointCreateDescription: "为指定原型创建 checkpoint",
+  checkpointCreateHelpAfter: `
+示例：
+  prdkit checkpoint create dashboard
+  prdkit checkpoint create dashboard --message "首页导航改版"
+
+说明：
+  手动创建一个 checkpoint。
+  如果内容与最近一次 checkpoint 完全一致，则不会重复创建。
+`,
+  checkpointSessionDescription: "管理手动 checkpoint session",
+  checkpointSessionStartDescription: "启动一个手动 session",
+  checkpointSessionStartHelpAfter: `
+示例：
+  prdkit checkpoint session start
+  prdkit checkpoint session start --name "AI 改版第 1 轮"
+
+说明：
+  记录当前进行中的手动 session。
+  不会自动创建 checkpoint，需在合适时机执行 checkpoint create。
+`,
+  checkpointSessionStatusDescription: "查看当前 session 状态",
+  checkpointSessionStatusHelpAfter: `
+示例：
+  prdkit checkpoint session status
+
+说明：
+  查看当前是否存在进行中的手动 session。
+`,
+  checkpointSessionEndDescription: "结束当前手动 session",
+  checkpointSessionEndHelpAfter: `
+示例：
+  prdkit checkpoint session end
+
+说明：
+  只结束 session 状态，不会自动创建 checkpoint。
+  如需保存版本，请先执行 checkpoint create。
+`,
+  checkpointListDescription: "列出 checkpoint 时间线",
+  checkpointListHelpAfter: `
+示例：
+  prdkit checkpoint list
+  prdkit checkpoint list dashboard --json
+
+说明：
+  可按原型筛选，也可查看整个项目下已记录的 checkpoint。
+`,
+  checkpointShowDescription: "查看单个 checkpoint 详情",
+  checkpointShowHelpAfter: `
+示例：
+  prdkit checkpoint show manual-2026-04-30T00-00-00-000Z-ab12cd
+
+说明：
+  展示 checkpoint 的元信息、文件数与标记数。
+`,
+  checkpointDiffDescription: "对比两个 checkpoint 的结构化差异",
+  checkpointDiffHelpAfter: `
+示例：
+  prdkit checkpoint diff checkpoint-a checkpoint-b
+  prdkit checkpoint diff checkpoint-a checkpoint-b --json
+
+说明：
+  输出新增/修改/删除文件，以及标记的新增/更新/删除摘要。
+`,
+  checkpointPreviewDescription: "生成 checkpoint 的可访问预览目录",
+  checkpointPreviewHelpAfter: `
+示例：
+  prdkit checkpoint preview checkpoint-a
+  prdkit checkpoint preview checkpoint-a --open
+
+说明：
+  将 checkpoint 版本还原到 .prdkit/checkpoints/previews/<checkpoint-id>/ 下。
+  适合在本地直接打开该历史版本页面进行检查。
+`,
+  checkpointRestoreDescription: "恢复到指定 checkpoint",
+  checkpointRestoreHelpAfter: `
+示例：
+  prdkit checkpoint restore checkpoint-a
+  prdkit checkpoint restore checkpoint-a --force
+
+说明：
+  默认遇到未归档变更会停止。
+  使用 --force 时会先创建 pre-restore checkpoint 再恢复。
+`,
+  checkpointStatusDescription: "查看工作区相对最近 checkpoint 的状态",
+  checkpointStatusHelpAfter: `
+示例：
+  prdkit checkpoint status
+  prdkit checkpoint status dashboard --json
+
+说明：
+  输出当前原型是否为 dirty，以及文件和标记层面的变化摘要。
+`,
+  checkpointPruneDescription: "清理超出保留上限的自动 checkpoint",
+  checkpointPruneHelpAfter: `
+示例：
+  prdkit checkpoint prune
+  prdkit checkpoint prune dashboard
+
+说明：
+  清理历史遗留的 auto checkpoint，不会删除 manual 或 pre-restore。
+`,
   initProjectNameMessage: "输入项目名称",
   initAuthorMessage: "输入作者名称",
   createTemplateMessage: "选择要创建的模板",
@@ -64,7 +170,7 @@ export const COPY = {
   nonInteractiveTemplateRequired: "--non-interactive 模式下必须通过 --template 指定模板 ID",
   nonInteractiveTitleRequired: "--non-interactive 模式下必须提供标题参数",
   targetNotEmpty: "目标目录包含非骨架文件，初始化可能覆盖现有内容",
-  createNextStep: "下一步：执行 prdkit create --template <id> <title> 创建文档",
+  createNextStep: "下一步：执行 prdkit prd create <标题> 或 prdkit prototype create <标题> 开始产出内容",
   doctorDescription: "检查并修复项目问题",
   doctorHelpAfter: `
 示例：
@@ -83,6 +189,7 @@ export const COPY = {
 
 说明：
   启动本地预览服务器，支持实时预览和热更新。
+  文件监听不会自动创建 checkpoint，版本需手动提交。
   自动选择可用端口并打开浏览器。
 `,
   publishDescription: "导出 publish 协议产物目录",

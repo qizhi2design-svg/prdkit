@@ -5,7 +5,8 @@ import Preview from './components/Preview';
 import Header from './components/Header';
 import MarkPanel from './components/MarkPanel';
 import PublishDrawer from './components/PublishDrawer';
-import type { ViewMode, Mark, PendingMarkInfo, PrototypeNode } from './types';
+import HistoryDrawer from './components/HistoryDrawer';
+import type { ActiveCheckpointPreview, ViewMode, Mark, PendingMarkInfo, PrototypeNode, CheckpointDetail } from './types';
 import './App.css';
 
 const { Sider, Content } = Layout;
@@ -48,6 +49,12 @@ function App() {
   const [publishLoading, setPublishLoading] = useState(false);
   const [publishSubmitting, setPublishSubmitting] = useState(false);
   const [defaultPublishPath, setDefaultPublishPath] = useState('');
+  const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
+  const [activeCheckpointPreview, setActiveCheckpointPreview] = useState<ActiveCheckpointPreview | null>(null);
+  const currentPrototypePath = selectedFile;
+  const effectiveMarks = activeCheckpointPreview?.prototypePath === currentPrototypePath
+    ? activeCheckpointPreview.marks
+    : marks;
 
   // 获取文件列表
   useEffect(() => {
@@ -240,14 +247,11 @@ function App() {
 
   // 加载标记数据的函数
   const loadMarks = useCallback(async () => {
-    if (!selectedFile || viewMode !== 'mark') return;
-
-    // 从文件路径提取原型名称（例如：dashboard/index.html -> dashboard）
-    const prototypeName = selectedFile.split('/')[0];
+    if (!currentPrototypePath || viewMode !== 'mark') return;
 
     try {
       // 从 API 加载
-      const response = await fetch(`/api/marks/${prototypeName}?t=${Date.now()}`, {
+      const response = await fetch(`/api/marks/${encodeURIComponent(currentPrototypePath)}?t=${Date.now()}`, {
         cache: 'no-store'
       });
       const data = await response.json();
@@ -256,7 +260,7 @@ function App() {
       console.error('加载标记失败:', error);
       setMarks([]);
     }
-  }, [selectedFile, viewMode]);
+  }, [currentPrototypePath, viewMode]);
 
   useEffect(() => {
     loadMarksRef.current = loadMarks;
@@ -344,6 +348,7 @@ function App() {
   useEffect(() => {
     setSelectedMarkId(null);
     setPendingMarkInfo(null);
+    setActiveCheckpointPreview(null);
   }, [selectedFile]);
 
   // 处理 MarkPanel 折叠状态变化
@@ -374,10 +379,13 @@ function App() {
 
   // 处理标记更新
   const handleMarkUpdate = (markId: string, title: string, description: string) => {
-    const prototypeName = selectedFile?.split('/')[0];
-    if (!prototypeName) return;
+    if (activeCheckpointPreview) {
+      message.info('历史版本预览中不可编辑标记，请先还原到该版本');
+      return;
+    }
+    if (!currentPrototypePath) return;
 
-    fetch(`/api/marks/${prototypeName}/${markId}`, {
+    fetch(`/api/marks/${encodeURIComponent(currentPrototypePath)}/${markId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, description }),
@@ -394,10 +402,13 @@ function App() {
 
   // 处理标记删除
   const handleMarkDelete = (markId: string) => {
-    const prototypeName = selectedFile?.split('/')[0];
-    if (!prototypeName) return;
+    if (activeCheckpointPreview) {
+      message.info('历史版本预览中不可删除标记，请先还原到该版本');
+      return;
+    }
+    if (!currentPrototypePath) return;
 
-    fetch(`/api/marks/${prototypeName}/${markId}`, {
+    fetch(`/api/marks/${encodeURIComponent(currentPrototypePath)}/${markId}`, {
       method: 'DELETE',
     })
       .then(() => {
@@ -415,9 +426,11 @@ function App() {
   // 处理新增标记
   const handleMarkCreate = (title: string, description: string) => {
     if (!pendingMarkInfo) return;
-
-    const prototypeName = selectedFile?.split('/')[0];
-    if (!prototypeName) return;
+    if (activeCheckpointPreview) {
+      message.info('历史版本预览中不可新增标记，请先还原到该版本');
+      return;
+    }
+    if (!currentPrototypePath) return;
 
     const markPayload = {
       title,
@@ -425,7 +438,7 @@ function App() {
       description,
     };
 
-    fetch(`/api/marks/${prototypeName}`, {
+    fetch(`/api/marks/${encodeURIComponent(currentPrototypePath)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(markPayload),
@@ -554,6 +567,54 @@ function App() {
     }
   };
 
+  const handleCheckpointPreview = (detail: CheckpointDetail) => {
+    if (!detail.previewUrl) {
+      message.error('该 checkpoint 暂时无法预览');
+      return;
+    }
+
+    setActiveCheckpointPreview({
+      checkpointId: detail.checkpoint.id,
+      prototypePath: detail.checkpoint.prototypePath,
+      previewUrl: detail.previewUrl,
+      marks: detail.marks || [],
+      message: detail.checkpoint.message
+    });
+    setSelectedMarkId(null);
+    setPendingMarkInfo(null);
+    message.success(`已切换到 checkpoint 预览：${detail.checkpoint.id}`);
+  };
+
+  const handleCheckpointRestore = async (detail: CheckpointDetail) => {
+    try {
+      const response = await fetch(`/api/checkpoints/${encodeURIComponent(detail.checkpoint.id)}/restore`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: true }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || '还原失败');
+      }
+
+      setActiveCheckpointPreview(null);
+      setSelectedMarkId(null);
+      setPendingMarkInfo(null);
+      setReloadVersion(prev => prev + 1);
+      await loadMarks();
+      message.success(`已还原到 checkpoint：${detail.checkpoint.id}`);
+    } catch (error) {
+      console.error('还原 checkpoint 失败:', error);
+      message.error(error instanceof Error ? error.message : '还原 checkpoint 失败');
+    }
+  };
+
+  const handleExitCheckpointPreview = () => {
+    setActiveCheckpointPreview(null);
+    message.info('已返回当前工作区版本');
+  };
+
   const currentIndex = selectedFile ? fileList.indexOf(selectedFile) + 1 : 0;
 
   return (
@@ -567,6 +628,8 @@ function App() {
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         onOpenPublish={handleOpenPublish}
+        onOpenHistory={() => setHistoryDrawerOpen(true)}
+        historyDisabled={!currentPrototypePath}
       />
       <Layout className="app-content-layout">
         <Sider
@@ -608,13 +671,15 @@ function App() {
             prototypesDir={prototypesDir}
             wsConnected={wsConnected}
             reloadVersion={reloadVersion}
-            marks={marks}
+            marks={effectiveMarks}
             selectedMarkId={selectedMarkId}
             pendingMarkInfo={pendingMarkInfo}
             onMarkPrepare={handleMarkPrepare}
             onMarkSelect={handleMarkSelect}
             onMarkCancel={handleMarkCancel}
             onToggleMarkPanel={handleToggleMarkPanel}
+            previewUrlOverride={activeCheckpointPreview?.prototypePath === currentPrototypePath ? activeCheckpointPreview.previewUrl : null}
+            previewReadonly={Boolean(activeCheckpointPreview && activeCheckpointPreview.prototypePath === currentPrototypePath)}
           />
         </Content>
         {viewMode === 'mark' && (
@@ -624,7 +689,7 @@ function App() {
               className={`app-resize-handle mark-panel-resize ${isResizingMarkPanel ? 'resizing' : ''}`}
             />
             <MarkPanel
-              marks={marks}
+              marks={effectiveMarks}
               selectedMarkId={selectedMarkId}
               pendingMarkInfo={pendingMarkInfo}
               onMarkSelect={handleMarkSelect}
@@ -653,6 +718,15 @@ function App() {
         onClose={() => setPublishDrawerOpen(false)}
         onPickOutputDirectory={handlePickPublishDirectory}
         onSubmit={handlePublishSubmit}
+      />
+      <HistoryDrawer
+        open={historyDrawerOpen}
+        prototypePath={currentPrototypePath}
+        onClose={() => setHistoryDrawerOpen(false)}
+        activeCheckpointId={activeCheckpointPreview?.checkpointId ?? null}
+        onPreview={handleCheckpointPreview}
+        onRestore={handleCheckpointRestore}
+        onExitPreview={handleExitCheckpointPreview}
       />
     </Layout>
   );

@@ -1,4 +1,5 @@
 import { Command } from 'commander';
+import { spawn } from 'node:child_process';
 import path from 'path';
 import { loadConfig } from '../config.js';
 import { startServer } from '../prototype/server/index.js';
@@ -38,15 +39,50 @@ export function registerServe(program: Command) {
       const prototypesDir = path.join(process.cwd(), 'workspace', 'prototypes');
 
       try {
-        // `serve --dev` 保持与普通 `serve` 一致的 viewer UI，
-        // 仅通过文件监听提供原型内容热更新。
-        const viewerDir = path.join(path.dirname(new URL(import.meta.url).pathname), '../viewer');
+        if (options.dev) {
+          const apiPort = port + 1;
+          startServer({
+            port: apiPort,
+            prototypesDir
+          });
 
-        startServer({
-          port,
-          prototypesDir,
-          viewerDir
-        });
+          const viewerDir = path.join(path.dirname(new URL(import.meta.url).pathname), '../../src/prototype/viewer');
+          const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+          const viteProcess = spawn(
+            pnpmCommand,
+            ['exec', 'vite', '--port', String(port)],
+            {
+              cwd: viewerDir,
+              env: {
+                ...process.env,
+                API_PORT: String(apiPort)
+              },
+              stdio: 'inherit'
+            }
+          );
+
+          viteProcess.on('error', (error) => {
+            console.error(error);
+            process.exit(1);
+          });
+
+          const shutdownVite = () => {
+            if (!viteProcess.killed) {
+              viteProcess.kill('SIGTERM');
+            }
+          };
+
+          process.on('SIGINT', shutdownVite);
+          process.on('SIGTERM', shutdownVite);
+        } else {
+          const viewerDir = path.join(path.dirname(new URL(import.meta.url).pathname), '../viewer');
+
+          startServer({
+            port,
+            prototypesDir,
+            viewerDir
+          });
+        }
 
         // 自动打开浏览器
         if (options.open) {

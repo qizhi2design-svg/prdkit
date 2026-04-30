@@ -45,9 +45,12 @@ export async function resolveOutputPath(options: {
   title: string;
   templateId: string;
   outputSuggestion?: string;
+  isDirectoryTemplate?: boolean;
 }): Promise<string> {
   const cwd = options.cwd ?? process.cwd();
-  const defaultName = suggestedFileName(options.title, options.templateId);
+  const defaultName = options.isDirectoryTemplate
+    ? sanitizeFileStem(options.title)
+    : suggestedFileName(options.title, options.templateId);
 
   if (options.output) {
     const resolved = path.resolve(cwd, options.output);

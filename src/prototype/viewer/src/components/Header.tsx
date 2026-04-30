@@ -1,4 +1,4 @@
-import { MenuFoldOutlined, MenuUnfoldOutlined, FileOutlined } from '@ant-design/icons';
+import { MenuFoldOutlined, MenuUnfoldOutlined, FileOutlined, CaretRightOutlined, HistoryOutlined } from '@ant-design/icons';
 import { Button, Tooltip, Segmented } from 'antd';
 import type { ViewMode } from '../types';
 import './Header.css';
@@ -11,9 +11,12 @@ interface HeaderProps {
   totalFiles: number;
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
+  onOpenPublish: () => void;
+  onOpenHistory: () => void;
+  historyDisabled?: boolean;
 }
 
-export default function Header({ collapsed, onToggle, currentFile, currentIndex, totalFiles, viewMode, onViewModeChange }: HeaderProps) {
+export default function Header({ collapsed, onToggle, currentFile, currentIndex, totalFiles, viewMode, onViewModeChange, onOpenPublish, onOpenHistory, historyDisabled = false }: HeaderProps) {
   // 从路径中提取文件名（去掉父级目录）
   const getFileName = (path: string | null) => {
     if (!path) return null;
@@ -63,7 +66,19 @@ export default function Header({ collapsed, onToggle, currentFile, currentIndex,
         className="header-mode-segmented"
       />
 
-      <img src="/logo.svg" alt="PRDKit" className="header-logo" />
+      <div className="header-actions">
+        <Button
+          className="header-history-button"
+          icon={<HistoryOutlined />}
+          onClick={onOpenHistory}
+          disabled={historyDisabled}
+        >
+          历史记录
+        </Button>
+        <Button color="primary" variant="solid" icon={<CaretRightOutlined />} iconPosition="end" onClick={onOpenPublish}>
+          发布项目
+        </Button>
+      </div>
     </div>
   );
 }

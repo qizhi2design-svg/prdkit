@@ -65,8 +65,7 @@ export default function MarkPanel({
 
         // 构建标记文件的绝对路径
         if (filePath && prototypesDir) {
-          const prototypeName = filePath.split('/')[0];
-          markFilePath = `${prototypesDir}/${prototypeName}/marks/${selectedMarkId}.md`;
+          markFilePath = `${prototypesDir}/${filePath}/marks/${selectedMarkId}.md`;
         }
       }
     }
