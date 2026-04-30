@@ -14,6 +14,7 @@ import { registerServe } from "./commands/serve.js";
 import { registerUpdate } from "./commands/update.js";
 import { registerPublish } from "./commands/publish.js";
 import { registerCheckpoint } from "./commands/checkpoint.js";
+import { registerInfo } from "./commands/info.js";
 import { fail } from "./ui.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -45,6 +46,7 @@ registerInit(program);
 registerPrd(program);
 registerPrototype(program);
 registerMark(program);
+registerInfo(program);
 registerDoctor(program);
 registerServe(program);
 registerUpdate(program);

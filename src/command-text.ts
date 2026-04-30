@@ -219,6 +219,16 @@ export const COPY = {
 说明：
   检查 npm 上的最新版本，如果有更新则自动安装。
 `,
+  infoDescription: "查看项目信息和内容统计",
+  infoHelpAfter: `
+示例：
+  prdkit info
+  prdkit info --json
+
+说明：
+  显示项目名称、作者以及各类文档的统计信息。
+  包括 PRD 文档数量（按状态分类）、原型数量、讨论数量、Bug 报告数量和 Checkpoint 数量。
+`,
   markDescription: "标记相关命令",
   markListDescription: "列出指定原型下的所有标记",
   markListHelpAfter: `
@@ -266,5 +276,7 @@ export const COPY = {
 说明：
   这是兼容保留命令。
   推荐改用 prdkit mark list 或 prdkit prototype list。
-`
+`,
+  jsonOutputOption: "以 JSON 格式输出",
+  notInProjectError: "当前目录不在 prdkit 项目中"
 } as const;
