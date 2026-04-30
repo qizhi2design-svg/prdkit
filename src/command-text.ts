@@ -38,6 +38,15 @@ export const COPY = {
 说明：
   默认使用 prd 模板创建文档，输出目录默认来自项目配置中的 workspace/prds。
 `,
+  prdListDescription: "列出当前项目中的所有 PRD",
+  prdListHelpAfter: `
+示例：
+  prdkit prd list
+  prdkit prd list --json
+
+说明：
+  输出 workspace/prds 下的所有 PRD 文档列表。
+`,
   prototypeDescription: "原型相关命令",
   prototypeCreateDescription: "创建原型文档",
   prototypeCreateHelpAfter: `
