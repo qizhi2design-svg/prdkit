@@ -5,6 +5,8 @@ import chalk from "chalk";
 import matter from "gray-matter";
 import { COPY } from "../command-text.js";
 import { loadConfig, resolveProjectRoot } from "../config.js";
+import { listCheckpointRecords } from "../prototype/checkpoint/store.js";
+import { flattenPrototypes, scanPrototypes } from "../prototype/server/scanner.js";
 import { fail } from "../ui.js";
 
 interface InfoOptions {
@@ -33,6 +35,11 @@ function countFiles(dir: string): number {
   }).length;
 }
 
+function countPrototypes(prototypesDir: string): number {
+  if (!fs.existsSync(prototypesDir)) return 0;
+  return flattenPrototypes(scanPrototypes(prototypesDir)).length;
+}
+
 function analyzePrds(prdsDir: string): { total: number; byStatus: Record<string, number> } {
   if (!fs.existsSync(prdsDir)) {
     return { total: 0, byStatus: {} };
@@ -58,21 +65,14 @@ function analyzePrds(prdsDir: string): { total: number; byStatus: Record<string,
 }
 
 function countCheckpoints(projectRoot: string): number {
-  const checkpointsDir = path.join(projectRoot, '.prdkit', 'checkpoints');
-  if (!fs.existsSync(checkpointsDir)) return 0;
-
   try {
-    const dirs = fs.readdirSync(checkpointsDir);
-    return dirs.filter(d => {
-      const fullPath = path.join(checkpointsDir, d);
-      return fs.statSync(fullPath).isDirectory();
-    }).length;
+    return listCheckpointRecords(projectRoot).length;
   } catch {
     return 0;
   }
 }
 
-async function getProjectStats(projectRoot: string): Promise<ProjectStats> {
+export async function getProjectStats(projectRoot: string): Promise<ProjectStats> {
   const config = await loadConfig(projectRoot);
   if (!config) {
     fail("未找到项目配置文件");
@@ -86,7 +86,7 @@ async function getProjectStats(projectRoot: string): Promise<ProjectStats> {
   const bugsDir = path.join(workspaceDir, 'bugs');
 
   const prds = analyzePrds(prdsDir);
-  const prototypes = countFiles(prototypesDir);
+  const prototypes = countPrototypes(prototypesDir);
   const discussions = countFiles(discussionsDir);
   const bugs = countFiles(bugsDir);
   const checkpoints = countCheckpoints(projectRoot);

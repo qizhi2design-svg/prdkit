@@ -582,10 +582,9 @@ function App() {
     });
     setSelectedMarkId(null);
     setPendingMarkInfo(null);
-    message.success(`已切换到 checkpoint 预览：${detail.checkpoint.id}`);
   };
 
-  const handleCheckpointRestore = async (detail: CheckpointDetail) => {
+  const handleCheckpointRestore = async (detail: CheckpointDetail, versionLabel: string) => {
     try {
       const response = await fetch(`/api/checkpoints/${encodeURIComponent(detail.checkpoint.id)}/restore`, {
         method: 'POST',
@@ -603,7 +602,7 @@ function App() {
       setPendingMarkInfo(null);
       setReloadVersion(prev => prev + 1);
       await loadMarks();
-      message.success(`已还原到 checkpoint：${detail.checkpoint.id}`);
+      message.success(`已还原 ${versionLabel}`);
     } catch (error) {
       console.error('还原 checkpoint 失败:', error);
       message.error(error instanceof Error ? error.message : '还原 checkpoint 失败');
@@ -612,7 +611,6 @@ function App() {
 
   const handleExitCheckpointPreview = () => {
     setActiveCheckpointPreview(null);
-    message.info('已返回当前工作区版本');
   };
 
   const currentIndex = selectedFile ? fileList.indexOf(selectedFile) + 1 : 0;
@@ -722,11 +720,12 @@ function App() {
       <HistoryDrawer
         open={historyDrawerOpen}
         prototypePath={currentPrototypePath}
-        onClose={() => setHistoryDrawerOpen(false)}
-        activeCheckpointId={activeCheckpointPreview?.checkpointId ?? null}
+        onClose={() => {
+          setHistoryDrawerOpen(false);
+          handleExitCheckpointPreview();
+        }}
         onPreview={handleCheckpointPreview}
         onRestore={handleCheckpointRestore}
-        onExitPreview={handleExitCheckpointPreview}
       />
     </Layout>
   );

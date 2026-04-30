@@ -58,6 +58,7 @@ export const COPY = {
 说明：
   默认使用 web 原型模板创建内容，输出目录默认来自项目配置中的 workspace/prototypes。
   可通过 --template 选择 web、mobile、admin 三种原型骨架。
+  创建页面后会自动生成初始 checkpoint。
 `,
   prototypeListDescription: "列出当前项目中的所有原型",
   prototypeListHelpAfter: `
@@ -198,7 +199,8 @@ export const COPY = {
 
 说明：
   启动本地预览服务器，支持实时预览和热更新。
-  文件监听不会自动创建 checkpoint，版本需手动提交。
+  通过 \`prdkit prototype create\` 新建页面时会自动生成初始 checkpoint。
+  文件监听本身不会持续自动创建 checkpoint。
   自动选择可用端口并打开浏览器。
 `,
   publishDescription: "导出 publish 协议产物目录",

@@ -3,19 +3,19 @@ import { renderTemplate, resolveTemplate } from "../src/templates.js";
 
 describe("templates", () => {
   it("renders supported placeholders", () => {
-    const content = "# {{title}}\n\n项目：{{projectName}}\n作者：{{author}}\n日期：{{date}}\n类型：{{templateId}}\n";
+    const content = "# {{title}}\n\n创建者：{{creator}}\n标签：{{label}}\n状态：{{status}}\n类型：{{templateId}}\n";
     const rendered = renderTemplate(content, {
       title: "支付优化",
-      projectName: "Demo",
-      author: "Alice",
-      date: "2026-04-26",
+      creator: "Alice",
+      label: "local-md|cli",
+      status: "planning",
       templateId: "prd"
     });
 
     expect(rendered).toContain("# 支付优化");
-    expect(rendered).toContain("项目：Demo");
-    expect(rendered).toContain("作者：Alice");
-    expect(rendered).toContain("日期：2026-04-26");
+    expect(rendered).toContain("创建者：Alice");
+    expect(rendered).toContain("标签：local-md|cli");
+    expect(rendered).toContain("状态：planning");
     expect(rendered).toContain("类型：prd");
   });
 

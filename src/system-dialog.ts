@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import { promisify } from "node:util";
 import path from "node:path";
 
@@ -76,9 +77,21 @@ async function selectDirectoryLinux(options: SelectDirectoryOptions): Promise<st
   }
 }
 
-function normalizeDefaultDirectory(defaultPath?: string): string | undefined {
+export function normalizeDefaultDirectory(defaultPath?: string): string | undefined {
   if (!defaultPath) return undefined;
-  return path.dirname(defaultPath);
+
+  const resolvedPath = path.resolve(defaultPath);
+  let candidate = resolvedPath;
+
+  while (!existsSync(candidate)) {
+    const parent = path.dirname(candidate);
+    if (parent === candidate) {
+      return undefined;
+    }
+    candidate = parent;
+  }
+
+  return candidate;
 }
 
 function escapeAppleScriptString(value: string): string {

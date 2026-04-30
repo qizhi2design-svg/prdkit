@@ -5,46 +5,39 @@ import {
   Empty,
   Skeleton,
   Tag,
-  Typography,
 } from 'antd';
 import {
   CaretRightOutlined,
   ReloadOutlined,
   RollbackOutlined,
-  StopOutlined,
 } from '@ant-design/icons';
 import type { CheckpointDetail, CheckpointRecord } from '../types';
 import './HistoryDrawer.css';
-
-const { Title } = Typography;
 
 interface HistoryDrawerProps {
   open: boolean;
   prototypePath: string | null;
   onClose: () => void;
-  activeCheckpointId?: string | null;
   onPreview: (detail: CheckpointDetail) => void;
-  onRestore: (detail: CheckpointDetail) => Promise<void>;
-  onExitPreview: () => void;
+  onRestore: (detail: CheckpointDetail, versionLabel: string) => Promise<void>;
 }
 
 export default function HistoryDrawer({
   open,
   prototypePath,
   onClose,
-  activeCheckpointId = null,
   onPreview,
   onRestore,
-  onExitPreview,
 }: HistoryDrawerProps) {
   const [loading, setLoading] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [checkpoints, setCheckpoints] = useState<CheckpointRecord[]>([]);
   const [detailCache, setDetailCache] = useState<Record<string, CheckpointDetail>>({});
+  const [selectedCheckpointId, setSelectedCheckpointId] = useState<string | null>(null);
 
-  const activeRecord = useMemo(
-    () => checkpoints.find((item) => item.id === activeCheckpointId) ?? null,
-    [checkpoints, activeCheckpointId]
+  const selectedRecord = useMemo(
+    () => checkpoints.find((item) => item.id === selectedCheckpointId) ?? checkpoints[0] ?? null,
+    [checkpoints, selectedCheckpointId]
   );
 
   const loadDetail = async (checkpointId: string): Promise<CheckpointDetail> => {
@@ -82,10 +75,19 @@ export default function HistoryDrawer({
 
       setCheckpoints((data.checkpoints || []) as CheckpointRecord[]);
       setDetailCache({});
+      setSelectedCheckpointId((prev) => {
+        const records = (data.checkpoints || []) as CheckpointRecord[];
+        if (records.length === 0) return null;
+        if (prev && records.some((item) => item.id === prev)) {
+          return prev;
+        }
+        return records[0].id;
+      });
     } catch (error) {
       console.error('读取历史记录失败:', error);
       setCheckpoints([]);
       setDetailCache({});
+      setSelectedCheckpointId(null);
     } finally {
       setLoading(false);
     }
@@ -98,6 +100,7 @@ export default function HistoryDrawer({
 
   const handlePreview = async (record: CheckpointRecord) => {
     try {
+      setSelectedCheckpointId(record.id);
       const detail = await loadDetail(record.id);
       onPreview(detail);
     } catch (error) {
@@ -108,8 +111,9 @@ export default function HistoryDrawer({
   const handleRestore = async (record: CheckpointRecord) => {
     try {
       setRestoringId(record.id);
+      setSelectedCheckpointId(record.id);
       const detail = await loadDetail(record.id);
-      await onRestore(detail);
+      await onRestore(detail, buildVersionLabel(checkpoints, record.id));
       await loadHistory();
     } catch (error) {
       console.error('还原 checkpoint 失败:', error);
@@ -120,23 +124,13 @@ export default function HistoryDrawer({
 
   return (
     <Drawer
-      title="版本历史记录"
+      title="版本记录"
       open={open}
       onClose={onClose}
       width={360}
       className="history-drawer compact"
       extra={(
         <div className="history-drawer-extra">
-          {activeCheckpointId && (
-            <Button
-              type="text"
-              size="small"
-              icon={<StopOutlined />}
-              onClick={onExitPreview}
-            >
-              返回当前
-            </Button>
-          )}
           <Button
             type="text"
             icon={<ReloadOutlined />}
@@ -150,18 +144,6 @@ export default function HistoryDrawer({
         <Empty description="请先选择一个原型页面" image={Empty.PRESENTED_IMAGE_SIMPLE} />
       ) : (
         <div className="history-drawer-compact-shell">
-          <div className="history-drawer-compact-header">
-            <Title level={5}>历史</Title>
-          </div>
-
-          {activeRecord && (
-            <div className="history-drawer-active-tip">
-              正在预览：
-              <span>{buildVersionLabel(checkpoints, activeRecord.id)}</span>
-              <Tag color="blue" className="history-current-tag">当前</Tag>
-            </div>
-          )}
-
           {loading ? (
             <div className="history-drawer-loading">
               <Skeleton active paragraph={{ rows: 8 }} />
@@ -171,7 +153,7 @@ export default function HistoryDrawer({
           ) : (
             <div className="history-version-list">
               {checkpoints.map((item) => {
-                const isActive = activeCheckpointId === item.id;
+                const isActive = selectedRecord?.id === item.id;
                 return (
                   <button
                     key={item.id}
