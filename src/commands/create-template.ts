@@ -19,14 +19,11 @@ export type CreateTemplateOptions = {
   output?: string;
   dir?: string;
   name?: string;
-  author?: string;
-  date?: string;
+  creator?: string;
+  label?: string;
+  status?: string;
   nonInteractive?: boolean;
 };
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 async function requiredTitle(title: string | undefined, nonInteractive?: boolean): Promise<string> {
   if (title?.trim()) return title.trim();
@@ -83,13 +80,9 @@ export async function runCreateTemplate(
 
   const template = resolveTemplate(manifest, templateId);
   const title = await requiredTitle(titleArg, options.nonInteractive);
-  const projectName = await requiredValue(
-    options.name ?? config?.projectName,
-    COPY.initProjectNameMessage,
-    options.nonInteractive
-  );
-  const author = await requiredValue(options.author ?? config?.author, COPY.initAuthorMessage, options.nonInteractive);
-  const date = options.date?.trim() || today();
+  const creator = await requiredValue(options.creator ?? config?.author, COPY.initAuthorMessage, options.nonInteractive);
+  const label = options.label ?? "local-md|cli";
+  const status = options.status ?? "planning";
 
   let selectedDir = options.dir;
   if (!selectedDir && !options.output && !options.nonInteractive) {
@@ -117,18 +110,18 @@ export async function runCreateTemplate(
   if (isDirectory) {
     await copyTemplateDirectory(repoDir, template, outputPath, {
       title,
-      projectName,
-      author,
-      date,
+      creator,
+      label,
+      status,
       templateId: template.id
     });
   } else {
     const templateContent = await readTemplateContent(repoDir, template);
     const finalContent = renderTemplate(templateContent, {
       title,
-      projectName,
-      author,
-      date,
+      creator,
+      label,
+      status,
       templateId: template.id
     });
     await writeTextFile(outputPath, finalContent);

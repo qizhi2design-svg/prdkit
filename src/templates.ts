@@ -75,9 +75,9 @@ export async function readTemplateContent(repoDir: string, template: TemplateIte
 export function renderTemplate(content: string, variables: CreateTemplateVariables): string {
   return content
     .replaceAll("{{title}}", variables.title)
-    .replaceAll("{{projectName}}", variables.projectName)
-    .replaceAll("{{author}}", variables.author)
-    .replaceAll("{{date}}", variables.date)
+    .replaceAll("{{creator}}", variables.creator)
+    .replaceAll("{{label}}", variables.label)
+    .replaceAll("{{status}}", variables.status)
     .replaceAll("{{templateId}}", variables.templateId);
 }
 

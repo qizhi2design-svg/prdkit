@@ -2,6 +2,7 @@ import { Command } from "commander";
 import fs from "node:fs";
 import path from "node:path";
 import chalk from "chalk";
+import matter from "gray-matter";
 import { COPY } from "../command-text.js";
 import { resolveProjectRoot } from "../config.js";
 import { fail } from "../ui.js";
@@ -11,23 +12,59 @@ interface PrdListOptions {
   json?: boolean;
 }
 
+interface PrdFrontmatter {
+  title?: string;
+  author?: string;
+  projectName?: string;
+  date?: string;
+  status?: string;
+  version?: string;
+}
+
 interface PrdInfo {
   fileName: string;
   title: string;
+  author?: string;
+  status?: string;
+  version?: string;
   path: string;
   modifiedAt: string;
+  createdAt: string;
   size: number;
 }
 
-function extractTitle(content: string): string {
-  const lines = content.split('\n');
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith('# ')) {
-      return trimmed.slice(2).trim();
+function extractPrdInfo(filePath: string, fileName: string): PrdInfo {
+  const content = fs.readFileSync(filePath, 'utf-8');
+  const stats = fs.statSync(filePath);
+
+  // 解析 frontmatter
+  const parsed = matter(content);
+  const frontmatter = parsed.data as PrdFrontmatter;
+
+  // 优先使用 frontmatter 中的标题，否则从内容中提取
+  let title = frontmatter.title || '(无标题)';
+  if (!frontmatter.title) {
+    const lines = parsed.content.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('# ')) {
+        title = trimmed.slice(2).trim();
+        break;
+      }
     }
   }
-  return '(无标题)';
+
+  return {
+    fileName,
+    title,
+    author: frontmatter.author,
+    status: frontmatter.status,
+    version: frontmatter.version,
+    path: path.relative(process.cwd(), filePath),
+    modifiedAt: stats.mtime.toISOString(),
+    createdAt: stats.birthtime.toISOString(),
+    size: stats.size
+  };
 }
 
 function scanPrdFiles(prdsDir: string): PrdInfo[] {
@@ -41,17 +78,11 @@ function scanPrdFiles(prdsDir: string): PrdInfo[] {
   for (const file of files) {
     if (file.isFile() && file.name.endsWith('.md')) {
       const filePath = path.join(prdsDir, file.name);
-      const stats = fs.statSync(filePath);
-      const content = fs.readFileSync(filePath, 'utf-8');
-      const title = extractTitle(content);
-
-      prdFiles.push({
-        fileName: file.name,
-        title,
-        path: path.relative(process.cwd(), filePath),
-        modifiedAt: stats.mtime.toISOString(),
-        size: stats.size
-      });
+      try {
+        prdFiles.push(extractPrdInfo(filePath, file.name));
+      } catch (error) {
+        console.warn(chalk.yellow(`警告: 无法解析文件 ${file.name}`));
+      }
     }
   }
 
@@ -65,7 +96,11 @@ function formatPrdList(prds: PrdInfo[]): string {
 
   return prds.map((prd, index) => {
     const date = new Date(prd.modifiedAt).toLocaleDateString('zh-CN');
-    return `${chalk.cyan(`${index + 1}.`)} ${prd.title}\n   ${chalk.dim(`文件: ${prd.fileName} | 修改: ${date}`)}`;
+    const statusBadge = prd.status ? ` ${chalk.cyan(`[${prd.status}]`)}` : '';
+    const versionBadge = prd.version ? ` ${chalk.dim(`v${prd.version}`)}` : '';
+    const authorInfo = prd.author ? ` | 作者: ${prd.author}` : '';
+
+    return `${chalk.cyan(`${index + 1}.`)} ${prd.title}${statusBadge}${versionBadge}\n   ${chalk.dim(`文件: ${prd.fileName} | 修改: ${date}${authorInfo}`)}`;
   }).join("\n\n");
 }
 

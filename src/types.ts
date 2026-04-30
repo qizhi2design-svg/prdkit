@@ -23,8 +23,8 @@ export type TemplateManifest = {
 
 export type CreateTemplateVariables = {
   title: string;
-  projectName: string;
-  author: string;
-  date: string;
+  creator: string;
+  label: string;
+  status: string;
   templateId: string;
 };
