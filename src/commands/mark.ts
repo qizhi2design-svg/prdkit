@@ -12,6 +12,7 @@ import {
   updateMarkSync
 } from "../prototype/server/marks.js";
 import { fail, info, success } from "../ui.js";
+import { createCheckpoint } from "../prototype/checkpoint/store.js";
 
 interface MarkCommonOptions {
   prototype: string;
@@ -111,7 +112,7 @@ function formatMarks(marks: ReturnType<typeof readPrototypeMarksSync>): string {
     .join("\n\n");
 }
 
-async function resolvePrototypesDir(prototypePath: string): Promise<string> {
+async function resolvePrototypesDir(prototypePath: string): Promise<{ projectRoot: string; prototypesDir: string }> {
   const projectRoot = await resolveProjectRoot(process.cwd());
   if (!projectRoot) {
     throw new Error("未找到 .prdkit/config.json，请先运行 prdkit init 初始化项目");
@@ -123,7 +124,31 @@ async function resolvePrototypesDir(prototypePath: string): Promise<string> {
     throw new Error(`原型 "${prototypePath}" 不存在`);
   }
 
-  return prototypesDir;
+  return { projectRoot, prototypesDir };
+}
+
+async function autoCreateCheckpoint(
+  projectRoot: string,
+  prototypesDir: string,
+  prototypePath: string,
+  message: string
+): Promise<void> {
+  try {
+    const result = await createCheckpoint({
+      projectRoot,
+      prototypesDir,
+      prototypePath,
+      kind: "auto",
+      message
+    });
+
+    if (result.created) {
+      info(`已创建 checkpoint：${result.record.id}`);
+    }
+  } catch (error) {
+    // 静默失败，不影响 mark 操作
+    console.error(`创建 checkpoint 失败：${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 function outputJson(value: unknown): void {
@@ -141,7 +166,7 @@ export function registerMark(program: Command): void {
     .addHelpText("after", `\n${COPY.markListHelpAfter}`)
     .action(async (options: MarkCommonOptions) => {
       try {
-        const prototypesDir = await resolvePrototypesDir(options.prototype);
+        const { prototypesDir } = await resolvePrototypesDir(options.prototype);
         const marks = readPrototypeMarksSync(prototypesDir, options.prototype).map(({ fileName, ...markItem }) => markItem);
 
         if (options.json) {
@@ -176,7 +201,7 @@ export function registerMark(program: Command): void {
     .addHelpText("after", `\n${COPY.markCreateHelpAfter}`)
     .action(async (options: MarkCreateOptions) => {
       try {
-        const prototypesDir = await resolvePrototypesDir(options.prototype);
+        const { projectRoot, prototypesDir } = await resolvePrototypesDir(options.prototype);
         const created = createMarkSync(prototypesDir, options.prototype, {
           title: options.title.trim(),
           description: resolveDescription(options.desc, options.descFile) ?? "",
@@ -194,6 +219,9 @@ export function registerMark(program: Command): void {
         success(`已创建标记：${created.id}`);
         info(`原型：${options.prototype}`);
         info(`文件：${path.join("workspace", "prototypes", options.prototype, "marks", created.fileName)}`);
+
+        // 自动创建 checkpoint
+        await autoCreateCheckpoint(projectRoot, prototypesDir, options.prototype, `创建标记：${created.title}`);
       } catch (error) {
         fail(error instanceof Error ? error.message : String(error));
         process.exit(1);
@@ -212,7 +240,7 @@ export function registerMark(program: Command): void {
     .addHelpText("after", `\n${COPY.markEditHelpAfter}`)
     .action(async (markId: string, options: MarkEditOptions) => {
       try {
-        const prototypesDir = await resolvePrototypesDir(options.prototype);
+        const { projectRoot, prototypesDir } = await resolvePrototypesDir(options.prototype);
         const description = resolveDescription(options.desc, options.descFile);
         const patch: MarkPatch = {
           title: options.title?.trim(),
@@ -233,6 +261,9 @@ export function registerMark(program: Command): void {
 
         success(`已更新标记：${markId}`);
         info(`原型：${options.prototype}`);
+
+        // 自动创建 checkpoint
+        await autoCreateCheckpoint(projectRoot, prototypesDir, options.prototype, `更新标记：${updated.title}`);
       } catch (error) {
         fail(error instanceof Error ? error.message : String(error));
         process.exit(1);
@@ -248,7 +279,7 @@ export function registerMark(program: Command): void {
     .addHelpText("after", `\n${COPY.markDeleteHelpAfter}`)
     .action(async (markId: string, options: MarkCommonOptions) => {
       try {
-        const prototypesDir = await resolvePrototypesDir(options.prototype);
+        const { projectRoot, prototypesDir } = await resolvePrototypesDir(options.prototype);
         deleteMarkSync(prototypesDir, options.prototype, markId);
 
         if (options.json) {
@@ -258,6 +289,9 @@ export function registerMark(program: Command): void {
 
         success(`已删除标记：${markId}`);
         info(`原型：${options.prototype}`);
+
+        // 自动创建 checkpoint
+        await autoCreateCheckpoint(projectRoot, prototypesDir, options.prototype, `删除标记：${markId}`);
       } catch (error) {
         fail(error instanceof Error ? error.message : String(error));
         process.exit(1);
