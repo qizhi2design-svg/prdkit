@@ -2,7 +2,7 @@ import { Command, Option } from "commander";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import chalk from "chalk";
-import { COPY } from "../command-text.js";
+import { COPY } from "../lib/command-text.js";
 import { resolveProjectRoot } from "../config.js";
 import {
   createMarkSync,
@@ -10,10 +10,10 @@ import {
   readPrototypeMarksSync,
   type MarkPatch,
   updateMarkSync
-} from "../prototype/server/marks.js";
+} from "../lib/prototype/server/marks.js";
 import { logger } from "../logger.js";
 import { ConfigError, PrototypeError, ValidationError } from "../errors.js";
-import { createCheckpoint } from "../prototype/checkpoint/store.js";
+import { createCheckpoint } from "../lib/prototype/checkpoint/store.js";
 
 interface MarkCommonOptions {
   prototype: string;

@@ -4,8 +4,8 @@ import path from "node:path";
 import os from "node:os";
 import http from "node:http";
 import express from "express";
-import { createApiRouter } from "../src/prototype/server/api.js";
-import { createCheckpoint } from "../src/prototype/checkpoint/store.js";
+import { createApiRouter } from "../src/lib/prototype/server/api.js";
+import { createCheckpoint } from "../src/lib/prototype/checkpoint/store.js";
 
 function makeRequest(
   app: express.Express,

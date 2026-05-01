@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import chalk from "chalk";
 import matter from "gray-matter";
-import { COPY } from "../command-text.js";
+import { COPY } from "../lib/command-text.js";
 import { resolveProjectRoot } from "../config.js";
 import { logger } from "../logger.js";
 import { ConfigError } from "../errors.js";

@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { saveConfig } from "../src/config.js";
 import { runCreateTemplate } from "../src/commands/create-template.js";
-import { listCheckpointRecords } from "../src/prototype/checkpoint/store.js";
+import { listCheckpointRecords } from "../src/lib/prototype/checkpoint/store.js";
 
 const tempDirs: string[] = [];
 const __filename = fileURLToPath(import.meta.url);

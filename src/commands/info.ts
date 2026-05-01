@@ -3,10 +3,10 @@ import fs from "node:fs";
 import path from "node:path";
 import chalk from "chalk";
 import matter from "gray-matter";
-import { COPY } from "../command-text.js";
+import { COPY } from "../lib/command-text.js";
 import { loadConfig, resolveProjectRoot } from "../config.js";
-import { listCheckpointRecords } from "../prototype/checkpoint/store.js";
-import { flattenPrototypes, scanPrototypes } from "../prototype/server/scanner.js";
+import { listCheckpointRecords } from "../lib/prototype/checkpoint/store.js";
+import { flattenPrototypes, scanPrototypes } from "../lib/prototype/server/scanner.js";
 import { logger } from "../logger.js";
 import { ConfigError } from "../errors.js";
 

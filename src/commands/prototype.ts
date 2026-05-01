@@ -1,9 +1,9 @@
 import { Command } from "commander";
 import path from "node:path";
 import chalk from "chalk";
-import { COPY } from "../command-text.js";
+import { COPY } from "../lib/command-text.js";
 import { resolveProjectRoot } from "../config.js";
-import { flattenPrototypes, scanPrototypes } from "../prototype/server/scanner.js";
+import { flattenPrototypes, scanPrototypes } from "../lib/prototype/server/scanner.js";
 import { logger } from "../logger.js";
 import { ConfigError, ValidationError } from "../errors.js";
 import { runCreateTemplate, type CreateTemplateOptions } from "./create-template.js";

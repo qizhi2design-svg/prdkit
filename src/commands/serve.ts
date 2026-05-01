@@ -2,10 +2,10 @@ import { Command } from 'commander';
 import { spawn } from 'node:child_process';
 import path from 'path';
 import { loadConfig } from '../config.js';
-import { startServer } from '../prototype/server/index.js';
+import { startServer } from '../lib/prototype/server/index.js';
 import { logger } from '../logger.js';
 import { ConfigError, ValidationError, ServerError } from '../errors.js';
-import { COPY } from '../command-text.js';
+import { COPY } from '../lib/command-text.js';
 import { findAvailablePort, findAvailablePortBlock, isPortAvailable } from '../utils/port.js';
 
 export function registerServe(program: Command) {

@@ -3,17 +3,17 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import chalk from "chalk";
 import open from "open";
-import { COPY } from "../command-text.js";
+import { COPY } from "../lib/command-text.js";
 import { resolveProjectRoot } from "../config.js";
 import { logger } from "../logger.js";
 import { ConfigError, FileSystemError, PrototypeError } from "../errors.js";
 import {
   diffCheckpoints,
   diffCurrentAgainstLatest
-} from "../prototype/checkpoint/diff.js";
-import { materializeCheckpointPreview } from "../prototype/checkpoint/preview.js";
-import { pruneAutoCheckpoints } from "../prototype/checkpoint/retention.js";
-import { restoreCheckpoint } from "../prototype/checkpoint/restore.js";
+} from "../lib/prototype/checkpoint/diff.js";
+import { materializeCheckpointPreview } from "../lib/prototype/checkpoint/preview.js";
+import { pruneAutoCheckpoints } from "../lib/prototype/checkpoint/retention.js";
+import { restoreCheckpoint } from "../lib/prototype/checkpoint/restore.js";
 import {
   createCheckpoint,
   endCheckpointSession,
@@ -23,10 +23,10 @@ import {
   listCheckpointRecords,
   readCheckpointData,
   startCheckpointSession
-} from "../prototype/checkpoint/store.js";
-import { collectPrototypeSnapshot } from "../prototype/checkpoint/snapshot.js";
-import { flattenPrototypes, scanPrototypes } from "../prototype/server/scanner.js";
-import type { CheckpointDiffSummary, CheckpointRecord } from "../prototype/checkpoint/types.js";
+} from "../lib/prototype/checkpoint/store.js";
+import { collectPrototypeSnapshot } from "../lib/prototype/checkpoint/snapshot.js";
+import { flattenPrototypes, scanPrototypes } from "../lib/prototype/server/scanner.js";
+import type { CheckpointDiffSummary, CheckpointRecord } from "../lib/prototype/checkpoint/types.js";
 
 interface CheckpointBaseOptions {
   json?: boolean;

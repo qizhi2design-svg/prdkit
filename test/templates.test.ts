@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderTemplate, resolveTemplate } from "../src/templates.js";
+import { renderTemplate, resolveTemplate } from "../src/lib/templates.js";
 
 describe("templates", () => {
   it("renders supported placeholders", () => {

@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import chalk from "chalk";
 import { Command } from "commander";
-import { COPY } from "./command-text.js";
+import { COPY } from "./lib/command-text.js";
 import { registerDoctor } from "./commands/doctor.js";
 import { registerInit } from "./commands/init.js";
 import { registerMark } from "./commands/mark.js";

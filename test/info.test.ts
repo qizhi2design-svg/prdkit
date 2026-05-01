@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { saveConfig } from "../src/config.js";
 import { getProjectStats } from "../src/commands/info.js";
-import { createCheckpoint } from "../src/prototype/checkpoint/store.js";
+import { createCheckpoint } from "../src/lib/prototype/checkpoint/store.js";
 
 const tempDirs: string[] = [];
 

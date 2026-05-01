@@ -266,3 +266,88 @@ export function applyMiddleware(
 
   return command;
 }
+
+/**
+ * JSON 输出中间件
+ *
+ * 为命令添加 --json 选项支持
+ */
+export function withJsonOutput(): Middleware {
+  return async (command, _args, options) => {
+    if ((options as any).json) {
+      // 标记命令使用 JSON 输出
+      (command as any).useJsonOutput = true;
+    }
+  };
+}
+
+/**
+ * 项目根目录解析中间件
+ *
+ * 自动解析并验证项目根目录
+ */
+export function withProjectRoot(required = true): Middleware {
+  return async (command) => {
+    const { resolveProjectRoot } = await import("../config.js");
+    const { ConfigError } = await import("../errors.js");
+
+    const projectRoot = await resolveProjectRoot(process.cwd());
+
+    if (required && !projectRoot) {
+      throw ConfigError.projectNotInitialized();
+    }
+
+    // 将项目根目录存储到命令上下文
+    if (projectRoot) {
+      (command as any).projectRoot = projectRoot;
+    }
+  };
+}
+
+/**
+ * 输出格式化中间件
+ *
+ * 统一处理 JSON 和终端输出
+ */
+export function withOutputFormatter<T>(
+  formatter: {
+    json: (data: T) => any;
+    terminal: (data: T) => string;
+  }
+): Middleware {
+  return async (_command, _args, options) => {
+    (_command as any).outputFormatter = formatter;
+    (_command as any).formatOutput = (data: T) => {
+      if ((options as any).json) {
+        console.log(`${JSON.stringify(formatter.json(data), null, 2)}\n`);
+      } else {
+        console.log(formatter.terminal(data));
+      }
+    };
+  };
+}
+
+/**
+ * 非交互模式验证中间件
+ *
+ * 在非交互模式下验证必需参数
+ */
+export function requireInNonInteractive(
+  requiredFields: string[],
+  getMessage: (field: string) => string
+): Middleware {
+  return async (command, args, options) => {
+    if (!(options as any).nonInteractive) {
+      return;
+    }
+
+    const { ValidationError } = await import("../errors.js");
+
+    for (const field of requiredFields) {
+      const value = (args as any)[field] || (options as any)[field];
+      if (!value || (typeof value === "string" && !value.trim())) {
+        throw ValidationError.missingRequired(getMessage(field));
+      }
+    }
+  };
+}

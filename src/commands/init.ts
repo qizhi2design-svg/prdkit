@@ -1,12 +1,12 @@
 import { input } from "@inquirer/prompts";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { COPY } from "../command-text.js";
+import { COPY } from "../lib/command-text.js";
 import { saveConfig } from "../config.js";
 import { createDefaultConfig, DEFAULT_SCAFFOLD_REPO, DEFAULT_TEMPLATE_REPO } from "../defaults.js";
 import { ensureSafeInitTarget } from "../files.js";
-import { copyScaffoldInto, personalizeReadme } from "../scaffold.js";
-import { ensureTemplateRepo } from "../templates.js";
+import { copyScaffoldInto, personalizeReadme } from "../lib/scaffold.js";
+import { ensureTemplateRepo } from "../lib/templates.js";
 import type { PrdkitConfig } from "../types.js";
 import { logger } from "../logger.js";
 import { ValidationError } from "../errors.js";

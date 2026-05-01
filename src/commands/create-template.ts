@@ -1,6 +1,6 @@
 import { input, select } from "@inquirer/prompts";
 import path from "node:path";
-import { COPY } from "../command-text.js";
+import { COPY } from "../lib/command-text.js";
 import { loadConfig, resolveProjectRoot } from "../config.js";
 import { assertFileDoesNotExist, resolveOutputPath, writeTextFile } from "../files.js";
 import {
@@ -11,10 +11,10 @@ import {
   readTemplateManifest,
   renderTemplate,
   resolveTemplate
-} from "../templates.js";
+} from "../lib/templates.js";
 import { logger } from "../logger.js";
 import { ConfigError, ValidationError, TemplateError } from "../errors.js";
-import { createCheckpoint } from "../prototype/checkpoint/store.js";
+import { createCheckpoint } from "../lib/prototype/checkpoint/store.js";
 
 export type CreateTemplateOptions = {
   template?: string;

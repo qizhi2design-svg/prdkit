@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { logger } from '../logger.js';
-import { COPY } from '../command-text.js';
+import { COPY } from '../lib/command-text.js';
 import chalk from 'chalk';
 import { NetworkError } from '../errors.js';
 
