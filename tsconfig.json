@@ -5,6 +5,14 @@
     "moduleResolution": "NodeNext",
     "outDir": "dist",
     "rootDir": "src",
+    "paths": {
+      "#commands/*.js": ["./src/commands/*.ts"],
+      "#constants/*.js": ["./src/constants/*.ts"],
+      "#core/*.js": ["./src/core/*.ts"],
+      "#lib/*.js": ["./src/lib/*.ts"],
+      "#types/*.js": ["./src/types/*.ts"],
+      "#utils/*.js": ["./src/utils/*.ts"]
+    },
     "strict": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
@@ -13,5 +21,5 @@
     "types": ["node"]
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["test/**/*.ts", "node_modules", "dist", "src/prototype/viewer"]
+  "exclude": ["test/**/*.ts", "node_modules", "dist", "src/lib/viewer"]
 }
