@@ -4,7 +4,7 @@ import path from "path";
 import os from "os";
 import http from "http";
 import express from "express";
-import { createApiRouter } from "../src/lib/prototype/server/api.js";
+import { createApiRouter } from "../src/lib/server/api.js";
 
 function makeRequest(
   app: express.Express,

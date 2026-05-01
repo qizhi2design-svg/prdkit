@@ -5,10 +5,10 @@
  */
 
 import type { Command } from "commander";
-import type { PrdkitConfig } from "../types.js";
-import { loadConfig, resolveProjectRoot } from "../config.js";
-import { logger } from "../logger.js";
-import { ConfigError, PrdkitError } from "../errors.js";
+import type { PrdkitConfig } from "#types/index.js";
+import { loadConfig, resolveProjectRoot } from "#utils/config.js";
+import { logger } from "#utils/logger.js";
+import { ConfigError, PrdkitError } from "#utils/errors.js";
 import type { Ora } from "ora";
 
 /**

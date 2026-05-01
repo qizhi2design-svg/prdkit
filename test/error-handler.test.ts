@@ -9,14 +9,14 @@ import {
   wrapError,
   isErrorCode,
   isErrorType,
-} from "../src/error-handler.js";
+} from "../src/utils/error-handler.js";
 import {
   PrdkitError,
   ConfigError,
   FileSystemError,
   UserCancelledError,
   ErrorCode,
-} from "../src/errors.js";
+} from "../src/utils/errors.js";
 
 describe("formatError", () => {
   it("should format a basic error", () => {

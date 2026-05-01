@@ -2,10 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
-import { saveConfig } from "../src/config.js";
-import { buildDiffSummary, diffCheckpoints, diffCurrentAgainstLatest } from "../src/lib/prototype/checkpoint/diff.js";
-import { pruneAutoCheckpoints } from "../src/lib/prototype/checkpoint/retention.js";
-import { restoreCheckpoint } from "../src/lib/prototype/checkpoint/restore.js";
+import { saveConfig } from "../src/utils/config.js";
+import { buildDiffSummary, diffCheckpoints, diffCurrentAgainstLatest } from "../src/lib/checkpoint/diff.js";
+import { pruneAutoCheckpoints } from "../src/lib/checkpoint/retention.js";
+import { restoreCheckpoint } from "../src/lib/checkpoint/restore.js";
 import {
   createCheckpoint,
   endCheckpointSession,
@@ -13,7 +13,7 @@ import {
   listCheckpointRecords,
   loadCheckpointIndex,
   startCheckpointSession
-} from "../src/lib/prototype/checkpoint/store.js";
+} from "../src/lib/checkpoint/store.js";
 
 const tempDirs: string[] = [];
 

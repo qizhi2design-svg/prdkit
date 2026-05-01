@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { loadConfig, resolveProjectRoot, saveConfig } from "../src/config.js";
+import { loadConfig, resolveProjectRoot, saveConfig } from "../src/utils/config.js";
 
 describe("config", () => {
   it("saves and loads project config", async () => {

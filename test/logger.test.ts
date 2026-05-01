@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Logger, type LogLevel, type LogFormat } from "../src/logger.js";
+import { Logger, type LogLevel, type LogFormat } from "../src/utils/logger.js";
 import { existsSync } from "node:fs";
 import { readFile, rm } from "node:fs/promises";
 import path from "node:path";

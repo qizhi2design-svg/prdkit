@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Logger } from "../../src/logger.js";
-import { ConfigError, FileSystemError } from "../../src/errors.js";
-import { withErrorHandling } from "../../src/error-handler.js";
+import { Logger } from "../../src/utils/logger.js";
+import { ConfigError, FileSystemError } from "../../src/utils/errors.js";
+import { withErrorHandling } from "../../src/utils/error-handler.js";
 
 describe("Logging Integration", () => {
   let consoleLogSpy: ReturnType<typeof vi.spyOn>;

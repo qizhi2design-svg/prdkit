@@ -3,11 +3,11 @@ import fs from "node:fs";
 import path from "node:path";
 import chalk from "chalk";
 import matter from "gray-matter";
-import { COPY } from "../lib/command-text.js";
-import { resolveProjectRoot } from "../config.js";
-import { logger } from "../logger.js";
-import { ConfigError } from "../errors.js";
-import { runCreateTemplate, type CreateTemplateOptions } from "./create-template.js";
+import { COPY } from "#constants/command-text.js";
+import { resolveProjectRoot } from "#utils/config.js";
+import { logger } from "#utils/logger.js";
+import { ConfigError } from "#utils/errors.js";
+import { runCreateTemplate, type CreateTemplateOptions } from "#core/create-command.js";
 
 interface PrdListOptions {
   json?: boolean;

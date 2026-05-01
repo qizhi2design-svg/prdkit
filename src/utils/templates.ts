@@ -4,7 +4,7 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { z } from "zod";
-import type { CreateTemplateVariables, TemplateItem, TemplateManifest } from "../types.js";
+import type { CreateTemplateVariables, TemplateItem, TemplateManifest } from "#types/index.js";
 
 const execFileAsync = promisify(execFile);
 

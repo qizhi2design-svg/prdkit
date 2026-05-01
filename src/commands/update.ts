@@ -3,10 +3,10 @@ import { execSync } from 'child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { logger } from '../logger.js';
-import { COPY } from '../lib/command-text.js';
+import { logger } from '#utils/logger.js';
+import { COPY } from '#constants/command-text.js';
 import chalk from 'chalk';
-import { NetworkError } from '../errors.js';
+import { NetworkError } from '#utils/errors.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

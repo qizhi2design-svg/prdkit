@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveOutputPath, sanitizeFileStem, suggestedFileName } from "../src/files.js";
+import { resolveOutputPath, sanitizeFileStem, suggestedFileName } from "../src/utils/files.js";
 
 describe("files", () => {
   it("sanitizes titles into file stems", () => {

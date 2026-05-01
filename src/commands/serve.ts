@@ -1,12 +1,12 @@
 import { Command } from 'commander';
 import { spawn } from 'node:child_process';
 import path from 'path';
-import { loadConfig } from '../config.js';
-import { startServer } from '../lib/prototype/server/index.js';
-import { logger } from '../logger.js';
-import { ConfigError, ValidationError, ServerError } from '../errors.js';
-import { COPY } from '../lib/command-text.js';
-import { findAvailablePort, findAvailablePortBlock, isPortAvailable } from '../utils/port.js';
+import { loadConfig } from '#utils/config.js';
+import { startServer } from '#lib/server/index.js';
+import { logger } from '#utils/logger.js';
+import { ConfigError, ValidationError, ServerError } from '#utils/errors.js';
+import { COPY } from '#constants/command-text.js';
+import { findAvailablePort, findAvailablePortBlock, isPortAvailable } from '#utils/port.js';
 
 export function registerServe(program: Command) {
   program
@@ -61,7 +61,7 @@ export function registerServe(program: Command) {
           prototypesDir
         });
 
-        const viewerDir = path.join(path.dirname(new URL(import.meta.url).pathname), '../../src/lib/prototype/viewer');
+        const viewerDir = path.join(path.dirname(new URL(import.meta.url).pathname), '../../src/lib/viewer');
         const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
         const viteProcess = spawn(
           pnpmCommand,

@@ -3,9 +3,9 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { saveConfig } from "../src/config.js";
-import { runCreateTemplate } from "../src/commands/create-template.js";
-import { listCheckpointRecords } from "../src/lib/prototype/checkpoint/store.js";
+import { saveConfig } from "../src/utils/config.js";
+import { runCreateTemplate } from "../src/core/create-command.js";
+import { listCheckpointRecords } from "../src/lib/checkpoint/store.js";
 
 const tempDirs: string[] = [];
 const __filename = fileURLToPath(import.meta.url);

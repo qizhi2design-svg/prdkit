@@ -2,18 +2,18 @@ import { Command, Option } from "commander";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import chalk from "chalk";
-import { COPY } from "../lib/command-text.js";
-import { resolveProjectRoot } from "../config.js";
+import { COPY } from "#constants/command-text.js";
+import { resolveProjectRoot } from "#utils/config.js";
 import {
   createMarkSync,
   deleteMarkSync,
   readPrototypeMarksSync,
   type MarkPatch,
   updateMarkSync
-} from "../lib/prototype/server/marks.js";
-import { logger } from "../logger.js";
-import { ConfigError, PrototypeError, ValidationError } from "../errors.js";
-import { createCheckpoint } from "../lib/prototype/checkpoint/store.js";
+} from "#lib/server/marks.js";
+import { logger } from "#utils/logger.js";
+import { ConfigError, PrototypeError, ValidationError } from "#utils/errors.js";
+import { createCheckpoint } from "#lib/checkpoint/store.js";
 
 interface MarkCommonOptions {
   prototype: string;

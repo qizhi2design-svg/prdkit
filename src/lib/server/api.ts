@@ -5,7 +5,7 @@ import open from 'open';
 import { scanPrototypes } from './scanner.js';
 import { createMarkSync, deleteMarkSync, readPrototypeMarksSync, stripMarkdownTitle, updateMarkSync } from './marks.js';
 import { buildDefaultPublishDirName, publishArtifacts } from '../publisher.js';
-import { selectDirectory } from '../../system-dialog.js';
+import { selectDirectory } from '../../utils/system-dialog.js';
 import { buildInitialCheckpointSummary, diffCheckpoints, diffCurrentAgainstLatest } from '../checkpoint/diff.js';
 import { createCheckpoint, findCheckpointRecord, listCheckpointRecords, readCheckpointData } from '../checkpoint/store.js';
 import { materializeCheckpointPreview } from '../checkpoint/preview.js';

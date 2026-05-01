@@ -2,9 +2,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { saveConfig } from "../src/config.js";
+import { saveConfig } from "../src/utils/config.js";
 import { getProjectStats } from "../src/commands/info.js";
-import { createCheckpoint } from "../src/lib/prototype/checkpoint/store.js";
+import { createCheckpoint } from "../src/lib/checkpoint/store.js";
 
 const tempDirs: string[] = [];
 

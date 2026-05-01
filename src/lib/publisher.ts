@@ -3,7 +3,7 @@ import { cp, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
-import { sanitizeFileStem } from "../../files.js";
+import { sanitizeFileStem } from "#utils/files.js";
 import { flattenPrototypes, scanPrototypes, type PrototypeNode } from "./server/scanner.js";
 import { readPrototypeMarksSync, type MarkRecord } from "./server/marks.js";
 
@@ -11,7 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const packageJson = JSON.parse(
-  readFileSync(path.join(__dirname, "../../../package.json"), "utf8")
+  readFileSync(path.join(__dirname, "../../package.json"), "utf8")
 ) as { version: string };
 
 export interface PublishedSourceMeta {

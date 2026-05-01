@@ -1,7 +1,7 @@
 import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { COPY } from "./lib/command-text.js";
+import { COPY } from "#constants/command-text.js";
 
 const IGNORED_INIT_FILES = new Set([".DS_Store"]);
 

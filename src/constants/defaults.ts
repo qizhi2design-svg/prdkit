@@ -1,4 +1,4 @@
-import type { PrdkitConfig } from "./types.js";
+import type { PrdkitConfig } from "#types/index.js";
 
 export const DEFAULT_SCAFFOLD_REPO = "https://github.com/qizhi2design-svg/scaffold.git";
 export const DEFAULT_TEMPLATE_REPO = "https://github.com/qizhi2design-svg/prdkit-tempaltes.git";

@@ -2,7 +2,7 @@ import path from "node:path";
 import os from "node:os";
 import fs from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { WatchContentTracker, resolvePrototypePathFromWatchEvent, shouldIgnoreWatchPath } from "../src/lib/prototype/server/watcher.js";
+import { WatchContentTracker, resolvePrototypePathFromWatchEvent, shouldIgnoreWatchPath } from "../src/lib/server/watcher.js";
 
 const tempDirs: string[] = [];
 

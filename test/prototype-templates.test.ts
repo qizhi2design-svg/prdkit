@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { copyTemplateDirectory } from "../src/lib/templates.js";
+import { copyTemplateDirectory } from "../src/utils/templates.js";
 
 const tempDirs: string[] = [];
 const __filename = fileURLToPath(import.meta.url);

@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
-import type { PrdkitConfig } from "./types.js";
+import type { PrdkitConfig } from "#types/index.js";
 
 const configSchema = z.object({
   version: z.literal(1),

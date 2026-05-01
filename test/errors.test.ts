@@ -14,7 +14,7 @@ import {
   isPrdkitError,
   isRecoverableError,
   fromNativeError,
-} from "../src/errors.js";
+} from "../src/utils/errors.js";
 
 describe("PrdkitError", () => {
   it("should create a basic error", () => {

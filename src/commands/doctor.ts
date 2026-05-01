@@ -2,13 +2,13 @@ import { Command } from "commander";
 import { existsSync, mkdirSync, writeFileSync, readdirSync, readFileSync, renameSync, statSync } from "node:fs";
 import { join, relative, basename, extname } from "node:path";
 import { confirm, input } from "@inquirer/prompts";
-import { COPY } from "../lib/command-text.js";
-import { loadConfig } from "../config.js";
-import { createDefaultConfig } from "../defaults.js";
-import { ensureTemplateRepo } from "../lib/templates.js";
-import { logger } from "../logger.js";
-import { ConfigError, FileSystemError } from "../errors.js";
-import type { PrdkitConfig } from "../types.js";
+import { COPY } from "#constants/command-text.js";
+import { loadConfig } from "#utils/config.js";
+import { createDefaultConfig } from "#constants/defaults.js";
+import { ensureTemplateRepo } from "#utils/templates.js";
+import { logger } from "#utils/logger.js";
+import { ConfigError, FileSystemError } from "#utils/errors.js";
+import type { PrdkitConfig } from "#types/index.js";
 
 type DoctorOptions = {
   fix?: boolean;

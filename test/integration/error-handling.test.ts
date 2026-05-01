@@ -10,7 +10,7 @@ import {
   ServerError,
   UserCancelledError,
   ErrorCode,
-} from "../../src/errors.js";
+} from "../../src/utils/errors.js";
 import {
   handleError,
   withErrorHandling,
@@ -18,7 +18,7 @@ import {
   tryOr,
   wrapError,
   isErrorCode,
-} from "../../src/error-handler.js";
+} from "../../src/utils/error-handler.js";
 
 describe("Error Handling Integration", () => {
   let exitSpy: ReturnType<typeof vi.spyOn>;

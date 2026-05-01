@@ -6,7 +6,7 @@
 
 import type { CommandBase } from "./command-base.js";
 import { z, type ZodSchema } from "zod";
-import { ValidationError } from "../errors.js";
+import { ValidationError } from "#utils/errors.js";
 
 /**
  * 中间件函数类型
@@ -288,8 +288,8 @@ export function withJsonOutput(): Middleware {
  */
 export function withProjectRoot(required = true): Middleware {
   return async (command) => {
-    const { resolveProjectRoot } = await import("../config.js");
-    const { ConfigError } = await import("../errors.js");
+    const { resolveProjectRoot } = await import("../utils/config.js");
+    const { ConfigError } = await import("../utils/errors.js");
 
     const projectRoot = await resolveProjectRoot(process.cwd());
 
@@ -341,7 +341,7 @@ export function requireInNonInteractive(
       return;
     }
 
-    const { ValidationError } = await import("../errors.js");
+    const { ValidationError } = await import("../utils/errors.js");
 
     for (const field of requiredFields) {
       const value = (args as any)[field] || (options as any)[field];

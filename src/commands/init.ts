@@ -1,15 +1,15 @@
 import { input } from "@inquirer/prompts";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { COPY } from "../lib/command-text.js";
-import { saveConfig } from "../config.js";
-import { createDefaultConfig, DEFAULT_SCAFFOLD_REPO, DEFAULT_TEMPLATE_REPO } from "../defaults.js";
-import { ensureSafeInitTarget } from "../files.js";
-import { copyScaffoldInto, personalizeReadme } from "../lib/scaffold.js";
-import { ensureTemplateRepo } from "../lib/templates.js";
-import type { PrdkitConfig } from "../types.js";
-import { logger } from "../logger.js";
-import { ValidationError } from "../errors.js";
+import { COPY } from "#constants/command-text.js";
+import { saveConfig } from "#utils/config.js";
+import { createDefaultConfig, DEFAULT_SCAFFOLD_REPO, DEFAULT_TEMPLATE_REPO } from "#constants/defaults.js";
+import { ensureSafeInitTarget } from "#utils/files.js";
+import { copyScaffoldInto, personalizeReadme } from "#utils/scaffold.js";
+import { ensureTemplateRepo } from "#utils/templates.js";
+import type { PrdkitConfig } from "#types/index.js";
+import { logger } from "#utils/logger.js";
+import { ValidationError } from "#utils/errors.js";
 
 type InitOptions = {
   name?: string;

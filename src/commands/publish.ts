@@ -1,10 +1,10 @@
 import { Command } from "commander";
 import path from "node:path";
-import { COPY } from "../lib/command-text.js";
-import { loadConfig, resolveProjectRoot } from "../config.js";
-import { logger } from "../logger.js";
-import { ConfigError } from "../errors.js";
-import { buildDefaultPublishOutputDir, publishArtifacts } from "../lib/prototype/publisher.js";
+import { COPY } from "#constants/command-text.js";
+import { loadConfig, resolveProjectRoot } from "#utils/config.js";
+import { logger } from "#utils/logger.js";
+import { ConfigError } from "#utils/errors.js";
+import { buildDefaultPublishOutputDir, publishArtifacts } from "#lib/publisher.js";
 
 interface PublishOptions {
   output?: string;
