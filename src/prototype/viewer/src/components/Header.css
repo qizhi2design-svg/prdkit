@@ -92,9 +92,25 @@
 }
 
 .header-history-button {
-  border-radius: 999px;
   border-color: #d6e4ff;
   background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
   color: #1d4ed8;
   box-shadow: 0 8px 18px rgba(22, 119, 255, 0.08);
+}
+
+.header-save-badge .ant-badge-count {
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.header-save-button {
+  border-color: #d9d9d9;
+  background: #ffffff;
+  color: #262626;
+}
+
+.header-save-button:not(:disabled):hover,
+.header-save-button:not(:disabled):focus {
+  border-color: #91caff;
+  color: #1677ff;
+  background: #f7fbff;
 }

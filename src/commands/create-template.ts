@@ -1,5 +1,4 @@
 import { input, select } from "@inquirer/prompts";
-import ora from "ora";
 import path from "node:path";
 import { COPY } from "../command-text.js";
 import { loadConfig, resolveProjectRoot } from "../config.js";
@@ -13,7 +12,8 @@ import {
   renderTemplate,
   resolveTemplate
 } from "../templates.js";
-import { info, success, withSpinner } from "../ui.js";
+import { logger } from "../logger.js";
+import { ConfigError, ValidationError, TemplateError } from "../errors.js";
 import { createCheckpoint } from "../prototype/checkpoint/store.js";
 
 export type CreateTemplateOptions = {
@@ -29,13 +29,17 @@ export type CreateTemplateOptions = {
 
 async function requiredTitle(title: string | undefined, nonInteractive?: boolean): Promise<string> {
   if (title?.trim()) return title.trim();
-  if (nonInteractive) throw new Error(COPY.nonInteractiveTitleRequired);
+  if (nonInteractive) {
+    throw ValidationError.missingRequired(COPY.nonInteractiveTitleRequired);
+  }
   return (await input({ message: COPY.createTitleMessage, required: true })).trim();
 }
 
 async function requiredValue(value: string | undefined, message: string, nonInteractive?: boolean): Promise<string> {
   if (value?.trim()) return value.trim();
-  if (nonInteractive) throw new Error(`${message}：请通过命令参数提供`);
+  if (nonInteractive) {
+    throw ValidationError.missingRequired(message);
+  }
   return (await input({ message, required: true })).trim();
 }
 
@@ -46,41 +50,42 @@ export async function runCreateTemplate(
 ): Promise<void> {
   const projectRoot = await resolveProjectRoot(process.cwd());
   if (!projectRoot) {
-    throw new Error("未找到 .prdkit/config.json，请先运行 prdkit init 初始化项目");
+    throw ConfigError.projectNotInitialized();
   }
 
   const config = await loadConfig(process.cwd());
   const templateRepo = config?.templateRepo ?? "git@github.com:qizhi2design-svg/prdkit-tempaltes.git";
 
-  const spinner = ora("读取模板清单").start();
-  const { repoDir, manifest } = await withSpinner(
-    spinner,
-    async () => {
-      const ensuredRepoDir = await ensureTemplateRepo(templateRepo, projectRoot);
-      return {
-        repoDir: ensuredRepoDir,
-        manifest: await readTemplateManifest(ensuredRepoDir)
-      };
-    },
-    {
-      successText: "模板清单读取成功",
-      failText: "读取模板清单失败"
-    }
-  );
+  const spinner = logger.spinner("读取模板清单").start();
+  let repoDir: string;
+  let manifest: any;
+
+  try {
+    const ensuredRepoDir = await ensureTemplateRepo(templateRepo, projectRoot);
+    manifest = await readTemplateManifest(ensuredRepoDir);
+    repoDir = ensuredRepoDir;
+    spinner.succeed("模板清单读取成功");
+  } catch (error) {
+    spinner.fail("读取模板清单失败");
+    throw error;
+  }
 
   let templateId = preferredTemplateId ?? options.template?.trim();
   if (!templateId) {
-    if (options.nonInteractive) throw new Error(COPY.nonInteractiveTemplateRequired);
+    if (options.nonInteractive) {
+      throw ValidationError.missingRequired(COPY.nonInteractiveTemplateRequired);
+    }
     templateId = await select({
       message: COPY.createTemplateMessage,
-      choices: manifest.templates.map((item) => ({
+      choices: manifest.templates.map((item: any) => ({
         name: `${item.name}${item.description ? ` - ${item.description}` : ""}`,
         value: item.id
       }))
     });
   }
 
-  const template = resolveTemplate(manifest, templateId);
+  // TypeScript 类型断言：此时 templateId 一定有值
+  const template = resolveTemplate(manifest, templateId!);
   const title = await requiredTitle(titleArg, options.nonInteractive);
   const creator = await requiredValue(options.creator ?? config?.author, COPY.initAuthorMessage, options.nonInteractive);
   const label = options.label ?? "local-md|cli";
@@ -129,9 +134,9 @@ export async function runCreateTemplate(
     await writeTextFile(outputPath, finalContent);
   }
 
-  success(`已创建：${outputPath}`);
-  info(`模板：${template.id} (${template.name})`);
-  info(`项目根目录：${projectRoot}`);
+  logger.success(`已创建：${outputPath}`);
+  logger.info(`模板：${template.id} (${template.name})`);
+  logger.info(`项目根目录：${projectRoot}`);
 
   // 如果是原型模板（目录类型），自动创建初始 checkpoint
   const isPrototypeTemplate = template.id.startsWith("prototype");
@@ -149,11 +154,11 @@ export async function runCreateTemplate(
       });
 
       if (result.created) {
-        info(`已创建初始 checkpoint：${result.record.id}`);
+        logger.info(`已创建初始 checkpoint：${result.record.id}`);
       }
     } catch (error) {
       // 静默失败，不影响原型创建
-      console.error(`创建初始 checkpoint 失败：${error instanceof Error ? error.message : String(error)}`);
+      logger.debug(`创建初始 checkpoint 失败：${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }

@@ -11,7 +11,8 @@ import {
   type MarkPatch,
   updateMarkSync
 } from "../prototype/server/marks.js";
-import { fail, info, success } from "../ui.js";
+import { logger } from "../logger.js";
+import { ConfigError, PrototypeError, ValidationError } from "../errors.js";
 import { createCheckpoint } from "../prototype/checkpoint/store.js";
 
 interface MarkCommonOptions {
@@ -41,7 +42,7 @@ interface MarkEditOptions extends MarkCommonOptions {
 
 function resolveDescription(desc?: string, descFile?: string): string | undefined {
   if (desc && descFile) {
-    throw new Error("--desc 与 --desc-file 不能同时使用");
+    throw ValidationError.invalidInput("desc", "--desc 与 --desc-file 不能同时使用");
   }
 
   if (descFile) {
@@ -55,7 +56,7 @@ function parseOptionalNumber(value: string | undefined, name: string): number | 
   if (value === undefined) return undefined;
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) {
-    throw new Error(`${name} 必须是有效数字`);
+    throw ValidationError.invalidInput(name, "必须是有效数字");
   }
   return parsed;
 }
@@ -68,7 +69,7 @@ function buildPosition(options: {
   const y = parseOptionalNumber(options.y, "y");
   if (x === undefined && y === undefined) return undefined;
   if (x === undefined || y === undefined) {
-    throw new Error("--x 与 --y 需要同时提供");
+    throw ValidationError.invalidInput("position", "--x 与 --y 需要同时提供");
   }
   return { x, y };
 }
@@ -86,7 +87,7 @@ function buildRect(options: {
   const values = [top, left, width, height];
   if (values.every((value) => value === undefined)) return undefined;
   if (values.some((value) => value === undefined)) {
-    throw new Error("--top、--left、--width、--height 需要同时提供");
+    throw ValidationError.invalidInput("rect", "--top、--left、--width、--height 需要同时提供");
   }
   return {
     top: top as number,
@@ -115,13 +116,13 @@ function formatMarks(marks: ReturnType<typeof readPrototypeMarksSync>): string {
 async function resolvePrototypesDir(prototypePath: string): Promise<{ projectRoot: string; prototypesDir: string }> {
   const projectRoot = await resolveProjectRoot(process.cwd());
   if (!projectRoot) {
-    throw new Error("未找到 .prdkit/config.json，请先运行 prdkit init 初始化项目");
+    throw ConfigError.projectNotInitialized();
   }
 
   const prototypesDir = path.join(projectRoot, "workspace", "prototypes");
   const targetPrototypeDir = path.join(prototypesDir, prototypePath);
   if (!existsSync(targetPrototypeDir)) {
-    throw new Error(`原型 "${prototypePath}" 不存在`);
+    throw PrototypeError.notFound(prototypePath);
   }
 
   return { projectRoot, prototypesDir };
@@ -143,11 +144,11 @@ async function autoCreateCheckpoint(
     });
 
     if (result.created) {
-      info(`已创建 checkpoint：${result.record.id}`);
+      logger.info(`已创建 checkpoint：${result.record.id}`);
     }
   } catch (error) {
     // 静默失败，不影响 mark 操作
-    console.error(`创建 checkpoint 失败：${error instanceof Error ? error.message : String(error)}`);
+    logger.debug(`创建 checkpoint 失败：${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -165,21 +166,16 @@ export function registerMark(program: Command): void {
     .option("--json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.markListHelpAfter}`)
     .action(async (options: MarkCommonOptions) => {
-      try {
-        const { prototypesDir } = await resolvePrototypesDir(options.prototype);
-        const marks = readPrototypeMarksSync(prototypesDir, options.prototype).map(({ fileName, ...markItem }) => markItem);
+      const { prototypesDir } = await resolvePrototypesDir(options.prototype);
+      const marks = readPrototypeMarksSync(prototypesDir, options.prototype).map(({ fileName, ...markItem }) => markItem);
 
-        if (options.json) {
-          outputJson({ prototype: options.prototype, marks });
-          return;
-        }
-
-        console.log(formatMarks(readPrototypeMarksSync(prototypesDir, options.prototype)));
-        console.log(chalk.dim(`\n共找到 ${marks.length} 个标记`));
-      } catch (error) {
-        fail(error instanceof Error ? error.message : String(error));
-        process.exit(1);
+      if (options.json) {
+        outputJson({ prototype: options.prototype, marks });
+        return;
       }
+
+      console.log(formatMarks(readPrototypeMarksSync(prototypesDir, options.prototype)));
+      console.log(chalk.dim(`\n共找到 ${marks.length} 个标记`));
     });
 
   mark
@@ -200,32 +196,27 @@ export function registerMark(program: Command): void {
     .addOption(new Option("--height <number>", "元素矩形高度").hideHelp())
     .addHelpText("after", `\n${COPY.markCreateHelpAfter}`)
     .action(async (options: MarkCreateOptions) => {
-      try {
-        const { projectRoot, prototypesDir } = await resolvePrototypesDir(options.prototype);
-        const created = createMarkSync(prototypesDir, options.prototype, {
-          title: options.title.trim(),
-          description: resolveDescription(options.desc, options.descFile) ?? "",
-          selector: options.selector.trim(),
-          domPath: options.domPath?.trim(),
-          position: buildPosition(options),
-          rect: buildRect(options)
-        });
+      const { projectRoot, prototypesDir } = await resolvePrototypesDir(options.prototype);
+      const created = createMarkSync(prototypesDir, options.prototype, {
+        title: options.title.trim(),
+        description: resolveDescription(options.desc, options.descFile) ?? "",
+        selector: options.selector.trim(),
+        domPath: options.domPath?.trim(),
+        position: buildPosition(options),
+        rect: buildRect(options)
+      });
 
-        if (options.json) {
-          outputJson({ success: true, prototype: options.prototype, mark: created });
-          return;
-        }
-
-        success(`已创建标记：${created.id}`);
-        info(`原型：${options.prototype}`);
-        info(`文件：${path.join("workspace", "prototypes", options.prototype, "marks", created.fileName)}`);
-
-        // 自动创建 checkpoint
-        await autoCreateCheckpoint(projectRoot, prototypesDir, options.prototype, `创建标记：${created.title}`);
-      } catch (error) {
-        fail(error instanceof Error ? error.message : String(error));
-        process.exit(1);
+      if (options.json) {
+        outputJson({ success: true, prototype: options.prototype, mark: created });
+        return;
       }
+
+      logger.success(`已创建标记：${created.id}`);
+      logger.info(`原型：${options.prototype}`);
+      logger.info(`文件：${path.join("workspace", "prototypes", options.prototype, "marks", created.fileName)}`);
+
+      // 自动创建 checkpoint
+      await autoCreateCheckpoint(projectRoot, prototypesDir, options.prototype, `创建标记：${created.title}`);
     });
 
   mark
@@ -239,35 +230,30 @@ export function registerMark(program: Command): void {
     .option("--json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.markEditHelpAfter}`)
     .action(async (markId: string, options: MarkEditOptions) => {
-      try {
-        const { projectRoot, prototypesDir } = await resolvePrototypesDir(options.prototype);
-        const description = resolveDescription(options.desc, options.descFile);
-        const patch: MarkPatch = {
-          title: options.title?.trim(),
-          description
-        };
+      const { projectRoot, prototypesDir } = await resolvePrototypesDir(options.prototype);
+      const description = resolveDescription(options.desc, options.descFile);
+      const patch: MarkPatch = {
+        title: options.title?.trim(),
+        description
+      };
 
-        const hasUpdates = Object.values(patch).some((value) => value !== undefined);
-        if (!hasUpdates) {
-          throw new Error("请至少提供一个需要更新的字段");
-        }
-
-        const updated = updateMarkSync(prototypesDir, options.prototype, markId, patch);
-
-        if (options.json) {
-          outputJson({ success: true, prototype: options.prototype, mark: updated });
-          return;
-        }
-
-        success(`已更新标记：${markId}`);
-        info(`原型：${options.prototype}`);
-
-        // 自动创建 checkpoint
-        await autoCreateCheckpoint(projectRoot, prototypesDir, options.prototype, `更新标记：${updated.title}`);
-      } catch (error) {
-        fail(error instanceof Error ? error.message : String(error));
-        process.exit(1);
+      const hasUpdates = Object.values(patch).some((value) => value !== undefined);
+      if (!hasUpdates) {
+        throw ValidationError.invalidInput("patch", "请至少提供一个需要更新的字段");
       }
+
+      const updated = updateMarkSync(prototypesDir, options.prototype, markId, patch);
+
+      if (options.json) {
+        outputJson({ success: true, prototype: options.prototype, mark: updated });
+        return;
+      }
+
+      logger.success(`已更新标记：${markId}`);
+      logger.info(`原型：${options.prototype}`);
+
+      // 自动创建 checkpoint
+      await autoCreateCheckpoint(projectRoot, prototypesDir, options.prototype, `更新标记：${updated.title}`);
     });
 
   mark
@@ -278,23 +264,18 @@ export function registerMark(program: Command): void {
     .option("--json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.markDeleteHelpAfter}`)
     .action(async (markId: string, options: MarkCommonOptions) => {
-      try {
-        const { projectRoot, prototypesDir } = await resolvePrototypesDir(options.prototype);
-        deleteMarkSync(prototypesDir, options.prototype, markId);
+      const { projectRoot, prototypesDir } = await resolvePrototypesDir(options.prototype);
+      deleteMarkSync(prototypesDir, options.prototype, markId);
 
-        if (options.json) {
-          outputJson({ success: true, prototype: options.prototype, markId });
-          return;
-        }
-
-        success(`已删除标记：${markId}`);
-        info(`原型：${options.prototype}`);
-
-        // 自动创建 checkpoint
-        await autoCreateCheckpoint(projectRoot, prototypesDir, options.prototype, `删除标记：${markId}`);
-      } catch (error) {
-        fail(error instanceof Error ? error.message : String(error));
-        process.exit(1);
+      if (options.json) {
+        outputJson({ success: true, prototype: options.prototype, markId });
+        return;
       }
+
+      logger.success(`已删除标记：${markId}`);
+      logger.info(`原型：${options.prototype}`);
+
+      // 自动创建 checkpoint
+      await autoCreateCheckpoint(projectRoot, prototypesDir, options.prototype, `删除标记：${markId}`);
     });
 }

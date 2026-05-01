@@ -5,7 +5,8 @@ import chalk from "chalk";
 import matter from "gray-matter";
 import { COPY } from "../command-text.js";
 import { resolveProjectRoot } from "../config.js";
-import { fail } from "../ui.js";
+import { logger } from "../logger.js";
+import { ConfigError } from "../errors.js";
 import { runCreateTemplate, type CreateTemplateOptions } from "./create-template.js";
 
 interface PrdListOptions {
@@ -128,25 +129,20 @@ export function registerPrd(program: Command): void {
     .option("--json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.prdListHelpAfter}`)
     .action(async (options: PrdListOptions) => {
-      try {
-        const projectRoot = await resolveProjectRoot(process.cwd());
-        if (!projectRoot) {
-          throw new Error("未找到 .prdkit/config.json，请先运行 prdkit init 初始化项目");
-        }
-
-        const prdsDir = path.join(projectRoot, "workspace", "prds");
-        const prdList = scanPrdFiles(prdsDir);
-
-        if (options.json) {
-          console.log(`${JSON.stringify({ prds: prdList }, null, 2)}\n`);
-          return;
-        }
-
-        console.log(formatPrdList(prdList));
-        console.log(chalk.dim(`\n共找到 ${prdList.length} 个 PRD 文档`));
-      } catch (error) {
-        fail(error instanceof Error ? error.message : String(error));
-        process.exit(1);
+      const projectRoot = await resolveProjectRoot(process.cwd());
+      if (!projectRoot) {
+        throw ConfigError.projectNotInitialized();
       }
+
+      const prdsDir = path.join(projectRoot, "workspace", "prds");
+      const prdList = scanPrdFiles(prdsDir);
+
+      if (options.json) {
+        console.log(`${JSON.stringify({ prds: prdList }, null, 2)}\n`);
+        return;
+      }
+
+      console.log(formatPrdList(prdList));
+      console.log(chalk.dim(`\n共找到 ${prdList.length} 个 PRD 文档`));
     });
 }

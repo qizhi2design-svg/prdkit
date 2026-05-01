@@ -91,3 +91,11 @@ export interface ActiveCheckpointPreview {
   marks: Mark[];
   message?: string;
 }
+
+export interface CheckpointStatus {
+  prototypePath: string;
+  latestCheckpointId: string | null;
+  hasChanges: boolean;
+  changeCount: number;
+  summary: CheckpointSummary;
+}

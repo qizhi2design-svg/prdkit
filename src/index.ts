@@ -15,7 +15,8 @@ import { registerUpdate } from "./commands/update.js";
 import { registerPublish } from "./commands/publish.js";
 import { registerCheckpoint } from "./commands/checkpoint.js";
 import { registerInfo } from "./commands/info.js";
-import { fail } from "./ui.js";
+import { handleError } from "./error-handler.js";
+import { UserCancelledError } from "./errors.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -54,9 +55,10 @@ registerPublish(program);
 registerCheckpoint(program);
 
 program.parseAsync(process.argv).catch((error: unknown) => {
+  // 用户取消操作（Ctrl+C）
   if (error instanceof Error && error.message.includes("force closed the prompt")) {
-    process.exit(0);
+    throw new UserCancelledError();
   }
-  fail(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+  // 其他错误直接抛出，由 handleError 处理
+  throw error;
+}).catch(handleError);

@@ -3,10 +3,10 @@ import { execSync } from 'child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fail, success } from '../ui.js';
+import { logger } from '../logger.js';
 import { COPY } from '../command-text.js';
-import ora from 'ora';
 import chalk from 'chalk';
+import { NetworkError } from '../errors.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -32,7 +32,7 @@ export function registerUpdate(program: Command) {
     .description(COPY.updateDescription)
     .addHelpText('after', COPY.updateHelpAfter)
     .action(async () => {
-      const spinner = ora('正在检查版本...').start();
+      const spinner = logger.spinner('正在检查版本...').start();
 
       try {
         // 获取当前版本
@@ -54,8 +54,10 @@ export function registerUpdate(program: Command) {
           latestVersion = output.trim();
         } catch (error) {
           spinner.fail('无法查询最新版本');
-          console.error(error instanceof Error ? error.message : String(error));
-          process.exit(1);
+          throw NetworkError.connectionFailed(
+            `npm registry for ${packageName}`,
+            error instanceof Error ? error : undefined
+          );
         }
 
         spinner.stop();
@@ -64,7 +66,7 @@ export function registerUpdate(program: Command) {
         const comparison = compareVersions(currentVersion, latestVersion);
 
         if (comparison === 0) {
-          success(`当前已是最新版本: ${currentVersion}`);
+          logger.success(`当前已是最新版本: ${currentVersion}`);
           return;
         }
 
@@ -79,7 +81,7 @@ export function registerUpdate(program: Command) {
         console.log('');
 
         // 执行更新
-        const updateSpinner = ora('正在更新...').start();
+        const updateSpinner = logger.spinner('正在更新...').start();
         try {
           execSync(`pnpm add -g ${packageName}@latest`, {
             stdio: 'inherit'
@@ -87,13 +89,11 @@ export function registerUpdate(program: Command) {
           updateSpinner.succeed(`更新成功！当前版本: ${latestVersion}`);
         } catch (error) {
           updateSpinner.fail('更新失败');
-          console.error(error instanceof Error ? error.message : String(error));
-          process.exit(1);
+          throw error;
         }
       } catch (error) {
         spinner.fail('检查更新失败');
-        fail(error instanceof Error ? error.message : String(error));
-        process.exit(1);
+        throw error;
       }
     });
 }

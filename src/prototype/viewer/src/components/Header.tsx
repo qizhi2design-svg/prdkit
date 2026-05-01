@@ -1,5 +1,5 @@
 import { MenuFoldOutlined, MenuUnfoldOutlined, FileOutlined, CaretRightOutlined, HistoryOutlined } from '@ant-design/icons';
-import { Button, Tooltip, Segmented } from 'antd';
+import { Badge, Button, Tooltip, Segmented } from 'antd';
 import type { ViewMode } from '../types';
 import './Header.css';
 
@@ -13,10 +13,29 @@ interface HeaderProps {
   onViewModeChange: (mode: ViewMode) => void;
   onOpenPublish: () => void;
   onOpenHistory: () => void;
+  onSaveVersion: () => void;
   historyDisabled?: boolean;
+  saveDisabled?: boolean;
+  saveSubmitting?: boolean;
+  saveChangeCount?: number;
 }
 
-export default function Header({ collapsed, onToggle, currentFile, currentIndex, totalFiles, viewMode, onViewModeChange, onOpenPublish, onOpenHistory, historyDisabled = false }: HeaderProps) {
+export default function Header({
+  collapsed,
+  onToggle,
+  currentFile,
+  currentIndex,
+  totalFiles,
+  viewMode,
+  onViewModeChange,
+  onOpenPublish,
+  onOpenHistory,
+  onSaveVersion,
+  historyDisabled = false,
+  saveDisabled = false,
+  saveSubmitting = false,
+  saveChangeCount = 0,
+}: HeaderProps) {
   // 从路径中提取文件名（去掉父级目录）
   const getFileName = (path: string | null) => {
     if (!path) return null;
@@ -75,6 +94,16 @@ export default function Header({ collapsed, onToggle, currentFile, currentIndex,
         >
           历史记录
         </Button>
+        <Badge count={saveChangeCount} size="small" offset={[-6, 6]} className="header-save-badge">
+          <Button
+            className="header-save-button"
+            onClick={onSaveVersion}
+            disabled={saveDisabled}
+            loading={saveSubmitting}
+          >
+            更新版本
+          </Button>
+        </Badge>
         <Button color="primary" variant="solid" icon={<CaretRightOutlined />} iconPosition="end" onClick={onOpenPublish}>
           发布项目
         </Button>

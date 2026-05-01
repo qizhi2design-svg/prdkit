@@ -7,7 +7,8 @@ import { COPY } from "../command-text.js";
 import { loadConfig, resolveProjectRoot } from "../config.js";
 import { listCheckpointRecords } from "../prototype/checkpoint/store.js";
 import { flattenPrototypes, scanPrototypes } from "../prototype/server/scanner.js";
-import { fail } from "../ui.js";
+import { logger } from "../logger.js";
+import { ConfigError } from "../errors.js";
 
 interface InfoOptions {
   json?: boolean;
@@ -75,8 +76,7 @@ function countCheckpoints(projectRoot: string): number {
 export async function getProjectStats(projectRoot: string): Promise<ProjectStats> {
   const config = await loadConfig(projectRoot);
   if (!config) {
-    fail("未找到项目配置文件");
-    throw new Error("未找到项目配置文件");
+    throw ConfigError.notFound(path.join(projectRoot, ".prdkit", "config.json"));
   }
 
   const workspaceDir = path.join(projectRoot, 'workspace');
@@ -138,8 +138,7 @@ export function registerInfo(program: Command): void {
     .action(async (options: InfoOptions) => {
       const projectRoot = await resolveProjectRoot();
       if (!projectRoot) {
-        fail(COPY.notInProjectError);
-        return;
+        throw ConfigError.projectNotInitialized();
       }
 
       const stats = await getProjectStats(projectRoot);

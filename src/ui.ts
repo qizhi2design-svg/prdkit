@@ -1,20 +1,33 @@
-import chalk from "chalk";
 import type { Ora } from "ora";
+import { logger } from "./logger.js";
+
+/**
+ * 向后兼容层：保留原有的 UI 函数，内部使用新的 logger
+ */
 
 export function success(message: string): void {
-  console.log(`${chalk.green("✓")} ${message}`);
+  logger.success(message);
 }
 
 export function info(message: string): void {
-  console.log(`${chalk.cyan("i")} ${message}`);
+  logger.info(message);
 }
 
 export function warn(message: string): void {
-  console.warn(`${chalk.yellow("!")} ${message}`);
+  logger.warn(message);
 }
 
 export function fail(message: string): void {
-  console.error(`${chalk.red("✖")} ${message}`);
+  logger.error(message);
+}
+
+/**
+ * 输出错误并退出进程
+ * @deprecated 使用 error-handler.ts 中的 handleError 替代
+ */
+export function failAndExit(message: string, exitCode = 1): never {
+  fail(message);
+  process.exit(exitCode);
 }
 
 export async function withSpinner<T>(
@@ -38,3 +51,6 @@ export async function withSpinner<T>(
     throw error;
   }
 }
+
+// Re-export logger for direct access
+export { logger } from "./logger.js";

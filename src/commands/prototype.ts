@@ -4,7 +4,8 @@ import chalk from "chalk";
 import { COPY } from "../command-text.js";
 import { resolveProjectRoot } from "../config.js";
 import { flattenPrototypes, scanPrototypes } from "../prototype/server/scanner.js";
-import { fail } from "../ui.js";
+import { logger } from "../logger.js";
+import { ConfigError, ValidationError } from "../errors.js";
 import { runCreateTemplate, type CreateTemplateOptions } from "./create-template.js";
 
 interface PrototypeListOptions {
@@ -35,7 +36,10 @@ function resolvePrototypeTemplate(template?: string): string {
   const normalized = template.trim().toLowerCase();
   const resolved = prototypeTemplateAliases[normalized];
   if (!resolved) {
-    throw new Error("不支持的原型模板，请使用 web、mobile、admin、prototype-mobile 或 prototype-admin");
+    throw ValidationError.invalidInput(
+      "template",
+      "不支持的原型模板，请使用 web、mobile、admin、prototype-mobile 或 prototype-admin"
+    );
   }
   return resolved;
 }
@@ -74,26 +78,21 @@ export function registerPrototype(program: Command): void {
     .option("--json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.prototypeListHelpAfter}`)
     .action(async (options: PrototypeListOptions) => {
-      try {
-        const projectRoot = await resolveProjectRoot(process.cwd());
-        if (!projectRoot) {
-          throw new Error("未找到 .prdkit/config.json，请先运行 prdkit init 初始化项目");
-        }
-
-        const prototypesDir = path.join(projectRoot, "workspace", "prototypes");
-        const tree = scanPrototypes(prototypesDir);
-        const prototypeList = flattenPrototypes(tree);
-
-        if (options.json) {
-          console.log(`${JSON.stringify({ prototypes: prototypeList }, null, 2)}\n`);
-          return;
-        }
-
-        console.log(formatPrototypeList(prototypeList));
-        console.log(chalk.dim(`\n共找到 ${prototypeList.length} 个原型`));
-      } catch (error) {
-        fail(error instanceof Error ? error.message : String(error));
-        process.exit(1);
+      const projectRoot = await resolveProjectRoot(process.cwd());
+      if (!projectRoot) {
+        throw ConfigError.projectNotInitialized();
       }
+
+      const prototypesDir = path.join(projectRoot, "workspace", "prototypes");
+      const tree = scanPrototypes(prototypesDir);
+      const prototypeList = flattenPrototypes(tree);
+
+      if (options.json) {
+        console.log(`${JSON.stringify({ prototypes: prototypeList }, null, 2)}\n`);
+        return;
+      }
+
+      console.log(formatPrototypeList(prototypeList));
+      console.log(chalk.dim(`\n共找到 ${prototypeList.length} 个原型`));
     });
 }

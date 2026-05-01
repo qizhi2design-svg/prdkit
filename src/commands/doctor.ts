@@ -6,7 +6,8 @@ import { COPY } from "../command-text.js";
 import { loadConfig } from "../config.js";
 import { createDefaultConfig } from "../defaults.js";
 import { ensureTemplateRepo } from "../templates.js";
-import { fail, info, success, warn } from "../ui.js";
+import { logger } from "../logger.js";
+import { ConfigError, FileSystemError } from "../errors.js";
 import type { PrdkitConfig } from "../types.js";
 
 type DoctorOptions = {
@@ -89,11 +90,11 @@ async function fixProjectStructure(
   const missingItems = results.filter((r) => !r.exists && r.required);
 
   if (missingItems.length === 0) {
-    success("项目结构完整，无需修复");
+    logger.success("项目结构完整，无需修复");
     return;
   }
 
-  info(`开始修复 ${missingItems.length} 个缺失项...`);
+  logger.info(`开始修复 ${missingItems.length} 个缺失项...`);
 
   const configFileMissing = missingItems.some(item => item.path.endsWith("config.json"));
   const templatesDirMissing = missingItems.some(item => item.path.endsWith("templates"));
@@ -105,11 +106,11 @@ async function fixProjectStructure(
       if (item.type === "directory" && !isTemplatesDir) {
         mkdirSync(item.path, { recursive: true });
         const relativePath = relative(process.cwd(), item.path);
-        success(`创建目录: ${relativePath}`);
+        logger.success(`创建目录: ${relativePath}`);
       }
     } catch (error) {
       const relativePath = relative(process.cwd(), item.path);
-      fail(`修复失败 ${relativePath}: ${error instanceof Error ? error.message : String(error)}`);
+      logger.error(`修复失败 ${relativePath}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -118,7 +119,7 @@ async function fixProjectStructure(
   // 如果配置文件缺失，创建配置文件
   if (configFileMissing) {
     try {
-      info("\n配置文件缺失，需要创建配置文件...");
+      logger.info("\n配置文件缺失，需要创建配置文件...");
 
       let projectName = "";
       let author = "";
@@ -127,7 +128,7 @@ async function fixProjectStructure(
         // 自动模式：使用默认值
         projectName = "My Project";
         author = "Unknown";
-        info("使用默认配置创建配置文件");
+        logger.info("使用默认配置创建配置文件");
       } else {
         // 交互模式：询问用户
         projectName = await input({
@@ -146,10 +147,12 @@ async function fixProjectStructure(
       const configPath = join(projectRoot, ".prdkit", "config.json");
       writeFileSync(configPath, JSON.stringify(config, null, 2));
       const relativeConfigPath = relative(process.cwd(), configPath);
-      success(`创建配置文件: ${relativeConfigPath}`);
+      logger.success(`创建配置文件: ${relativeConfigPath}`);
     } catch (error) {
-      fail(`创建配置文件失败: ${error instanceof Error ? error.message : String(error)}`);
-      return;
+      throw ConfigError.writeFailed(
+        join(projectRoot, ".prdkit", "config.json"),
+        error instanceof Error ? error : undefined
+      );
     }
   }
 
@@ -160,20 +163,19 @@ async function fixProjectStructure(
       if (!config) {
         config = await loadConfig(projectRoot);
         if (!config) {
-          fail("无法读取配置文件，请先运行 prdkit init");
-          return;
+          throw ConfigError.notFound(join(projectRoot, ".prdkit", "config.json"));
         }
       }
 
-      info("\n正在拉取模板仓库...");
+      logger.info("\n正在拉取模板仓库...");
       await ensureTemplateRepo(config.templateRepo, projectRoot);
-      success("模板仓库拉取完成");
+      logger.success("模板仓库拉取完成");
     } catch (error) {
-      fail(`拉取模板仓库失败: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
     }
   }
 
-  success("\n修复完成");
+  logger.success("\n修复完成");
 }
 
 /**
@@ -328,11 +330,11 @@ async function checkPrototypeMarks(projectRoot: string): Promise<MarkFileIssue[]
  */
 async function fixPrototypeMarks(issues: MarkFileIssue[], autoFix: boolean): Promise<void> {
   if (issues.length === 0) {
-    success("所有 prototype marks 文件格式正确");
+    logger.success("所有 prototype marks 文件格式正确");
     return;
   }
 
-  info(`开始修复 ${issues.length} 个 marks 文件问题...`);
+  logger.info(`开始修复 ${issues.length} 个 marks 文件问题...`);
 
   for (const issue of issues) {
     try {
@@ -363,7 +365,7 @@ async function fixPrototypeMarks(issues: MarkFileIssue[], autoFix: boolean): Pro
         await fs.unlink(issue.filePath + '.bak');
 
         const relativePath = relative(process.cwd(), issue.filePath);
-        success(`重命名: ${relativePath} → ${newFileName}`);
+        logger.success(`重命名: ${relativePath} → ${newFileName}`);
       } else if (issue.issue === "frontmatter_mismatch") {
         // 更新 frontmatter 中的 id
         const content = readFileSync(issue.filePath, 'utf-8');
@@ -381,15 +383,15 @@ async function fixPrototypeMarks(issues: MarkFileIssue[], autoFix: boolean): Pro
         writeFileSync(issue.filePath, newContent, 'utf-8');
 
         const relativePath = relative(process.cwd(), issue.filePath);
-        success(`更新 frontmatter: ${relativePath}`);
+        logger.success(`更新 frontmatter: ${relativePath}`);
       }
     } catch (error) {
       const relativePath = relative(process.cwd(), issue.filePath);
-      fail(`修复失败 ${relativePath}: ${error instanceof Error ? error.message : String(error)}`);
+      logger.error(`修复失败 ${relativePath}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
-  success("\nmarks 文件修复完成");
+  logger.success("\nmarks 文件修复完成");
 }
 
 export function registerDoctor(program: Command): void {
@@ -399,84 +401,80 @@ export function registerDoctor(program: Command): void {
     .option("--fix", "自动修复发现的问题")
     .addHelpText("after", COPY.doctorHelpAfter)
     .action(async (options: DoctorOptions) => {
-      try {
-        const projectRoot = process.cwd();
+      const projectRoot = process.cwd();
 
-        // 检查项目结构
-        info("正在检查项目结构...");
-        const results = await checkProjectStructure(projectRoot);
+      // 检查项目结构
+      logger.info("正在检查项目结构...");
+      const results = await checkProjectStructure(projectRoot);
 
-        const missingItems = results.filter((r) => !r.exists && r.required);
-        const existingItems = results.filter((r) => r.exists);
+      const missingItems = results.filter((r) => !r.exists && r.required);
+      const existingItems = results.filter((r) => r.exists);
 
-        console.log("\n项目结构检查结果:");
-        console.log(`✓ 完整: ${existingItems.length} 项`);
-        console.log(`✗ 缺失: ${missingItems.length} 项\n`);
+      console.log("\n项目结构检查结果:");
+      console.log(`✓ 完整: ${existingItems.length} 项`);
+      console.log(`✗ 缺失: ${missingItems.length} 项\n`);
 
-        let hasStructureIssues = false;
+      let hasStructureIssues = false;
 
-        if (missingItems.length > 0) {
-          hasStructureIssues = true;
-          warn("发现以下缺失项:");
-          for (const item of missingItems) {
-            const relativePath = relative(process.cwd(), item.path);
-            console.log(`  - ${relativePath} (${item.type})`);
-          }
-          console.log();
+      if (missingItems.length > 0) {
+        hasStructureIssues = true;
+        logger.warn("发现以下缺失项:");
+        for (const item of missingItems) {
+          const relativePath = relative(process.cwd(), item.path);
+          console.log(`  - ${relativePath} (${item.type})`);
         }
+        console.log();
+      }
 
-        // 检查 prototype marks 文件
-        info("正在检查 prototype marks 文件...");
-        const markIssues = await checkPrototypeMarks(projectRoot);
+      // 检查 prototype marks 文件
+      logger.info("正在检查 prototype marks 文件...");
+      const markIssues = await checkPrototypeMarks(projectRoot);
 
-        console.log("\nPrototype marks 检查结果:");
-        if (markIssues.length === 0) {
-          console.log("✓ 所有 marks 文件格式正确\n");
+      console.log("\nPrototype marks 检查结果:");
+      if (markIssues.length === 0) {
+        console.log("✓ 所有 marks 文件格式正确\n");
+      } else {
+        console.log(`✗ 发现 ${markIssues.length} 个问题\n`);
+        logger.warn("发现以下问题:");
+        for (const issue of markIssues) {
+          const relativePath = relative(process.cwd(), issue.filePath);
+          if (issue.issue === "invalid_filename") {
+            console.log(`  - ${relativePath}: 文件名格式不正确（应为 mark-{timestamp}.md）`);
+          } else if (issue.issue === "frontmatter_mismatch") {
+            console.log(`  - ${relativePath}: frontmatter id 不匹配（当前: ${issue.currentId}, 应为: ${issue.expectedId}）`);
+          }
+        }
+        console.log();
+      }
+
+      // 修复问题
+      if (missingItems.length > 0 || markIssues.length > 0) {
+        if (options.fix) {
+          if (hasStructureIssues) {
+            await fixProjectStructure(projectRoot, results, true);
+          }
+          if (markIssues.length > 0) {
+            await fixPrototypeMarks(markIssues, true);
+          }
         } else {
-          console.log(`✗ 发现 ${markIssues.length} 个问题\n`);
-          warn("发现以下问题:");
-          for (const issue of markIssues) {
-            const relativePath = relative(process.cwd(), issue.filePath);
-            if (issue.issue === "invalid_filename") {
-              console.log(`  - ${relativePath}: 文件名格式不正确（应为 mark-{timestamp}.md）`);
-            } else if (issue.issue === "frontmatter_mismatch") {
-              console.log(`  - ${relativePath}: frontmatter id 不匹配（当前: ${issue.currentId}, 应为: ${issue.expectedId}）`);
-            }
-          }
-          console.log();
-        }
+          const shouldFix = await confirm({
+            message: "是否修复这些问题?",
+            default: true,
+          });
 
-        // 修复问题
-        if (missingItems.length > 0 || markIssues.length > 0) {
-          if (options.fix) {
+          if (shouldFix) {
             if (hasStructureIssues) {
-              await fixProjectStructure(projectRoot, results, true);
+              await fixProjectStructure(projectRoot, results, false);
             }
             if (markIssues.length > 0) {
-              await fixPrototypeMarks(markIssues, true);
+              await fixPrototypeMarks(markIssues, false);
             }
           } else {
-            const shouldFix = await confirm({
-              message: "是否修复这些问题?",
-              default: true,
-            });
-
-            if (shouldFix) {
-              if (hasStructureIssues) {
-                await fixProjectStructure(projectRoot, results, false);
-              }
-              if (markIssues.length > 0) {
-                await fixPrototypeMarks(markIssues, false);
-              }
-            } else {
-              info("已取消修复");
-            }
+            logger.info("已取消修复");
           }
-        } else {
-          success("\n所有检查通过 ✓");
         }
-      } catch (error) {
-        fail(error instanceof Error ? error.message : String(error));
+      } else {
+        logger.success("\n所有检查通过 ✓");
       }
     });
 }

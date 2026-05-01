@@ -5,7 +5,8 @@ import chalk from "chalk";
 import open from "open";
 import { COPY } from "../command-text.js";
 import { resolveProjectRoot } from "../config.js";
-import { fail, info, success, warn } from "../ui.js";
+import { logger } from "../logger.js";
+import { ConfigError, FileSystemError, PrototypeError } from "../errors.js";
 import {
   diffCheckpoints,
   diffCurrentAgainstLatest
@@ -50,12 +51,12 @@ function outputJson(value: unknown): void {
 async function resolveCheckpointContext(): Promise<{ projectRoot: string; prototypesDir: string }> {
   const projectRoot = await resolveProjectRoot(process.cwd());
   if (!projectRoot) {
-    throw new Error("未找到 .prdkit/config.json，请先运行 prdkit init 初始化项目");
+    throw ConfigError.projectNotInitialized();
   }
 
   const prototypesDir = path.join(projectRoot, "workspace", "prototypes");
   if (!existsSync(prototypesDir)) {
-    throw new Error("未找到 workspace/prototypes 目录");
+    throw FileSystemError.directoryNotFound(prototypesDir);
   }
 
   return { projectRoot, prototypesDir };
@@ -64,7 +65,7 @@ async function resolveCheckpointContext(): Promise<{ projectRoot: string; protot
 function ensurePrototypeExists(prototypesDir: string, prototypePath: string): void {
   const target = path.join(prototypesDir, prototypePath);
   if (!existsSync(target)) {
-    throw new Error(`原型 "${prototypePath}" 不存在`);
+    throw PrototypeError.notFound(prototypePath);
   }
 }
 
@@ -107,23 +108,18 @@ export function registerCheckpoint(program: Command): void {
     .option("--json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointPreviewHelpAfter}`)
     .action(async (checkpointId: string, options: { open?: boolean; json?: boolean }) => {
-      try {
-        const { projectRoot } = await resolveCheckpointContext();
-        const result = await materializeCheckpointPreview(projectRoot, checkpointId);
+      const { projectRoot } = await resolveCheckpointContext();
+      const result = await materializeCheckpointPreview(projectRoot, checkpointId);
 
-        if (options.json) {
-          outputJson(result);
-          return;
-        }
+      if (options.json) {
+        outputJson(result);
+        return;
+      }
 
-        success(`已生成 checkpoint 预览目录：${result.previewDir}`);
-        info(`入口文件：${result.entryFilePath}`);
-        if (options.open) {
-          await open(result.entryFilePath);
-        }
-      } catch (error) {
-        fail(error instanceof Error ? error.message : String(error));
-        process.exit(1);
+      logger.success(`已生成 checkpoint 预览目录：${result.previewDir}`);
+      logger.info(`入口文件：${result.entryFilePath}`);
+      if (options.open) {
+        await open(result.entryFilePath);
       }
     });
 
@@ -135,33 +131,28 @@ export function registerCheckpoint(program: Command): void {
     .option("--json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointCreateHelpAfter}`)
     .action(async (prototypePath: string, options: CreateOptions) => {
-      try {
-        const { projectRoot, prototypesDir } = await resolveCheckpointContext();
-        ensurePrototypeExists(prototypesDir, prototypePath);
-        const result = await createCheckpoint({
-          projectRoot,
-          prototypesDir,
-          prototypePath,
-          kind: "manual",
-          message: options.message
-        });
+      const { projectRoot, prototypesDir } = await resolveCheckpointContext();
+      ensurePrototypeExists(prototypesDir, prototypePath);
+      const result = await createCheckpoint({
+        projectRoot,
+        prototypesDir,
+        prototypePath,
+        kind: "manual",
+        message: options.message
+      });
 
-        if (options.json) {
-          outputJson(result);
-          return;
-        }
-
-        if (!result.created) {
-          warn(`没有检测到新变更，最近 checkpoint：${result.record.id}`);
-          return;
-        }
-
-        success(`已创建 checkpoint：${result.record.id}`);
-        info(`原型：${prototypePath}`);
-      } catch (error) {
-        fail(error instanceof Error ? error.message : String(error));
-        process.exit(1);
+      if (options.json) {
+        outputJson(result);
+        return;
       }
+
+      if (!result.created) {
+        logger.warn(`没有检测到新变更，最近 checkpoint：${result.record.id}`);
+        return;
+      }
+
+      logger.success(`已创建 checkpoint：${result.record.id}`);
+      logger.info(`原型：${prototypePath}`);
     });
 
   const session = checkpoint.command("session").description(COPY.checkpointSessionDescription);
@@ -173,22 +164,17 @@ export function registerCheckpoint(program: Command): void {
     .option("--json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointSessionStartHelpAfter}`)
     .action(async (options: SessionStartOptions) => {
-      try {
-        const { projectRoot } = await resolveCheckpointContext();
-        const result = await startCheckpointSession(projectRoot, options.name);
+      const { projectRoot } = await resolveCheckpointContext();
+      const result = await startCheckpointSession(projectRoot, options.name);
 
-        if (options.json) {
-          outputJson(result);
-          return;
-        }
+      if (options.json) {
+        outputJson(result);
+        return;
+      }
 
-        success(`已启动 session：${result.id}`);
-        if (result.name) {
-          info(`名称：${result.name}`);
-        }
-      } catch (error) {
-        fail(error instanceof Error ? error.message : String(error));
-        process.exit(1);
+      logger.success(`已启动 session：${result.id}`);
+      if (result.name) {
+        logger.info(`名称：${result.name}`);
       }
     });
 
@@ -198,30 +184,25 @@ export function registerCheckpoint(program: Command): void {
     .option("--json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointSessionStatusHelpAfter}`)
     .action(async (options: CheckpointBaseOptions) => {
-      try {
-        const { projectRoot } = await resolveCheckpointContext();
-        const current = getCheckpointSession(projectRoot);
+      const { projectRoot } = await resolveCheckpointContext();
+      const current = getCheckpointSession(projectRoot);
 
-        if (options.json) {
-          outputJson({ session: current ?? null });
-          return;
-        }
-
-        if (!current) {
-          warn("当前没有进行中的 session");
-          return;
-        }
-
-        console.log(`${chalk.bold(current.id)} ${chalk.green("[active]")}`);
-        if (current.name) {
-          console.log(`${chalk.dim("name:")} ${current.name}`);
-        }
-        console.log(`${chalk.dim("startedAt:")} ${current.startedAt}`);
-        console.log(`${chalk.dim("updatedAt:")} ${current.updatedAt}`);
-      } catch (error) {
-        fail(error instanceof Error ? error.message : String(error));
-        process.exit(1);
+      if (options.json) {
+        outputJson({ session: current ?? null });
+        return;
       }
+
+      if (!current) {
+        logger.warn("当前没有进行中的 session");
+        return;
+      }
+
+      console.log(`${chalk.bold(current.id)} ${chalk.green("[active]")}`);
+      if (current.name) {
+        console.log(`${chalk.dim("name:")} ${current.name}`);
+      }
+      console.log(`${chalk.dim("startedAt:")} ${current.startedAt}`);
+      console.log(`${chalk.dim("updatedAt:")} ${current.updatedAt}`);
     });
 
   session
@@ -230,25 +211,20 @@ export function registerCheckpoint(program: Command): void {
     .option("--json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointSessionEndHelpAfter}`)
     .action(async (options: CheckpointBaseOptions) => {
-      try {
-        const { projectRoot } = await resolveCheckpointContext();
-        const result = await endCheckpointSession(projectRoot);
+      const { projectRoot } = await resolveCheckpointContext();
+      const result = await endCheckpointSession(projectRoot);
 
-        if (options.json) {
-          outputJson({ session: result ?? null });
-          return;
-        }
-
-        if (!result) {
-          warn("当前没有进行中的 session");
-          return;
-        }
-
-        success(`已结束 session：${result.id}`);
-      } catch (error) {
-        fail(error instanceof Error ? error.message : String(error));
-        process.exit(1);
+      if (options.json) {
+        outputJson({ session: result ?? null });
+        return;
       }
+
+      if (!result) {
+        logger.warn("当前没有进行中的 session");
+        return;
+      }
+
+      logger.success(`已结束 session：${result.id}`);
     });
 
   checkpoint
@@ -258,26 +234,21 @@ export function registerCheckpoint(program: Command): void {
     .option("--json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointListHelpAfter}`)
     .action(async (prototypePath: string | undefined, options: CheckpointBaseOptions) => {
-      try {
-        const { projectRoot } = await resolveCheckpointContext();
-        const records = listCheckpointRecords(projectRoot, prototypePath);
+      const { projectRoot } = await resolveCheckpointContext();
+      const records = listCheckpointRecords(projectRoot, prototypePath);
 
-        if (options.json) {
-          outputJson({ checkpoints: records });
-          return;
-        }
-
-        if (records.length === 0) {
-          warn("未找到任何 checkpoint");
-          return;
-        }
-
-        console.log(records.map((record, index) => formatRecord(record, index)).join("\n"));
-        console.log(chalk.dim(`\n共找到 ${records.length} 个 checkpoint`));
-      } catch (error) {
-        fail(error instanceof Error ? error.message : String(error));
-        process.exit(1);
+      if (options.json) {
+        outputJson({ checkpoints: records });
+        return;
       }
+
+      if (records.length === 0) {
+        logger.warn("未找到任何 checkpoint");
+        return;
+      }
+
+      console.log(records.map((record, index) => formatRecord(record, index)).join("\n"));
+      console.log(chalk.dim(`\n共找到 ${records.length} 个 checkpoint`));
     });
 
   checkpoint
@@ -287,23 +258,18 @@ export function registerCheckpoint(program: Command): void {
     .option("--json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointShowHelpAfter}`)
     .action(async (checkpointId: string, options: CheckpointBaseOptions) => {
-      try {
-        const { projectRoot } = await resolveCheckpointContext();
-        const data = readCheckpointData(projectRoot, checkpointId);
+      const { projectRoot } = await resolveCheckpointContext();
+      const data = readCheckpointData(projectRoot, checkpointId);
 
-        if (options.json) {
-          outputJson(data);
-          return;
-        }
-
-        console.log(formatRecord(data.manifest));
-        console.log(`${chalk.dim("createdAt:")} ${data.manifest.createdAt}`);
-        console.log(`${chalk.dim("files:")} ${data.files.length}`);
-        console.log(`${chalk.dim("marks:")} ${data.marks.length}`);
-      } catch (error) {
-        fail(error instanceof Error ? error.message : String(error));
-        process.exit(1);
+      if (options.json) {
+        outputJson(data);
+        return;
       }
+
+      console.log(formatRecord(data.manifest));
+      console.log(`${chalk.dim("createdAt:")} ${data.manifest.createdAt}`);
+      console.log(`${chalk.dim("files:")} ${data.files.length}`);
+      console.log(`${chalk.dim("marks:")} ${data.marks.length}`);
     });
 
   checkpoint
@@ -314,26 +280,21 @@ export function registerCheckpoint(program: Command): void {
     .option("--json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointDiffHelpAfter}`)
     .action(async (fromId: string, toId: string, options: CheckpointBaseOptions) => {
-      try {
-        const { projectRoot } = await resolveCheckpointContext();
-        const summary = diffCheckpoints(projectRoot, fromId, toId);
+      const { projectRoot } = await resolveCheckpointContext();
+      const summary = diffCheckpoints(projectRoot, fromId, toId);
 
-        if (options.json) {
-          outputJson(summary);
-          return;
-        }
-
-        console.log(formatSummary(summary));
-        printPathList("新增文件", summary.addedFiles);
-        printPathList("修改文件", summary.modifiedFiles);
-        printPathList("删除文件", summary.deletedFiles);
-        printPathList("新增标记", summary.markAdded);
-        printPathList("更新标记", summary.markUpdated);
-        printPathList("删除标记", summary.markDeleted);
-      } catch (error) {
-        fail(error instanceof Error ? error.message : String(error));
-        process.exit(1);
+      if (options.json) {
+        outputJson(summary);
+        return;
       }
+
+      console.log(formatSummary(summary));
+      printPathList("新增文件", summary.addedFiles);
+      printPathList("修改文件", summary.modifiedFiles);
+      printPathList("删除文件", summary.deletedFiles);
+      printPathList("新增标记", summary.markAdded);
+      printPathList("更新标记", summary.markUpdated);
+      printPathList("删除标记", summary.markDeleted);
     });
 
   checkpoint
@@ -344,27 +305,22 @@ export function registerCheckpoint(program: Command): void {
     .option("--json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointRestoreHelpAfter}`)
     .action(async (checkpointId: string, options: RestoreOptions) => {
-      try {
-        const { projectRoot, prototypesDir } = await resolveCheckpointContext();
-        const result = await restoreCheckpoint({
-          projectRoot,
-          prototypesDir,
-          checkpointId,
-          force: options.force
-        });
+      const { projectRoot, prototypesDir } = await resolveCheckpointContext();
+      const result = await restoreCheckpoint({
+        projectRoot,
+        prototypesDir,
+        checkpointId,
+        force: options.force
+      });
 
-        if (options.json) {
-          outputJson(result);
-          return;
-        }
-
-        success(`已恢复到 checkpoint：${checkpointId}`);
-        info(`原型：${result.target.prototypePath}`);
-        info(`pre-restore：${result.preRestore.id}`);
-      } catch (error) {
-        fail(error instanceof Error ? error.message : String(error));
-        process.exit(1);
+      if (options.json) {
+        outputJson(result);
+        return;
       }
+
+      logger.success(`已恢复到 checkpoint：${checkpointId}`);
+      logger.info(`原型：${result.target.prototypePath}`);
+      logger.info(`pre-restore：${result.preRestore.id}`);
     });
 
   checkpoint
@@ -374,43 +330,38 @@ export function registerCheckpoint(program: Command): void {
     .option("--json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointStatusHelpAfter}`)
     .action(async (prototypePath: string | undefined, options: CheckpointBaseOptions) => {
-      try {
-        const { projectRoot, prototypesDir } = await resolveCheckpointContext();
-        const targets = prototypePath
-          ? [prototypePath]
-          : flattenPrototypes(scanPrototypes(prototypesDir));
+      const { projectRoot, prototypesDir } = await resolveCheckpointContext();
+      const targets = prototypePath
+        ? [prototypePath]
+        : flattenPrototypes(scanPrototypes(prototypesDir));
 
-        const result = targets.map((targetPath) => {
-          const latest = getLatestCheckpointRecord(projectRoot, targetPath);
-          const snapshot = collectPrototypeSnapshot(prototypesDir, targetPath);
-          const diff = diffCurrentAgainstLatest(projectRoot, prototypesDir, targetPath);
-          return {
-            prototypePath: targetPath,
-            latestCheckpointId: latest?.id,
-            contentHash: snapshot.contentHash,
-            hasChanges: diff.hasChanges,
-            summary: diff.summary
-          };
-        });
+      const result = targets.map((targetPath) => {
+        const latest = getLatestCheckpointRecord(projectRoot, targetPath);
+        const snapshot = collectPrototypeSnapshot(prototypesDir, targetPath);
+        const diff = diffCurrentAgainstLatest(projectRoot, prototypesDir, targetPath);
+        return {
+          prototypePath: targetPath,
+          latestCheckpointId: latest?.id,
+          contentHash: snapshot.contentHash,
+          hasChanges: diff.hasChanges,
+          summary: diff.summary
+        };
+      });
 
-        if (options.json) {
-          outputJson({ checkpoints: result });
-          return;
+      if (options.json) {
+        outputJson({ checkpoints: result });
+        return;
+      }
+
+      for (const item of result) {
+        console.log(`${chalk.bold(item.prototypePath)} ${item.hasChanges ? chalk.yellow("dirty") : chalk.green("clean")}`);
+        if (item.latestCheckpointId) {
+          console.log(`  ${chalk.dim("latest:")} ${item.latestCheckpointId}`);
+        } else {
+          console.log(`  ${chalk.dim("latest:")} none`);
         }
-
-        for (const item of result) {
-          console.log(`${chalk.bold(item.prototypePath)} ${item.hasChanges ? chalk.yellow("dirty") : chalk.green("clean")}`);
-          if (item.latestCheckpointId) {
-            console.log(`  ${chalk.dim("latest:")} ${item.latestCheckpointId}`);
-          } else {
-            console.log(`  ${chalk.dim("latest:")} none`);
-          }
-          console.log(`  ${chalk.dim("files:")} +${item.summary.addedFiles.length} ~${item.summary.modifiedFiles.length} -${item.summary.deletedFiles.length}`);
-          console.log(`  ${chalk.dim("marks:")} +${item.summary.markAdded.length} ~${item.summary.markUpdated.length} -${item.summary.markDeleted.length}`);
-        }
-      } catch (error) {
-        fail(error instanceof Error ? error.message : String(error));
-        process.exit(1);
+        console.log(`  ${chalk.dim("files:")} +${item.summary.addedFiles.length} ~${item.summary.modifiedFiles.length} -${item.summary.deletedFiles.length}`);
+        console.log(`  ${chalk.dim("marks:")} +${item.summary.markAdded.length} ~${item.summary.markUpdated.length} -${item.summary.markDeleted.length}`);
       }
     });
 
@@ -421,23 +372,18 @@ export function registerCheckpoint(program: Command): void {
     .option("--json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointPruneHelpAfter}`)
     .action(async (prototypePath: string | undefined, options: CheckpointBaseOptions) => {
-      try {
-        const { projectRoot } = await resolveCheckpointContext();
-        const removed = await pruneAutoCheckpoints(projectRoot, prototypePath, 0);
-        if (options.json) {
-          outputJson({ removed });
-          return;
-        }
-
-        if (removed.length === 0) {
-          warn("没有需要清理的自动 checkpoint");
-          return;
-        }
-
-        success(`已清理 ${removed.length} 个自动 checkpoint`);
-      } catch (error) {
-        fail(error instanceof Error ? error.message : String(error));
-        process.exit(1);
+      const { projectRoot } = await resolveCheckpointContext();
+      const removed = await pruneAutoCheckpoints(projectRoot, prototypePath, 0);
+      if (options.json) {
+        outputJson({ removed });
+        return;
       }
+
+      if (removed.length === 0) {
+        logger.warn("没有需要清理的自动 checkpoint");
+        return;
+      }
+
+      logger.success(`已清理 ${removed.length} 个自动 checkpoint`);
     });
 }

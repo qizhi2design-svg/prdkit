@@ -6,7 +6,7 @@ import Header from './components/Header';
 import MarkPanel from './components/MarkPanel';
 import PublishDrawer from './components/PublishDrawer';
 import HistoryDrawer from './components/HistoryDrawer';
-import type { ActiveCheckpointPreview, ViewMode, Mark, PendingMarkInfo, PrototypeNode, CheckpointDetail } from './types';
+import type { ActiveCheckpointPreview, ViewMode, Mark, PendingMarkInfo, PrototypeNode, CheckpointDetail, CheckpointStatus } from './types';
 import './App.css';
 
 const { Sider, Content } = Layout;
@@ -43,6 +43,7 @@ function App() {
   const markPanelRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const loadMarksRef = useRef<() => void>(() => {});
+  const loadCheckpointStatusRef = useRef<() => void>(() => {});
   const [wsConnected, setWsConnected] = useState(false);
   const [reloadVersion, setReloadVersion] = useState(0);
   const [publishDrawerOpen, setPublishDrawerOpen] = useState(false);
@@ -51,6 +52,8 @@ function App() {
   const [defaultPublishPath, setDefaultPublishPath] = useState('');
   const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
   const [activeCheckpointPreview, setActiveCheckpointPreview] = useState<ActiveCheckpointPreview | null>(null);
+  const [checkpointStatus, setCheckpointStatus] = useState<CheckpointStatus | null>(null);
+  const [saveVersionSubmitting, setSaveVersionSubmitting] = useState(false);
   const currentPrototypePath = selectedFile;
   const effectiveMarks = activeCheckpointPreview?.prototypePath === currentPrototypePath
     ? activeCheckpointPreview.marks
@@ -266,10 +269,41 @@ function App() {
     loadMarksRef.current = loadMarks;
   }, [loadMarks]);
 
+  const loadCheckpointStatus = useCallback(async () => {
+    if (!currentPrototypePath) {
+      setCheckpointStatus(null);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/checkpoints/status?prototypePath=${encodeURIComponent(currentPrototypePath)}&t=${Date.now()}`, {
+        cache: 'no-store',
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || data.error || '读取版本状态失败');
+      }
+      setCheckpointStatus(data as CheckpointStatus);
+    } catch (error) {
+      console.error('读取版本状态失败:', error);
+      setCheckpointStatus(null);
+    }
+  }, [currentPrototypePath]);
+
   // 加载标记数据
   useEffect(() => {
     loadMarks();
   }, [loadMarks]);
+
+  useEffect(() => {
+    void loadCheckpointStatus();
+  }, [loadCheckpointStatus]);
+
+  useEffect(() => {
+    loadCheckpointStatusRef.current = () => {
+      void loadCheckpointStatus();
+    };
+  }, [loadCheckpointStatus]);
 
   // WebSocket 连接用于文件热重载
   useEffect(() => {
@@ -307,6 +341,7 @@ function App() {
             console.log('检测到文件变更，刷新预览并重新加载标记数据');
             setReloadVersion(prev => prev + 1);
             loadMarksRef.current();
+            loadCheckpointStatusRef.current();
           }
         } catch (error) {
           console.error('解析 WebSocket 消息失败:', error);
@@ -602,6 +637,7 @@ function App() {
       setPendingMarkInfo(null);
       setReloadVersion(prev => prev + 1);
       await loadMarks();
+      await loadCheckpointStatus();
       message.success(`已还原 ${versionLabel}`);
     } catch (error) {
       console.error('还原 checkpoint 失败:', error);
@@ -611,6 +647,34 @@ function App() {
 
   const handleExitCheckpointPreview = () => {
     setActiveCheckpointPreview(null);
+  };
+
+  const handleSaveVersion = async () => {
+    if (!currentPrototypePath || !checkpointStatus?.hasChanges || activeCheckpointPreview) {
+      return;
+    }
+
+    try {
+      setSaveVersionSubmitting(true);
+      const response = await fetch('/api/checkpoints', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prototypePath: currentPrototypePath }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || '保存版本失败');
+      }
+
+      await loadCheckpointStatus();
+      message.success(data.created ? `已保存 ${data.versionLabel}` : `没有检测到新变更，当前仍是${data.versionLabel}`);
+    } catch (error) {
+      console.error('保存版本失败:', error);
+      message.error(error instanceof Error ? error.message : '保存版本失败');
+    } finally {
+      setSaveVersionSubmitting(false);
+    }
   };
 
   const currentIndex = selectedFile ? fileList.indexOf(selectedFile) + 1 : 0;
@@ -627,7 +691,11 @@ function App() {
         onViewModeChange={setViewMode}
         onOpenPublish={handleOpenPublish}
         onOpenHistory={() => setHistoryDrawerOpen(true)}
+        onSaveVersion={handleSaveVersion}
         historyDisabled={!currentPrototypePath}
+        saveDisabled={!currentPrototypePath || !checkpointStatus?.hasChanges || Boolean(activeCheckpointPreview)}
+        saveSubmitting={saveVersionSubmitting}
+        saveChangeCount={checkpointStatus?.hasChanges ? checkpointStatus.changeCount : 0}
       />
       <Layout className="app-content-layout">
         <Sider
