@@ -17,6 +17,10 @@ interface InfoOptions {
 interface ProjectStats {
   projectName: string;
   author: string;
+  description?: string;
+  productPositioning?: string;
+  teamSize?: string;
+  projectStage?: string;
   prds: {
     total: number;
     byStatus: Record<string, number>;
@@ -94,6 +98,10 @@ export async function getProjectStats(projectRoot: string): Promise<ProjectStats
   return {
     projectName: config.projectName,
     author: config.author,
+    description: config.description,
+    productPositioning: config.productPositioning,
+    teamSize: config.teamSize,
+    projectStage: config.projectStage,
     prds,
     prototypes,
     discussions,
@@ -108,6 +116,18 @@ function displayStats(stats: ProjectStats): void {
   console.log(chalk.gray('─'.repeat(50)));
   console.log(`${chalk.yellow('项目名称:')} ${stats.projectName}`);
   console.log(`${chalk.yellow('作者:')} ${stats.author}`);
+  if (stats.description) {
+    console.log(`${chalk.yellow('项目描述:')} ${stats.description}`);
+  }
+  if (stats.productPositioning) {
+    console.log(`${chalk.yellow('产品定型:')} ${stats.productPositioning}`);
+  }
+  if (stats.teamSize) {
+    console.log(`${chalk.yellow('团队规模:')} ${stats.teamSize}`);
+  }
+  if (stats.projectStage) {
+    console.log(`${chalk.yellow('项目阶段:')} ${stats.projectStage}`);
+  }
   console.log();
 
   console.log(chalk.cyan.bold('内容统计'));

@@ -1,5 +1,5 @@
-import { Tree, Input, Tooltip } from 'antd';
-import { FileOutlined, FolderOutlined, SearchOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
+import { Tree, Input, Tooltip, Button, Popconfirm } from 'antd';
+import { FileOutlined, FolderOutlined, SearchOutlined, LeftOutlined, RightOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import type { DataNode } from 'antd/es/tree';
 import './FileTree.css';
@@ -8,6 +8,9 @@ interface FileTreeProps {
   onSelect: (path: string | null) => void;
   selectedFile: string | null;
   onNavigate: (direction: 'prev' | 'next') => void;
+  onDeletePrototype: (path: string) => Promise<void> | void;
+  refreshVersion?: number;
+  onFilesUpdate?: (files: string[]) => void;
 }
 
 interface PrototypeNode {
@@ -21,7 +24,8 @@ interface PrototypeNode {
 function convertToTreeData(
   node: PrototypeNode,
   searchValue: string,
-  onFolderClick?: (key: string) => void
+  onFolderClick?: (key: string) => void,
+  onDeletePrototype?: (path: string) => Promise<void> | void
 ): DataNode | null {
   const isFolder = node.type === 'folder';
   const matchesSearch = !searchValue || node.name.toLowerCase().includes(searchValue.toLowerCase());
@@ -42,21 +46,48 @@ function convertToTreeData(
   }
 
   const nodeKey = node.path || 'root';
+  const isFile = node.type === 'file';
 
   return {
     key: nodeKey,
     title: (
       <Tooltip title={node.name} placement="right">
-        <div
-          className="file-tree-node-title"
-          onClick={(e) => {
-            if (isFolder && onFolderClick) {
-              e.stopPropagation();
-              onFolderClick(nodeKey);
-            }
-          }}
-        >
-          {node.name}
+        <div className="file-tree-node-row">
+          <div
+            className="file-tree-node-title"
+            onClick={(e) => {
+              if (isFolder && onFolderClick) {
+                e.stopPropagation();
+                onFolderClick(nodeKey);
+              }
+            }}
+          >
+            {node.name}
+          </div>
+          {isFile && onDeletePrototype && (
+            <Popconfirm
+              title="删除页面"
+              description="将删除页面目录及页面下的标记文件，checkpoint 历史会保留，确认继续？"
+              okText="删除"
+              cancelText="取消"
+              okButtonProps={{ danger: true }}
+              onConfirm={(e) => {
+                e?.stopPropagation();
+                return onDeletePrototype(node.path);
+              }}
+            >
+              <Button
+                type="text"
+                danger
+                size="small"
+                icon={<DeleteOutlined />}
+                className="file-tree-delete-button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+              />
+            </Popconfirm>
+          )}
         </div>
       </Tooltip>
     ),
@@ -67,7 +98,14 @@ function convertToTreeData(
   };
 }
 
-export default function FileTree({ onSelect, selectedFile, onNavigate }: FileTreeProps) {
+export default function FileTree({
+  onSelect,
+  selectedFile,
+  onNavigate,
+  onDeletePrototype,
+  refreshVersion = 0,
+  onFilesUpdate,
+}: FileTreeProps) {
   const [treeData, setTreeData] = useState<DataNode[]>([]);
   const [originalData, setOriginalData] = useState<PrototypeNode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,14 +120,18 @@ export default function FileTree({ onSelect, selectedFile, onNavigate }: FileTre
   }, []);
 
   useEffect(() => {
+    fetchPrototypes();
+  }, [refreshVersion]);
+
+  useEffect(() => {
     // 当搜索值变化时，重新过滤树数据
     if (originalData.length > 0) {
       const filtered = originalData
-        .map(node => convertToTreeData(node, searchValue, handleFolderClick))
+        .map(node => convertToTreeData(node, searchValue, handleFolderClick, onDeletePrototype))
         .filter(Boolean) as DataNode[];
       setTreeData(filtered);
     }
-  }, [searchValue, originalData]);
+  }, [searchValue, originalData, onDeletePrototype]);
 
   const handleFolderClick = (key: string) => {
     setExpandedKeys(prev => {
@@ -119,9 +161,23 @@ export default function FileTree({ onSelect, selectedFile, onNavigate }: FileTre
       if (data.children) {
         setOriginalData(data.children);
         const treeNodes = data.children
-          .map(node => convertToTreeData(node, '', handleFolderClick))
+          .map(node => convertToTreeData(node, '', handleFolderClick, onDeletePrototype))
           .filter(Boolean) as DataNode[];
         setTreeData(treeNodes);
+
+        const files: string[] = [];
+        const collectFiles = (nodes: PrototypeNode[]) => {
+          nodes.forEach((node) => {
+            if (node.type === 'file' && node.path) {
+              files.push(node.path);
+            }
+            if (node.children) {
+              collectFiles(node.children);
+            }
+          });
+        };
+        collectFiles(data.children);
+        onFilesUpdate?.(files);
 
         // 默认展开所有节点
         const allKeys: React.Key[] = [];

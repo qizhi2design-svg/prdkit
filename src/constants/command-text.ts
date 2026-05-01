@@ -4,8 +4,9 @@ export const COPY = {
 常用流程
   1. prdkit init ./my-product --name "My Product" --author "Alice"
   2. prdkit prd create "支付流程优化"
-  3. prdkit prototype create "首页原型" --template mobile
-  4. prdkit mark list --prototype dashboard
+  3. prdkit prd check "支付流程优化"
+  4. prdkit prototype create "首页原型" --template mobile
+  5. prdkit mark list --prototype dashboard
 `,
   initDescription: "初始化产品项目",
   initHelpAfter: `
@@ -30,13 +31,27 @@ export const COPY = {
 `,
   prdDescription: "PRD 文档相关命令",
   prdCreateDescription: "创建 PRD 文档",
+  prdCheckDescription: "定位 PRD 并给出 review skill 使用入口",
   prdCreateHelpAfter: `
 示例：
   prdkit prd create "支付流程优化"
   prdkit prd create "结算改版" --dir ./workspace/prds
+  prdkit prd create --from-plan ./draft/reference/支付流程优化-prd-plan.md
 
 说明：
   默认使用 prd 模板创建文档，输出目录默认来自项目配置中的 workspace/prds。
+  推荐先通过 prdkit-prd-create skill 完成复杂度判断和方案确认，再用 --from-plan 生成正式 PRD 初稿。
+`,
+  prdCheckHelpAfter: `
+示例：
+  prdkit prd check
+  prdkit prd check "支付流程优化"
+  prdkit prd check 支付流程优化-prd.md
+  prdkit prd check ./workspace/prds/支付流程优化-prd.md
+
+说明：
+  该命令不会在 CLI 内直接执行 AI 评审，而是负责定位目标 PRD，并给出推荐的 prdkit-prd-check skill 调用方式。
+  推荐在支持 skill 的终端中，基于命令输出继续执行 review。
 `,
   prdListDescription: "列出当前项目中的所有 PRD",
   prdListHelpAfter: `
@@ -203,6 +218,15 @@ export const COPY = {
   文件监听本身不会持续自动创建 checkpoint。
   自动选择可用端口并打开浏览器。
 `,
+  serveStatusDescription: "查看服务运行状态",
+  serveStatusHelpAfter: `
+示例：
+  prdkit serve status
+
+说明：
+  检查当前项目是否有正在运行的预览服务器。
+  显示服务的端口、模式、启动时间等信息。
+`,
   publishDescription: "导出 publish 协议产物目录",
   publishHelpAfter: `
 示例：
@@ -240,6 +264,15 @@ export const COPY = {
 
 说明：
   读取指定原型目录下 marks 文件夹中的所有标记文件。
+`,
+  markGetDescription: "获取指定标记的详细信息",
+  markGetHelpAfter: `
+示例：
+  prdkit mark get mark-1777349007244 --prototype dashboard
+  prdkit mark get mark-1777349007244 --prototype dashboard --json
+
+说明：
+  读取指定标记的完整内容，包括标题、描述、选择器等信息。
 `,
   markCreateDescription: "创建标记",
   markCreateHelpAfter: `

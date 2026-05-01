@@ -73,12 +73,10 @@ export async function readTemplateContent(repoDir: string, template: TemplateIte
 }
 
 export function renderTemplate(content: string, variables: CreateTemplateVariables): string {
-  return content
-    .replaceAll("{{title}}", variables.title)
-    .replaceAll("{{creator}}", variables.creator)
-    .replaceAll("{{label}}", variables.label)
-    .replaceAll("{{status}}", variables.status)
-    .replaceAll("{{templateId}}", variables.templateId);
+  return Object.entries(variables).reduce((rendered, [key, value]) => {
+    const normalized = value == null ? "" : String(value);
+    return rendered.replaceAll(`{{${key}}}`, normalized);
+  }, content);
 }
 
 export async function isTemplateDirectory(repoDir: string, template: TemplateItem): Promise<boolean> {

@@ -133,6 +133,26 @@
   line-height: 1.4;
 }
 
+.mark-list-item .ant-list-item-action {
+  margin-left: 8px;
+}
+
+.mark-list-delete-button {
+  opacity: 0;
+  pointer-events: none;
+  color: #ff4d4f;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
+}
+
+.mark-list-item:hover .mark-list-delete-button {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.mark-list-delete-button:hover {
+  background: rgba(255, 77, 79, 0.08) !important;
+}
+
 .mark-list-item .ant-avatar {
   background-color: #f0f0f0;
   color: #8c8c8c;

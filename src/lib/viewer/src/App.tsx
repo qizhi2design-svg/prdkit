@@ -6,7 +6,8 @@ import Header from './components/Header';
 import MarkPanel from './components/MarkPanel';
 import PublishDrawer from './components/PublishDrawer';
 import HistoryDrawer from './components/HistoryDrawer';
-import type { ActiveCheckpointPreview, ViewMode, Mark, PendingMarkInfo, PrototypeNode, CheckpointDetail, CheckpointStatus } from './types';
+import { DEFAULT_COPY_TERMINAL_GUIDE, DEFAULT_INSPECT_COPY_SKILL_COMMAND, DEFAULT_MARK_CREATE_SKILL_COMMAND, DEFAULT_MARK_UPDATE_SKILL_COMMAND } from './constants/clipboard';
+import type { ActiveCheckpointPreview, ViewMode, Mark, PendingMarkInfo, PrototypeNode, CheckpointDetail, CheckpointStatus, ViewerConfigResponse, ViewerSkillConfig } from './types';
 import './App.css';
 
 const { Sider, Content } = Layout;
@@ -25,10 +26,17 @@ function App() {
   };
 
   const [selectedFile, setSelectedFile] = useState<string | null>(getInitialFile);
+  const [prototypeRefreshVersion, setPrototypeRefreshVersion] = useState(0);
   const [collapsed, setCollapsed] = useState(false);
   const [fileList, setFileList] = useState<string[]>([]);
   const [projectName, setProjectName] = useState<string>(getInitialProjectName);
   const [prototypesDir, setPrototypesDir] = useState<string>('');
+  const [viewerSkills, setViewerSkills] = useState<ViewerSkillConfig>({
+    inspectCopySkillCommand: DEFAULT_INSPECT_COPY_SKILL_COMMAND,
+    markCreateSkillCommand: DEFAULT_MARK_CREATE_SKILL_COMMAND,
+    markUpdateSkillCommand: DEFAULT_MARK_UPDATE_SKILL_COMMAND,
+    copyTerminalGuide: DEFAULT_COPY_TERMINAL_GUIDE,
+  });
   const [siderWidth, setSiderWidth] = useState(200);
   const [isResizing, setIsResizing] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('preview');
@@ -65,10 +73,16 @@ function App() {
       try {
         // 从 API 加载配置和原型数据
         const configRes = await fetch('/api/config', { cache: 'no-store' });
-        const configData = await configRes.json();
+        const configData: ViewerConfigResponse = await configRes.json();
         const loadedProjectName = configData.projectName || 'PRDKit';
         setProjectName(loadedProjectName);
         setPrototypesDir(configData.prototypesDir || '');
+        setViewerSkills(configData.viewerSkills || {
+          inspectCopySkillCommand: DEFAULT_INSPECT_COPY_SKILL_COMMAND,
+          markCreateSkillCommand: DEFAULT_MARK_CREATE_SKILL_COMMAND,
+          markUpdateSkillCommand: DEFAULT_MARK_UPDATE_SKILL_COMMAND,
+          copyTerminalGuide: DEFAULT_COPY_TERMINAL_GUIDE,
+        });
 
         const prototypesRes = await fetch('/api/prototypes', { cache: 'no-store' });
         const prototypesData: PrototypeNode = await prototypesRes.json();
@@ -125,6 +139,10 @@ function App() {
       url.searchParams.delete('projectname');
     }
     window.history.pushState({}, '', url);
+  };
+
+  const handleFilesUpdate = (files: string[]) => {
+    setFileList(files);
   };
 
   // 导航到上一个/下一个文件
@@ -458,6 +476,44 @@ function App() {
       });
   };
 
+  const handlePrototypeDelete = async (prototypePath: string) => {
+    if (activeCheckpointPreview) {
+      message.info('历史版本预览中不可删除页面，请先退出预览');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/prototypes/${encodeURIComponent(prototypePath)}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.message || data?.error || '删除页面失败');
+      }
+
+      const remainingFiles = fileList.filter((file) => file !== prototypePath);
+
+      if (selectedFile === prototypePath) {
+        const deletedIndex = fileList.indexOf(prototypePath);
+        const nextFile = remainingFiles[deletedIndex] || remainingFiles[deletedIndex - 1] || null;
+        handleFileSelect(nextFile);
+      }
+
+      setMarks([]);
+      setSelectedMarkId(null);
+      setPendingMarkInfo(null);
+      setActiveCheckpointPreview(null);
+      setCheckpointStatus(null);
+      setFileList(remainingFiles);
+      setPrototypeRefreshVersion((prev) => prev + 1);
+      message.success('页面已删除，checkpoint 历史已保留');
+    } catch (error) {
+      console.error('删除页面失败:', error);
+      message.error(error instanceof Error ? error.message : '删除页面失败');
+    }
+  };
+
   // 处理新增标记
   const handleMarkCreate = (title: string, description: string) => {
     if (!pendingMarkInfo) return;
@@ -711,6 +767,9 @@ function App() {
             onSelect={handleFileSelect}
             selectedFile={selectedFile}
             onNavigate={handleNavigate}
+            onDeletePrototype={handlePrototypeDelete}
+            refreshVersion={prototypeRefreshVersion}
+            onFilesUpdate={handleFilesUpdate}
           />
         </Sider>
         {!collapsed && (
@@ -737,6 +796,7 @@ function App() {
             prototypesDir={prototypesDir}
             wsConnected={wsConnected}
             reloadVersion={reloadVersion}
+            viewerSkills={viewerSkills}
             marks={effectiveMarks}
             selectedMarkId={selectedMarkId}
             pendingMarkInfo={pendingMarkInfo}
@@ -758,6 +818,7 @@ function App() {
               marks={effectiveMarks}
               selectedMarkId={selectedMarkId}
               pendingMarkInfo={pendingMarkInfo}
+              viewerSkills={viewerSkills}
               onMarkSelect={handleMarkSelect}
               onMarkCreate={handleMarkCreate}
               onMarkUpdate={handleMarkUpdate}

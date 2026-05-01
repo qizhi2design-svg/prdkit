@@ -14,6 +14,10 @@ import { ValidationError } from "#utils/errors.js";
 type InitOptions = {
   name?: string;
   author?: string;
+  description?: string;
+  productPositioning?: string;
+  teamSize?: string;
+  projectStage?: string;
   scaffoldRepo?: string;
   templateRepo?: string;
   branch?: string;
@@ -39,6 +43,10 @@ export function registerInit(program: import("commander").Command): void {
     .description(COPY.initDescription)
     .option("--name <project-name>", "项目名称")
     .option("--author <author>", "作者")
+    .option("--description <description>", "项目描述")
+    .option("--product-positioning <positioning>", "产品定型")
+    .option("--team-size <size>", "团队规模")
+    .option("--project-stage <stage>", "项目阶段")
     .option("--scaffold-repo <git-url>", "scaffold 仓库地址", DEFAULT_SCAFFOLD_REPO)
     .option("--template-repo <git-url>", "template 仓库地址", DEFAULT_TEMPLATE_REPO)
     .option("--branch <branch>", "scaffold 仓库分支", "main")
@@ -63,7 +71,11 @@ export function registerInit(program: import("commander").Command): void {
           projectName,
           author,
           options.scaffoldRepo ?? DEFAULT_SCAFFOLD_REPO,
-          options.templateRepo ?? DEFAULT_TEMPLATE_REPO
+          options.templateRepo ?? DEFAULT_TEMPLATE_REPO,
+          options.description,
+          options.productPositioning,
+          options.teamSize,
+          options.projectStage
         );
         await saveConfig(config, targetPath);
 

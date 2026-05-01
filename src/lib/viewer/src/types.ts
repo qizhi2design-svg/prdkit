@@ -51,6 +51,19 @@ export interface PendingMarkInfo {
   };
 }
 
+export interface ViewerSkillConfig {
+  inspectCopySkillCommand: string;
+  markCreateSkillCommand: string;
+  markUpdateSkillCommand: string;
+  copyTerminalGuide: string;
+}
+
+export interface ViewerConfigResponse {
+  projectName: string;
+  prototypesDir: string;
+  viewerSkills: ViewerSkillConfig;
+}
+
 export type CheckpointKind = 'manual' | 'auto' | 'pre-restore';
 
 export interface CheckpointRecord {

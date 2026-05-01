@@ -327,6 +327,12 @@
   cursor: pointer;
 }
 
+.preview-mark-highlight.inspect-mode,
+.preview-mark-number.inspect-mode {
+  pointer-events: none;
+  cursor: default;
+}
+
 .preview-mark-highlight:hover .preview-mark-number {
   background: #1890ff;
 }

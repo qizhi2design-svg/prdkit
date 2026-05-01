@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Button, Input, List, Empty, Avatar, Typography, message } from 'antd';
+import { Button, Input, List, Empty, Avatar, Typography, message, Popconfirm } from 'antd';
 import { DeleteOutlined, EditOutlined, ArrowLeftOutlined, UpOutlined, DownOutlined, DoubleRightOutlined, DoubleLeftOutlined, SearchOutlined, CopyOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { Mark, PendingMarkInfo } from '../types';
+import { copySkillClipboardText } from '../utils/clipboard';
+import type { Mark, PendingMarkInfo, ViewerSkillConfig } from '../types';
 import DomPathBreadcrumb from './DomPathBreadcrumb';
 import './MarkPanel.css';
 
@@ -16,6 +17,7 @@ interface MarkPanelProps {
   marks: Mark[];
   selectedMarkId: string | null;
   pendingMarkInfo: PendingMarkInfo | null;
+  viewerSkills: ViewerSkillConfig;
   onMarkSelect: (markId: string) => void;
   onMarkCreate: (title: string, description: string) => void;
   onMarkUpdate: (markId: string, title: string, description: string) => void;
@@ -33,6 +35,7 @@ export default function MarkPanel({
   marks,
   selectedMarkId,
   pendingMarkInfo,
+  viewerSkills,
   onMarkSelect,
   onMarkCreate,
   onMarkUpdate,
@@ -52,7 +55,7 @@ export default function MarkPanel({
   const [searchKeyword, setSearchKeyword] = useState('');
 
   // 复制 DOM 信息
-  const copyDomInfo = () => {
+  const copyDomInfo = async () => {
     let domPath = '';
     let markFilePath = '';
 
@@ -82,12 +85,29 @@ DOM 路径: ${domPath}`;
       info += `\n标记文件: ${markFilePath}`;
     }
 
-    navigator.clipboard.writeText(info).then(() => {
-      message.success('已复制 DOM 信息');
-    }).catch(err => {
+    const isCreateMode = viewMode === 'create';
+    const skillCommand = isCreateMode
+      ? viewerSkills.markCreateSkillCommand
+      : viewerSkills.markUpdateSkillCommand;
+    const successPrefix = isCreateMode
+      ? '已复制新增标记 skill 指令'
+      : '已复制修改标记 skill 指令';
+
+    try {
+      await copySkillClipboardText(
+        {
+          skillCommand,
+          payload: info,
+        },
+        {
+          successPrefix,
+          terminalGuide: viewerSkills.copyTerminalGuide,
+        }
+      );
+    } catch (err) {
       console.error('复制失败:', err);
       message.error('复制失败');
-    });
+    }
   };
 
   // 计算当前视图模式
@@ -177,7 +197,7 @@ DOM 路径: ${domPath}`;
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true);
     };
-  }, [viewMode, pendingMarkInfo, selectedMarkId, projectName, filePath, prototypesDir, marks]);
+  }, [viewMode, pendingMarkInfo, selectedMarkId, projectName, filePath, prototypesDir, marks, viewerSkills]);
 
   const handleBackToList = () => {
     if (viewMode === 'create') {
@@ -310,6 +330,31 @@ DOM 路径: ${domPath}`;
                   key={mark.id}
                   className="mark-list-item"
                   onClick={() => onMarkSelect(mark.id)}
+                  actions={[
+                    <Popconfirm
+                      key="delete"
+                      title="删除标记"
+                      description="将删除当前标记文件，确认继续？"
+                      okText="删除"
+                      cancelText="取消"
+                      okButtonProps={{ danger: true }}
+                      onConfirm={(e) => {
+                        e?.stopPropagation();
+                        onMarkDelete(mark.id);
+                      }}
+                    >
+                      <Button
+                        type="text"
+                        danger
+                        size="small"
+                        icon={<DeleteOutlined />}
+                        className="mark-list-delete-button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                        }}
+                      />
+                    </Popconfirm>
+                  ]}
                 >
                   <List.Item.Meta
                     avatar={
@@ -354,7 +399,7 @@ DOM 路径: ${domPath}`;
             size="small"
             icon={<CopyOutlined />}
             onClick={copyDomInfo}
-            title="复制 DOM 信息 (Ctrl/Cmd+C)"
+            title="复制新增标记 skill 指令 (Ctrl/Cmd+C)"
             style={{ flexShrink: 0 }}
           />
         </div>
@@ -471,7 +516,7 @@ DOM 路径: ${domPath}`;
               size="small"
               icon={<CopyOutlined />}
               onClick={copyDomInfo}
-              title="复制 DOM 信息 (Ctrl/Cmd+C)"
+              title="复制修改标记 skill 指令 (Ctrl/Cmd+C)"
               style={{ flexShrink: 0 }}
             />
           </div>

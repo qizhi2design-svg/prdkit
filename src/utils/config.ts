@@ -3,14 +3,27 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import type { PrdkitConfig } from "#types/index.js";
+import { DEFAULT_VIEWER_SKILLS } from "#lib/shared/index.js";
+
+const viewerSkillsSchema = z.object({
+  inspectCopySkillCommand: z.string().min(1).default(DEFAULT_VIEWER_SKILLS.inspectCopySkillCommand),
+  markCreateSkillCommand: z.string().min(1).default(DEFAULT_VIEWER_SKILLS.markCreateSkillCommand),
+  markUpdateSkillCommand: z.string().min(1).default(DEFAULT_VIEWER_SKILLS.markUpdateSkillCommand),
+  copyTerminalGuide: z.string().min(1).default(DEFAULT_VIEWER_SKILLS.copyTerminalGuide),
+});
 
 const configSchema = z.object({
   version: z.literal(1),
   projectName: z.string().min(1),
   author: z.string().min(1),
+  description: z.string().optional(),
+  productPositioning: z.string().optional(),
+  teamSize: z.string().optional(),
+  projectStage: z.string().optional(),
   scaffoldRepo: z.string().min(1),
   templateRepo: z.string().min(1),
-  defaultCreateDirs: z.record(z.string(), z.string()).optional()
+  defaultCreateDirs: z.record(z.string(), z.string()).optional(),
+  viewerSkills: viewerSkillsSchema.optional().default(DEFAULT_VIEWER_SKILLS),
 });
 
 export function prdkitDir(cwd = process.cwd()): string {

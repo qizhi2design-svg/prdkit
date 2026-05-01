@@ -107,6 +107,7 @@
 }
 
 .file-tree-node-title {
+  flex: 1;
   max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -115,6 +116,31 @@
   user-select: none;
   -webkit-user-select: none;
   -moz-user-select: none;
+}
+
+.file-tree-node-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.file-tree-delete-button {
+  opacity: 0;
+  pointer-events: none;
+  color: #ff4d4f;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
+}
+
+.file-tree-content .ant-tree-node-content-wrapper:hover .file-tree-delete-button,
+.file-tree-content .ant-tree-treenode:hover .file-tree-delete-button {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.file-tree-delete-button:hover {
+  background: rgba(255, 77, 79, 0.08) !important;
 }
 
 .file-tree-loading {

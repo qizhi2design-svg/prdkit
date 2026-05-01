@@ -10,6 +10,47 @@ import { buildInitialCheckpointSummary, diffCheckpoints, diffCurrentAgainstLates
 import { createCheckpoint, findCheckpointRecord, listCheckpointRecords, readCheckpointData } from '../checkpoint/store.js';
 import { materializeCheckpointPreview } from '../checkpoint/preview.js';
 import { restoreCheckpoint } from '../checkpoint/restore.js';
+import { DEFAULT_VIEWER_SKILLS } from '../shared/index.js';
+import type { PrdkitConfig } from '#types/index.js';
+
+function readViewerSkills(projectRoot: string, config?: PrdkitConfig) {
+  if (config?.viewerSkills) {
+    return {
+      inspectCopySkillCommand: config.viewerSkills.inspectCopySkillCommand || DEFAULT_VIEWER_SKILLS.inspectCopySkillCommand,
+      markCreateSkillCommand: config.viewerSkills.markCreateSkillCommand || DEFAULT_VIEWER_SKILLS.markCreateSkillCommand,
+      markUpdateSkillCommand: config.viewerSkills.markUpdateSkillCommand || DEFAULT_VIEWER_SKILLS.markUpdateSkillCommand,
+      copyTerminalGuide: config.viewerSkills.copyTerminalGuide || DEFAULT_VIEWER_SKILLS.copyTerminalGuide,
+    };
+  }
+
+  const viewerSkillsPath = path.join(projectRoot, '.prdkit', 'skills.json');
+
+  if (!fs.existsSync(viewerSkillsPath)) {
+    return DEFAULT_VIEWER_SKILLS;
+  }
+
+  try {
+    const raw = fs.readFileSync(viewerSkillsPath, 'utf-8');
+    const parsed = JSON.parse(raw) as {
+      viewer?: {
+        inspectCopySkillCommand?: string;
+        markCreateSkillCommand?: string;
+        markUpdateSkillCommand?: string;
+        copyTerminalGuide?: string;
+      };
+    };
+
+    return {
+      inspectCopySkillCommand: parsed.viewer?.inspectCopySkillCommand || DEFAULT_VIEWER_SKILLS.inspectCopySkillCommand,
+      markCreateSkillCommand: parsed.viewer?.markCreateSkillCommand || DEFAULT_VIEWER_SKILLS.markCreateSkillCommand,
+      markUpdateSkillCommand: parsed.viewer?.markUpdateSkillCommand || DEFAULT_VIEWER_SKILLS.markUpdateSkillCommand,
+      copyTerminalGuide: parsed.viewer?.copyTerminalGuide || DEFAULT_VIEWER_SKILLS.copyTerminalGuide,
+    };
+  } catch (error) {
+    console.error('读取 .prdkit/skills.json 失败，已回退默认 viewer skill 配置:', error);
+    return DEFAULT_VIEWER_SKILLS;
+  }
+}
 
 export function createApiRouter(prototypesDir: string): Router {
   const router = express.Router();
@@ -32,6 +73,43 @@ export function createApiRouter(prototypesDir: string): Router {
     }
   });
 
+  router.delete(/^\/prototypes\/(.+)$/, async (req: Request, res: Response) => {
+    try {
+      const prototypePathRaw = req.params[0];
+      const prototypePathValue = Array.isArray(prototypePathRaw) ? prototypePathRaw[0] : prototypePathRaw;
+      const prototypePath = prototypePathValue ? decodeURIComponent(prototypePathValue) : prototypePathValue;
+
+      if (!prototypePath || typeof prototypePath !== 'string') {
+        return res.status(400).json({ error: '缺少 prototypePath' });
+      }
+
+      const targetDir = path.resolve(prototypesDir, prototypePath);
+      const normalizedRoot = `${path.resolve(prototypesDir)}${path.sep}`;
+
+      if (!targetDir.startsWith(normalizedRoot)) {
+        return res.status(400).json({ error: '非法 prototypePath' });
+      }
+
+      if (!fs.existsSync(targetDir)) {
+        return res.status(404).json({ error: '页面不存在' });
+      }
+
+      fs.rmSync(targetDir, { recursive: true, force: true });
+
+      res.json({
+        success: true,
+        prototypePath,
+        checkpointPreserved: true,
+      });
+    } catch (error) {
+      console.error('删除页面失败:', error);
+      res.status(500).json({
+        error: '删除页面失败',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   // 获取项目配置
   router.get('/config', (req: Request, res: Response) => {
     try {
@@ -46,11 +124,12 @@ export function createApiRouter(prototypesDir: string): Router {
 
       // 添加 prototypes 目录的绝对路径
       config.prototypesDir = prototypesDir;
+      config.viewerSkills = readViewerSkills(projectRoot, config as PrdkitConfig);
 
       res.json(config);
     } catch (error) {
       console.error('读取配置失败:', error);
-      res.json({ projectName: 'PRDKit', prototypesDir });
+      res.json({ projectName: 'PRDKit', prototypesDir, viewerSkills: DEFAULT_VIEWER_SKILLS });
     }
   });
 

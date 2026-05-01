@@ -34,6 +34,7 @@ export interface CreateOptions {
   label?: string;
   status?: string;
   nonInteractive?: boolean;
+  extraVariables?: Record<string, string>;
 }
 
 export type CreateTemplateOptions = CreateOptions;
@@ -166,7 +167,8 @@ export abstract class CreateCommand extends CommandBase<CreateArgs, CreateOption
       creator,
       label: options.label ?? defaults.label ?? "local-md|cli",
       status: options.status ?? defaults.status ?? "planning",
-      templateId
+      templateId,
+      ...(options.extraVariables ?? {})
     };
   }
 

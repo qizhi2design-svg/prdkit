@@ -7,6 +7,7 @@ import { resolveProjectRoot } from "#utils/config.js";
 import {
   createMarkSync,
   deleteMarkSync,
+  readMarkSync,
   readPrototypeMarksSync,
   type MarkPatch,
   updateMarkSync
@@ -176,6 +177,35 @@ export function registerMark(program: Command): void {
 
       console.log(formatMarks(readPrototypeMarksSync(prototypesDir, options.prototype)));
       console.log(chalk.dim(`\n共找到 ${marks.length} 个标记`));
+    });
+
+  mark
+    .command("get")
+    .argument("<mark-id>", "标记 ID")
+    .description(COPY.markGetDescription)
+    .requiredOption("--prototype <path>", "原型路径，例如 dashboard 或 foo/bar")
+    .option("--json", "以 JSON 输出")
+    .addHelpText("after", `\n${COPY.markGetHelpAfter}`)
+    .action(async (markId: string, options: MarkCommonOptions) => {
+      const { prototypesDir } = await resolvePrototypesDir(options.prototype);
+      const mark = readMarkSync(prototypesDir, options.prototype, markId);
+
+      if (!mark) {
+        throw ValidationError.invalidInput("markId", `标记不存在：${markId}`);
+      }
+
+      if (options.json) {
+        const { fileName, ...markData } = mark;
+        outputJson({ prototype: options.prototype, mark: markData });
+        return;
+      }
+
+      console.log(chalk.bold(mark.title));
+      console.log(chalk.dim(`ID: ${mark.id}`));
+      if (mark.selector) console.log(chalk.dim(`Selector: ${mark.selector}`));
+      if (mark.domPath) console.log(chalk.dim(`DOM Path: ${mark.domPath}`));
+      console.log();
+      console.log(mark.description);
     });
 
   mark

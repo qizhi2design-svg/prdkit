@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, writeFileSync, readdirSync, readFileSync, rename
 import { join, relative, basename, extname } from "node:path";
 import { confirm, input } from "@inquirer/prompts";
 import { COPY } from "#constants/command-text.js";
-import { loadConfig } from "#utils/config.js";
+import { loadConfig, saveConfig } from "#utils/config.js";
 import { createDefaultConfig } from "#constants/defaults.js";
 import { ensureTemplateRepo } from "#utils/templates.js";
 import { logger } from "#utils/logger.js";
@@ -27,6 +27,11 @@ type MarkFileIssue = {
   issue: "invalid_filename" | "frontmatter_mismatch";
   currentId?: string;
   expectedId?: string;
+};
+
+type ConfigNormalizationResult = {
+  needsUpdate: boolean;
+  normalizedConfig?: PrdkitConfig;
 };
 
 async function checkProjectStructure(projectRoot: string): Promise<CheckResult[]> {
@@ -176,6 +181,33 @@ async function fixProjectStructure(
   }
 
   logger.success("\n修复完成");
+}
+
+async function checkConfigNormalization(projectRoot: string): Promise<ConfigNormalizationResult> {
+  const configFile = join(projectRoot, ".prdkit", "config.json");
+  if (!existsSync(configFile)) {
+    return { needsUpdate: false };
+  }
+
+  const rawText = readFileSync(configFile, "utf8");
+  const rawConfig = JSON.parse(rawText);
+  const normalizedConfig = await loadConfig(projectRoot);
+
+  if (!normalizedConfig) {
+    return { needsUpdate: false };
+  }
+
+  const needsUpdate = JSON.stringify(rawConfig) !== JSON.stringify(normalizedConfig);
+  return {
+    needsUpdate,
+    normalizedConfig,
+  };
+}
+
+async function normalizeConfigFile(projectRoot: string, normalizedConfig: PrdkitConfig): Promise<void> {
+  await saveConfig(normalizedConfig, projectRoot);
+  const relativeConfigPath = relative(process.cwd(), join(projectRoot, ".prdkit", "config.json"));
+  logger.success(`更新配置文件: ${relativeConfigPath}`);
 }
 
 /**
@@ -426,6 +458,16 @@ export function registerDoctor(program: Command): void {
         console.log();
       }
 
+      logger.info("正在检查配置文件...");
+      const configNormalization = await checkConfigNormalization(projectRoot);
+
+      console.log("\n配置文件检查结果:");
+      if (configNormalization.needsUpdate) {
+        console.log("✗ 配置文件缺少标准字段，将补齐默认配置项\n");
+      } else {
+        console.log("✓ 配置文件格式完整\n");
+      }
+
       // 检查 prototype marks 文件
       logger.info("正在检查 prototype marks 文件...");
       const markIssues = await checkPrototypeMarks(projectRoot);
@@ -448,10 +490,13 @@ export function registerDoctor(program: Command): void {
       }
 
       // 修复问题
-      if (missingItems.length > 0 || markIssues.length > 0) {
+      if (missingItems.length > 0 || markIssues.length > 0 || configNormalization.needsUpdate) {
         if (options.fix) {
           if (hasStructureIssues) {
             await fixProjectStructure(projectRoot, results, true);
+          }
+          if (configNormalization.needsUpdate && configNormalization.normalizedConfig) {
+            await normalizeConfigFile(projectRoot, configNormalization.normalizedConfig);
           }
           if (markIssues.length > 0) {
             await fixPrototypeMarks(markIssues, true);
@@ -465,6 +510,9 @@ export function registerDoctor(program: Command): void {
           if (shouldFix) {
             if (hasStructureIssues) {
               await fixProjectStructure(projectRoot, results, false);
+            }
+            if (configNormalization.needsUpdate && configNormalization.normalizedConfig) {
+              await normalizeConfigFile(projectRoot, configNormalization.normalizedConfig);
             }
             if (markIssues.length > 0) {
               await fixPrototypeMarks(markIssues, false);
