@@ -1,5 +1,37 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
-.DS_Store
+
+# Test coverage
 coverage/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Package files
+*.tgz
+
+# Claude Code
 .claude/
