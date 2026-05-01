@@ -400,18 +400,85 @@
   box-shadow: none;
 }
 
+.mark-create-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 12px;
+}
+
+.mark-create-header .ant-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.mark-create-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.mark-ghost-icon-button.ant-btn {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #d9d9d9;
+  border-radius: 999px;
+  color: #8c8c8c;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.mark-ghost-icon-button.ant-btn:hover,
+.mark-ghost-icon-button.ant-btn:focus-visible {
+  color: #262626;
+  border-color: #bfbfbf;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.mark-ghost-icon-button-primary.ant-btn {
+  color: #1677ff;
+  border-color: rgba(22, 119, 255, 0.28);
+  background: rgba(240, 247, 255, 0.92);
+}
+
+.mark-ghost-icon-button-primary.ant-btn:hover,
+.mark-ghost-icon-button-primary.ant-btn:focus-visible {
+  color: #0958d9;
+  border-color: rgba(22, 119, 255, 0.42);
+  background: rgba(230, 244, 255, 1);
+}
+
 .mark-editor-label {
   font-size: 13px;
   font-weight: 500;
   color: #262626;
 }
 
+.mark-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 12px 12px 16px;
+}
+
 .mark-detail-title {
+  flex: 1;
+  min-width: 0;
   font-size: 16px;
   font-weight: normal;
   color: #262626;
-  padding: 12px 16px;
   line-height: 1.5;
+}
+
+.mark-detail-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .mark-preview-content {
@@ -593,11 +660,125 @@
   margin: 8px 0;
 }
 
+.mark-ai-footer-button.ant-btn {
+  position: relative;
+  border: none;
+  background: linear-gradient(135deg, #1677ff 0%, #22c3ee 52%, #7b61ff 100%);
+  box-shadow: 0 8px 18px rgba(34, 195, 238, 0.24);
+  overflow: hidden;
+}
+
+.mark-ai-footer-button.ant-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, rgba(255, 255, 255, 0) 24%, rgba(255, 255, 255, 0.26) 50%, rgba(255, 255, 255, 0) 76%);
+  transform: translateX(-130%);
+  transition: transform 0.4s ease;
+}
+
+.mark-ai-footer-button.ant-btn:hover::before,
+.mark-ai-footer-button.ant-btn:focus-visible::before {
+  transform: translateX(130%);
+}
+
+.mark-ai-footer-button.ant-btn:hover,
+.mark-ai-footer-button.ant-btn:focus-visible {
+  background: linear-gradient(135deg, #0f6fff 0%, #1ec0ee 50%, #7755ff 100%);
+  box-shadow: 0 10px 22px rgba(34, 195, 238, 0.28);
+}
+
+.mark-ai-footer-button.ant-btn:active {
+  transform: translateY(1px);
+}
+
+.mark-ai-footer-button.ant-btn > span {
+  position: relative;
+  z-index: 1;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.mark-detail-icon-button.ant-btn {
+  color: #8c8c8c;
+}
+
+.mark-detail-icon-button.ant-btn:hover {
+  color: #262626;
+  background: #f5f5f5;
+}
+
 .mark-panel-actions {
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
+  align-items: stretch;
   gap: 8px;
   padding: 8px;
   border-top: 1px solid #e8e8e8;
   flex-shrink: 0;
+}
+
+.mark-panel-actions-leading,
+.mark-panel-actions-trailing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.mark-panel-actions-leading {
+  order: 1;
+}
+
+.mark-panel-actions-trailing {
+  order: 2;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.mark-ai-footer-button.ant-btn {
+  width: 100%;
+  min-height: 42px;
+}
+
+@media (max-width: 480px) {
+  .mark-panel-view {
+    padding: 4px 12px;
+  }
+
+  .mark-detail-header {
+    align-items: flex-start;
+    padding: 12px;
+  }
+
+  .mark-detail-header-actions {
+    gap: 2px;
+  }
+
+  .mark-create-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    padding-right: 8px;
+  }
+
+  .mark-create-header-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .mark-panel-actions {
+    flex-wrap: wrap;
+  }
+
+  .mark-panel-actions-trailing {
+    justify-content: flex-end;
+  }
+
+  .mark-ai-footer-button.ant-btn {
+    width: 100%;
+  }
+
+  .mark-ai-footer-button.ant-btn > span {
+    font-size: 12px;
+  }
 }

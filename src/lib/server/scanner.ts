@@ -68,17 +68,15 @@ function scanDirectory(dirPath: string, rootDir: string): PrototypeNode[] {
             path: relativePath.replace(/\\/g, '/')
           });
         } else {
-          // 这是一个普通文件夹，递归扫描
+          // 这是一个普通文件夹，递归扫描；空文件夹也需要显示
           const children = scanDirectory(fullPath, rootDir);
-          if (children.length > 0) {
-            nodes.push({
-              id: relativePath.replace(/\\/g, '/'),
-              name: entry.name,
-              type: 'folder',
-              path: relativePath.replace(/\\/g, '/'),
-              children
-            });
-          }
+          nodes.push({
+            id: relativePath.replace(/\\/g, '/'),
+            name: entry.name,
+            type: 'folder',
+            path: relativePath.replace(/\\/g, '/'),
+            children
+          });
         }
       }
     }

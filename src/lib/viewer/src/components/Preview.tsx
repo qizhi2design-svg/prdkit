@@ -69,15 +69,19 @@ export default function Preview({
   const [selectionMode, setSelectionMode] = useState<'single' | 'multiple'>('single');
   const [selectedElements, setSelectedElements] = useState<SelectedElement[]>([]);
   const [marksVisible, setMarksVisible] = useState(true); // 标记是否可见
+  const [inspectMarksVisible, setInspectMarksVisible] = useState(false); // 编辑模式下是否显示已有标记点
   const [previewViewport, setPreviewViewport] = useState<PreviewViewport>('desktop');
   const [zoomPercent, setZoomPercent] = useState(100);
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const [, setOverlayRefreshTick] = useState(0);
   const [iframeReloadToken, setIframeReloadToken] = useState(0);
 
-  const marksVisibleInCurrentMode = viewMode === 'mark' || viewMode === 'inspect'
+  const marksVisibleInCurrentMode = viewMode === 'mark' ? marksVisible : false;
+  const markOverlaysVisible = viewMode === 'mark'
     ? marksVisible
-    : false;
+    : viewMode === 'inspect'
+      ? inspectMarksVisible
+      : false;
 
   const isEditableTarget = (target: EventTarget | null) => {
     const element = target as HTMLElement | null;
@@ -107,6 +111,12 @@ export default function Preview({
   useEffect(() => {
     requestOverlayRefresh();
   }, [previewViewport, zoomPercent]);
+
+  useEffect(() => {
+    if (viewMode === 'inspect') {
+      setInspectMarksVisible(false);
+    }
+  }, [viewMode]);
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -267,7 +277,7 @@ export default function Preview({
   // 元素检查模式和标记模式
   useEffect(() => {
     const iframe = iframeRef.current;
-    const isInteractiveMode = (viewMode === 'inspect' || viewMode === 'mark') && marksVisibleInCurrentMode;
+    const isInteractiveMode = viewMode === 'inspect' || (viewMode === 'mark' && marksVisibleInCurrentMode);
 
     if (!iframe || !isInteractiveMode) {
       setHoveredElement(null);
@@ -500,7 +510,7 @@ export default function Preview({
 
         if (isToggleMarksKey(e)) {
           e.preventDefault();
-          setMarksVisible(prev => !prev);
+          setInspectMarksVisible(prev => !prev);
         }
       };
 
@@ -741,61 +751,58 @@ export default function Preview({
       {viewMode === 'inspect' && (
         <div className="preview-inspect-banner">
           <span className="preview-inspect-banner-text">
-            {marksVisible ? '点击页面元素复制 DOM 信息' : '预览模式（标记已隐藏）'}
-            {marksVisible && <Hotkey keys={['Shift', 'Tab']} description="切换模式" />}
-            {marksVisible && selectionMode === 'multiple' && (
+            点击页面元素复制 DOM 信息
+            <Hotkey keys={['Shift', 'Tab']} description="切换模式" />
+            {selectionMode === 'multiple' && (
               <>
                 <Hotkey keys={[getModifierKey(), 'C']} description="复制" />
                 <Hotkey keys={['ESC']} description="清空" />
               </>
             )}
-            <Hotkey keys={['X']} description={marksVisible ? '隐藏标记' : '显示标记'} />
+            <Hotkey keys={['X']} description={inspectMarksVisible ? '隐藏标记点' : '显示标记点'} />
           </span>
 
           <div className="preview-inspect-banner-controls">
-            {marksVisible && (
-              <>
-                <Segmented
-                  options={[
-                    { label: '单选', value: 'single' },
-                    { label: '多选', value: 'multiple' }
-                  ]}
-                  value={selectionMode}
-                  onChange={(value) => handleSelectionModeChange(value as 'single' | 'multiple')}
-                  size="small"
-                />
+            <Segmented
+              options={[
+                { label: '单选', value: 'single' },
+                { label: '多选', value: 'multiple' }
+              ]}
+              value={selectionMode}
+              onChange={(value) => handleSelectionModeChange(value as 'single' | 'multiple')}
+              size="small"
+            />
 
-                {selectionMode === 'multiple' && (
-                  <>
-                    {selectedElements.length > 0 && (
-                      <span className="preview-inspect-banner-count">
-                        已选: {selectedElements.length} 个元素
-                      </span>
-                    )}
-                    <Button
-                      type="primary"
-                      size="small"
-                      onClick={handleCopyAll}
-                      disabled={selectedElements.length === 0}
-                    >
-                      复制所有
-                    </Button>
-                    <Button
-                      size="small"
-                      onClick={handleClearSelection}
-                      disabled={selectedElements.length === 0}
-                    >
-                      清空
-                    </Button>
-                  </>
+            {selectionMode === 'multiple' && (
+              <>
+                {selectedElements.length > 0 && (
+                  <span className="preview-inspect-banner-count">
+                    已选: {selectedElements.length} 个元素
+                  </span>
                 )}
+                <Button
+                  type="primary"
+                  size="small"
+                  onClick={handleCopyAll}
+                  disabled={selectedElements.length === 0}
+                  className="preview-ai-action-button"
+                >
+                  复制所有给 AI
+                </Button>
+                <Button
+                  size="small"
+                  onClick={handleClearSelection}
+                  disabled={selectedElements.length === 0}
+                >
+                  清空
+                </Button>
               </>
             )}
             <Button
               size="small"
-              onClick={() => setMarksVisible(prev => !prev)}
+              onClick={() => setInspectMarksVisible(prev => !prev)}
             >
-              {marksVisible ? '隐藏标记' : '显示标记'}
+              {inspectMarksVisible ? '隐藏标记点' : '显示标记点'}
             </Button>
           </div>
         </div>
@@ -977,7 +984,7 @@ export default function Preview({
           })()}
 
           {/* 标记高亮框覆盖层 */}
-          {(viewMode === 'mark' || viewMode === 'inspect') && marksVisibleInCurrentMode && marks.map((mark) => {
+          {(viewMode === 'mark' || viewMode === 'inspect') && markOverlaysVisible && marks.map((mark) => {
             try {
               const iframe = iframeRef.current;
               if (!iframe) return null;

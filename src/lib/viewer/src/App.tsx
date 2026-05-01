@@ -7,6 +7,7 @@ import MarkPanel from './components/MarkPanel';
 import PublishDrawer from './components/PublishDrawer';
 import HistoryDrawer from './components/HistoryDrawer';
 import { DEFAULT_COPY_TERMINAL_GUIDE, DEFAULT_INSPECT_COPY_SKILL_COMMAND, DEFAULT_MARK_CREATE_SKILL_COMMAND, DEFAULT_MARK_UPDATE_SKILL_COMMAND } from './constants/clipboard';
+import { copySkillClipboardText } from './utils/clipboard';
 import type { ActiveCheckpointPreview, ViewMode, Mark, PendingMarkInfo, PrototypeNode, CheckpointDetail, CheckpointStatus, ViewerConfigResponse, ViewerSkillConfig } from './types';
 import './App.css';
 
@@ -514,6 +515,187 @@ function App() {
     }
   };
 
+  const handlePrototypeDuplicate = async (prototypePath: string) => {
+    if (activeCheckpointPreview) {
+      message.info('历史版本预览中不可复制页面，请先退出预览');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/prototypes/duplicate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prototypePath }),
+      });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.message || data?.error || '复制页面失败');
+      }
+
+      const duplicatePath = typeof data?.duplicatePath === 'string' ? data.duplicatePath : null;
+      if (duplicatePath) {
+        handleFileSelect(duplicatePath);
+      }
+
+      setPrototypeRefreshVersion((prev) => prev + 1);
+      message.success(`页面已复制为 ${data?.duplicateName || '副本'}`);
+    } catch (error) {
+      console.error('复制页面失败:', error);
+      message.error(error instanceof Error ? error.message : '复制页面失败');
+    }
+  };
+
+  const handleFolderDelete = async (folderPath: string) => {
+    if (activeCheckpointPreview) {
+      message.info('历史版本预览中不可删除文件夹，请先退出预览');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/prototypes/folders?folderPath=${encodeURIComponent(folderPath)}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.message || data?.error || '删除文件夹失败');
+      }
+
+      if (selectedFile && (selectedFile === folderPath || selectedFile.startsWith(`${folderPath}/`))) {
+        handleFileSelect(null);
+      }
+
+      setMarks([]);
+      setSelectedMarkId(null);
+      setPendingMarkInfo(null);
+      setActiveCheckpointPreview(null);
+      setCheckpointStatus(null);
+      setPrototypeRefreshVersion((prev) => prev + 1);
+      message.success('文件夹已删除，包含的页面和标记已一并清理');
+    } catch (error) {
+      console.error('删除文件夹失败:', error);
+      message.error(error instanceof Error ? error.message : '删除文件夹失败');
+    }
+  };
+
+  const handleCreateFolder = async (folderName: string) => {
+    if (activeCheckpointPreview) {
+      message.info('历史版本预览中不可新建文件夹，请先退出预览');
+      return;
+    }
+
+    const response = await fetch('/api/prototypes/folders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderName }),
+    });
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      throw new Error(data?.message || data?.error || '新建文件夹失败');
+    }
+
+    setPrototypeRefreshVersion((prev) => prev + 1);
+    message.success(`已创建文件夹 ${data?.folderName || folderName}`);
+  };
+
+  const handleRenameNode = async (sourcePath: string, targetName: string) => {
+    if (activeCheckpointPreview) {
+      message.info('历史版本预览中不可重命名，请先退出预览');
+      return;
+    }
+
+    const response = await fetch('/api/prototypes/rename', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sourcePath, targetName }),
+    });
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      throw new Error(data?.message || data?.error || '重命名失败');
+    }
+
+    const renamedPath = typeof data?.renamedPath === 'string' ? data.renamedPath : null;
+    if (selectedFile && renamedPath) {
+      if (selectedFile === sourcePath) {
+        handleFileSelect(renamedPath);
+      } else if (selectedFile.startsWith(`${sourcePath}/`)) {
+        handleFileSelect(selectedFile.replace(sourcePath, renamedPath));
+      }
+    }
+
+    setPrototypeRefreshVersion((prev) => prev + 1);
+    message.success(`已重命名为 ${data?.renamedName || targetName}`);
+  };
+
+  const handleMovePrototype = async (prototypePath: string, targetFolderPath: string) => {
+    if (activeCheckpointPreview) {
+      message.info('历史版本预览中不可移动页面，请先退出预览');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/prototypes/move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prototypePath, targetFolderPath }),
+      });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.message || data?.error || '移动页面失败');
+      }
+
+      const movedPath = typeof data?.movedPath === 'string' ? data.movedPath : null;
+      if (selectedFile === prototypePath && movedPath) {
+        handleFileSelect(movedPath);
+      }
+
+      setPrototypeRefreshVersion((prev) => prev + 1);
+      message.success(`页面已移动到 ${targetFolderPath || '根目录'}`);
+    } catch (error) {
+      console.error('移动页面失败:', error);
+      message.error(error instanceof Error ? error.message : '移动页面失败');
+    }
+  };
+
+  const handleCreatePageWithAi = async () => {
+    const suggestedParent = (() => {
+      if (!selectedFile) return '根目录';
+      const segments = selectedFile.split('/');
+      segments.pop();
+      return segments.length > 0 ? segments.join('/') : '根目录';
+    })();
+
+    const payload = `项目名: ${projectName}
+原型目录: ${prototypesDir}
+建议放置目录: ${suggestedParent}
+当前参考页面: ${selectedFile || '无'}
+
+请创建一个新的原型页面，并说明：
+1. 建议的页面名称
+2. 页面应放置的目录
+3. 需要生成的页面结构与核心内容`;
+
+    try {
+      await copySkillClipboardText(
+        {
+          skillCommand: viewerSkills.inspectCopySkillCommand,
+          payload,
+        },
+        {
+          successPrefix: '已复制新建页面 skill 指令',
+          terminalGuide: viewerSkills.copyTerminalGuide,
+        }
+      );
+    } catch (error) {
+      console.error('复制新建页面 skill 失败:', error);
+      message.error('复制失败');
+    }
+  };
+
   // 处理新增标记
   const handleMarkCreate = (title: string, description: string) => {
     if (!pendingMarkInfo) return;
@@ -768,6 +950,12 @@ function App() {
             selectedFile={selectedFile}
             onNavigate={handleNavigate}
             onDeletePrototype={handlePrototypeDelete}
+            onDeleteFolder={handleFolderDelete}
+            onDuplicatePrototype={handlePrototypeDuplicate}
+            onRenameNode={handleRenameNode}
+            onCreateFolder={handleCreateFolder}
+            onMovePrototype={handleMovePrototype}
+            onCreatePageWithAi={handleCreatePageWithAi}
             refreshVersion={prototypeRefreshVersion}
             onFilesUpdate={handleFilesUpdate}
           />

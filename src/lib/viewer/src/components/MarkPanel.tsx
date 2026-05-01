@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button, Input, List, Empty, Avatar, Typography, message, Popconfirm } from 'antd';
-import { DeleteOutlined, EditOutlined, ArrowLeftOutlined, UpOutlined, DownOutlined, DoubleRightOutlined, DoubleLeftOutlined, SearchOutlined, CopyOutlined } from '@ant-design/icons';
+import { DeleteOutlined, EditOutlined, ArrowLeftOutlined, UpOutlined, DownOutlined, DoubleRightOutlined, DoubleLeftOutlined, SearchOutlined, CopyOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { copySkillClipboardText } from '../utils/clipboard';
@@ -269,6 +269,19 @@ DOM 路径: ${domPath}`;
     }
   };
 
+  const renderAiFooterButton = () => (
+    <Button
+      type="primary"
+      size="small"
+      icon={<CopyOutlined />}
+      onClick={copyDomInfo}
+      title="复制给 AI (Ctrl/Cmd+C)"
+      className="mark-ai-footer-button"
+    >
+      复制给 AI
+    </Button>
+  );
+
   // 导航到上一个/下一个标记
   const handleNavigateMark = (direction: 'prev' | 'next') => {
     if (marks.length === 0 || !selectedMarkId) return;
@@ -390,27 +403,36 @@ DOM 路径: ${domPath}`;
         </Button>
       </div>
       <div className="mark-panel-view">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <DomPathBreadcrumb domPath={pendingMarkInfo?.domPath || pendingMarkInfo?.selector || ''} />
-          </div>
-          <Button
-            type="text"
-            size="small"
-            icon={<CopyOutlined />}
-            onClick={copyDomInfo}
-            title="复制新增标记 skill 指令 (Ctrl/Cmd+C)"
-            style={{ flexShrink: 0 }}
-          />
-        </div>
+        <DomPathBreadcrumb domPath={pendingMarkInfo?.domPath || pendingMarkInfo?.selector || ''} />
         <div className="mark-panel-editor">
           <div className="mark-editor-card">
-            <Input
-              value={newMarkTitle}
-              onChange={(e) => setNewMarkTitle(e.target.value)}
-              placeholder="例如：登录按钮、用户头像等"
-              variant="borderless"
-            />
+            <div className="mark-create-header">
+              <Input
+                value={newMarkTitle}
+                onChange={(e) => setNewMarkTitle(e.target.value)}
+                placeholder="例如：登录按钮、用户头像等"
+                variant="borderless"
+              />
+              <div className="mark-create-header-actions">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<CloseOutlined />}
+                  onClick={handleBackToList}
+                  title="取消"
+                  className="mark-ghost-icon-button"
+                />
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<CheckOutlined />}
+                  onClick={handleCreateMark}
+                  disabled={!newMarkDescription.trim()}
+                  title="创建标记"
+                  className="mark-ghost-icon-button mark-ghost-icon-button-primary"
+                />
+              </div>
+            </div>
             <div className="mark-editor-divider" />
             <TextArea
               value={newMarkDescription}
@@ -422,17 +444,9 @@ DOM 路径: ${domPath}`;
           </div>
         </div>
         <div className="mark-panel-actions">
-          <Button onClick={handleBackToList} style={{ padding: '4px 16px' }}>
-            取消
-          </Button>
-          <Button
-            type="primary"
-            onClick={handleCreateMark}
-            disabled={!newMarkDescription.trim()}
-            style={{ padding: '4px 16px' }}
-          >
-            创建标记
-          </Button>
+          <div className="mark-panel-actions-leading">
+            {renderAiFooterButton()}
+          </div>
         </div>
       </div>
     </>
@@ -511,14 +525,6 @@ DOM 路径: ${domPath}`;
             <div style={{ flex: 1, minWidth: 0 }}>
               <DomPathBreadcrumb domPath={selectedMark.domPath || selectedMark.selector} />
             </div>
-            <Button
-              type="text"
-              size="small"
-              icon={<CopyOutlined />}
-              onClick={copyDomInfo}
-              title="复制修改标记 skill 指令 (Ctrl/Cmd+C)"
-              style={{ flexShrink: 0 }}
-            />
           </div>
           <div className="mark-panel-editor">
             {isEditing ? (
@@ -540,7 +546,28 @@ DOM 路径: ${domPath}`;
               </div>
             ) : (
               <div className="mark-editor-card">
-                <div className="mark-detail-title">{selectedMark.title}</div>
+                <div className="mark-detail-header">
+                  <div className="mark-detail-title">{selectedMark.title}</div>
+                  <div className="mark-detail-header-actions">
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<EditOutlined />}
+                      onClick={handleStartEdit}
+                      title="编辑"
+                      className="mark-detail-icon-button"
+                    />
+                    <Button
+                      type="text"
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={handleDeleteMark}
+                      title="删除"
+                      className="mark-detail-icon-button"
+                    />
+                  </div>
+                </div>
                 <div className="mark-editor-divider" />
                 <div className="mark-preview-content">
                   {displayDescription ? (
@@ -553,40 +580,28 @@ DOM 路径: ${domPath}`;
             )}
           </div>
           <div className="mark-panel-actions">
-            {isEditing ? (
-              <>
-                <Button onClick={handleCancelEdit} style={{ padding: '4px 16px' }}>
-                  取消
-                </Button>
-                <Button
-                  type="primary"
-                  onClick={handleSaveEdit}
-                  disabled={!editContent.trim()}
-                  style={{ padding: '4px 16px' }}
-                >
-                  保存
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={handleDeleteMark}
-                  style={{ padding: '4px 16px' }}
-                >
-                  删除
-                </Button>
-                <Button
-                  type="primary"
-                  icon={<EditOutlined />}
-                  onClick={handleStartEdit}
-                  style={{ padding: '4px 16px' }}
-                >
-                  编辑
-                </Button>
-              </>
-            )}
+            {!isEditing ? (
+              <div className="mark-panel-actions-leading">
+                {renderAiFooterButton()}
+              </div>
+            ) : null}
+            <div className="mark-panel-actions-trailing">
+              {isEditing ? (
+                <>
+                  <Button onClick={handleCancelEdit} style={{ padding: '4px 16px' }}>
+                    取消
+                  </Button>
+                  <Button
+                    type="primary"
+                    onClick={handleSaveEdit}
+                    disabled={!editContent.trim()}
+                    style={{ padding: '4px 16px' }}
+                  >
+                    保存
+                  </Button>
+                </>
+              ) : null}
+            </div>
           </div>
         </div>
       </>
