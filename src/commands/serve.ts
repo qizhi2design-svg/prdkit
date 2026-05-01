@@ -61,7 +61,7 @@ export function registerServe(program: Command) {
           prototypesDir
         });
 
-        const viewerDir = path.join(path.dirname(new URL(import.meta.url).pathname), '../../src/prototype/viewer');
+        const viewerDir = path.join(path.dirname(new URL(import.meta.url).pathname), '../../src/lib/prototype/viewer');
         const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
         const viteProcess = spawn(
           pnpmCommand,
