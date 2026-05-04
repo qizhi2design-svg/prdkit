@@ -5,9 +5,7 @@ import chalk from "chalk";
 import matter from "gray-matter";
 import { COPY } from "#constants/command-text.js";
 import { loadConfig, resolveProjectRoot } from "#utils/config.js";
-import { listCheckpointRecords } from "#lib/checkpoint/store.js";
 import { flattenPrototypes, scanPrototypes } from "#lib/server/scanner.js";
-import { logger } from "#utils/logger.js";
 import { ConfigError } from "#utils/errors.js";
 
 interface InfoOptions {
@@ -28,7 +26,6 @@ interface ProjectStats {
   prototypes: number;
   discussions: number;
   bugs: number;
-  checkpoints: number;
 }
 
 function countFiles(dir: string): number {
@@ -69,14 +66,6 @@ function analyzePrds(prdsDir: string): { total: number; byStatus: Record<string,
   return { total: files.length, byStatus };
 }
 
-function countCheckpoints(projectRoot: string): number {
-  try {
-    return listCheckpointRecords(projectRoot).length;
-  } catch {
-    return 0;
-  }
-}
-
 export async function getProjectStats(projectRoot: string): Promise<ProjectStats> {
   const config = await loadConfig(projectRoot);
   if (!config) {
@@ -93,7 +82,6 @@ export async function getProjectStats(projectRoot: string): Promise<ProjectStats
   const prototypes = countPrototypes(prototypesDir);
   const discussions = countFiles(discussionsDir);
   const bugs = countFiles(bugsDir);
-  const checkpoints = countCheckpoints(projectRoot);
 
   return {
     projectName: config.projectName,
@@ -105,8 +93,7 @@ export async function getProjectStats(projectRoot: string): Promise<ProjectStats
     prds,
     prototypes,
     discussions,
-    bugs,
-    checkpoints
+    bugs
   };
 }
 
@@ -146,7 +133,6 @@ function displayStats(stats: ProjectStats): void {
   console.log(`${chalk.yellow('原型:')} ${stats.prototypes}`);
   console.log(`${chalk.yellow('讨论:')} ${stats.discussions}`);
   console.log(`${chalk.yellow('Bug 报告:')} ${stats.bugs}`);
-  console.log(`${chalk.yellow('Checkpoints:')} ${stats.checkpoints}`);
   console.log();
 }
 
@@ -154,7 +140,7 @@ export function registerInfo(program: Command): void {
   program
     .command("info")
     .description(COPY.infoDescription)
-    .option("--json", COPY.jsonOutputOption)
+    .option("-j, --json", COPY.jsonOutputOption)
     .action(async (options: InfoOptions) => {
       const projectRoot = await resolveProjectRoot();
       if (!projectRoot) {

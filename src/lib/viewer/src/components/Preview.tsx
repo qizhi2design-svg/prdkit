@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Empty, message, Segmented, Button, Select } from 'antd';
-import { DesktopOutlined, MobileOutlined } from '@ant-design/icons';
+import { Empty, message, Segmented, Button } from 'antd';
 import './Preview.css';
 import { getElementInfo, getElementPath, formatMultipleElementsInfo, generateUniqueSelector, type ElementInfo } from '../utils/domUtils';
 import { getModifierKey } from '../utils/platform';
@@ -36,14 +35,6 @@ const VIEWPORT_DIMENSIONS: Record<PreviewViewport, { width: number; height: numb
   mobile: { width: 390, height: 844 },
 };
 
-const ZOOM_OPTIONS = [
-  { label: '50%', value: 50 },
-  { label: '75%', value: 75 },
-  { label: '100%', value: 100 },
-  { label: '125%', value: 125 },
-  { label: '150%', value: 150 },
-];
-
 export default function Preview({
   filePath,
   viewMode,
@@ -70,8 +61,8 @@ export default function Preview({
   const [selectedElements, setSelectedElements] = useState<SelectedElement[]>([]);
   const [marksVisible, setMarksVisible] = useState(true); // 标记是否可见
   const [inspectMarksVisible, setInspectMarksVisible] = useState(false); // 编辑模式下是否显示已有标记点
-  const [previewViewport, setPreviewViewport] = useState<PreviewViewport>('desktop');
-  const [zoomPercent, setZoomPercent] = useState(100);
+  const [previewViewport] = useState<PreviewViewport>('desktop');
+  const [zoomPercent] = useState(100);
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const [, setOverlayRefreshTick] = useState(0);
   const [iframeReloadToken, setIframeReloadToken] = useState(0);
@@ -841,28 +832,6 @@ export default function Preview({
           </div>
         </div>
       )}
-
-      <div className="preview-floating-toolbar">
-        <div className="preview-stage-toolbar-group">
-          <Segmented
-            size="small"
-            value={previewViewport}
-            onChange={(value) => setPreviewViewport(value as PreviewViewport)}
-            options={[
-              { label: 'PC端', value: 'desktop', icon: <DesktopOutlined /> },
-              { label: '移动端', value: 'mobile', icon: <MobileOutlined /> },
-            ]}
-          />
-          <Select
-            size="small"
-            value={zoomPercent}
-            onChange={setZoomPercent}
-            options={ZOOM_OPTIONS}
-            className="preview-zoom-select"
-            suffixIcon={null}
-          />
-        </div>
-      </div>
 
       {!wsConnected && (
         <div className="preview-floating-status">

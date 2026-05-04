@@ -163,8 +163,8 @@ export function registerMark(program: Command): void {
   mark
     .command("list")
     .description(COPY.markListDescription)
-    .requiredOption("--prototype <path>", "原型路径，例如 dashboard 或 foo/bar")
-    .option("--json", "以 JSON 输出")
+    .requiredOption("-p, --prototype <path>", "原型路径，例如 dashboard 或 foo/bar")
+    .option("-j, --json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.markListHelpAfter}`)
     .action(async (options: MarkCommonOptions) => {
       const { prototypesDir } = await resolvePrototypesDir(options.prototype);
@@ -183,8 +183,8 @@ export function registerMark(program: Command): void {
     .command("get")
     .argument("<mark-id>", "标记 ID")
     .description(COPY.markGetDescription)
-    .requiredOption("--prototype <path>", "原型路径，例如 dashboard 或 foo/bar")
-    .option("--json", "以 JSON 输出")
+    .requiredOption("-p, --prototype <path>", "原型路径，例如 dashboard 或 foo/bar")
+    .option("-j, --json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.markGetHelpAfter}`)
     .action(async (markId: string, options: MarkCommonOptions) => {
       const { prototypesDir } = await resolvePrototypesDir(options.prototype);
@@ -211,12 +211,12 @@ export function registerMark(program: Command): void {
   mark
     .command("create")
     .description(COPY.markCreateDescription)
-    .requiredOption("--prototype <path>", "原型路径，例如 dashboard 或 foo/bar")
-    .requiredOption("--title <text>", "标记标题")
-    .requiredOption("--selector <css>", "元素 CSS 选择器")
-    .option("--desc <markdown>", "标记描述（Markdown）")
-    .option("--desc-file <file>", "从 Markdown 文件读取标记描述")
-    .option("--json", "以 JSON 输出")
+    .requiredOption("-p, --prototype <path>", "原型路径，例如 dashboard 或 foo/bar")
+    .requiredOption("-t, --title <text>", "标记标题")
+    .requiredOption("-s, --selector <css>", "元素 CSS 选择器")
+    .option("-d, --desc <markdown>", "标记描述（Markdown）")
+    .option("-F, --desc-file <file>", "从 Markdown 文件读取标记描述")
+    .option("-j, --json", "以 JSON 输出")
     .addOption(new Option("--dom-path <path>", "DOM 路径").hideHelp())
     .addOption(new Option("--x <number>", "标记点 x 坐标").hideHelp())
     .addOption(new Option("--y <number>", "标记点 y 坐标").hideHelp())
@@ -253,11 +253,11 @@ export function registerMark(program: Command): void {
     .command("edit")
     .argument("<mark-id>", "标记 ID")
     .description(COPY.markEditDescription)
-    .requiredOption("--prototype <path>", "原型路径，例如 dashboard 或 foo/bar")
-    .option("--title <text>", "更新标记标题")
-    .option("--desc <markdown>", "更新标记描述（Markdown）")
-    .option("--desc-file <file>", "从 Markdown 文件读取新的标记描述")
-    .option("--json", "以 JSON 输出")
+    .requiredOption("-p, --prototype <path>", "原型路径，例如 dashboard 或 foo/bar")
+    .option("-t, --title <text>", "更新标记标题")
+    .option("-d, --desc <markdown>", "更新标记描述（Markdown）")
+    .option("-F, --desc-file <file>", "从 Markdown 文件读取新的标记描述")
+    .option("-j, --json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.markEditHelpAfter}`)
     .action(async (markId: string, options: MarkEditOptions) => {
       const { projectRoot, prototypesDir } = await resolvePrototypesDir(options.prototype);
@@ -290,8 +290,8 @@ export function registerMark(program: Command): void {
     .command("delete")
     .argument("<mark-id>", "标记 ID")
     .description(COPY.markDeleteDescription)
-    .requiredOption("--prototype <path>", "原型路径，例如 dashboard 或 foo/bar")
-    .option("--json", "以 JSON 输出")
+    .requiredOption("-p, --prototype <path>", "原型路径，例如 dashboard 或 foo/bar")
+    .option("-j, --json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.markDeleteHelpAfter}`)
     .action(async (markId: string, options: MarkCommonOptions) => {
       const { projectRoot, prototypesDir } = await resolvePrototypesDir(options.prototype);

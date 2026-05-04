@@ -1,4 +1,5 @@
 export type ViewerSkillConfig = {
+  pageCreateSkillCommand: string;
   inspectCopySkillCommand: string;
   markCreateSkillCommand: string;
   markUpdateSkillCommand: string;

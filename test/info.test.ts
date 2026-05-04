@@ -4,7 +4,6 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { saveConfig } from "../src/utils/config.js";
 import { getProjectStats } from "../src/commands/info.js";
-import { createCheckpoint } from "../src/lib/checkpoint/store.js";
 
 const tempDirs: string[] = [];
 
@@ -15,7 +14,7 @@ afterEach(() => {
 });
 
 describe("getProjectStats", () => {
-  it("counts directory-based prototypes and real checkpoint records", async () => {
+  it("counts directory-based prototypes", async () => {
     const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "prdkit-info-"));
     tempDirs.push(projectRoot);
 
@@ -38,17 +37,8 @@ describe("getProjectStats", () => {
       scaffoldRepo: "a",
       templateRepo: "b"
     }, projectRoot);
-
-    await createCheckpoint({
-      projectRoot,
-      prototypesDir,
-      prototypePath: "需求管理后台",
-      kind: "auto",
-      message: "初始版本"
-    });
-
     const stats = await getProjectStats(projectRoot);
     expect(stats.prototypes).toBe(2);
-    expect(stats.checkpoints).toBe(1);
+    expect("checkpoints" in stats).toBe(false);
   });
 });

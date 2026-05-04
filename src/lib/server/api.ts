@@ -10,16 +10,40 @@ import { buildInitialCheckpointSummary, diffCheckpoints, diffCurrentAgainstLates
 import { createCheckpoint, findCheckpointRecord, listCheckpointRecords, readCheckpointData } from '../checkpoint/store.js';
 import { materializeCheckpointPreview } from '../checkpoint/preview.js';
 import { restoreCheckpoint } from '../checkpoint/restore.js';
-import { DEFAULT_VIEWER_SKILLS } from '../shared/index.js';
+import { DEFAULT_INSPECT_COPY_SKILL_COMMAND, DEFAULT_PAGE_CREATE_SKILL_COMMAND, DEFAULT_VIEWER_SKILLS } from '../shared/index.js';
+import { loadConfig } from '#utils/config.js';
 import type { PrdkitConfig } from '#types/index.js';
+
+function normalizeViewerSkills(viewerSkills: {
+  pageCreateSkillCommand?: string;
+  inspectCopySkillCommand?: string;
+  markCreateSkillCommand?: string;
+  markUpdateSkillCommand?: string;
+  copyTerminalGuide?: string;
+}, hasExplicitPageCreateSkillCommand: boolean) {
+  if (
+    viewerSkills.inspectCopySkillCommand === DEFAULT_PAGE_CREATE_SKILL_COMMAND &&
+    !hasExplicitPageCreateSkillCommand
+  ) {
+    return {
+      ...viewerSkills,
+      pageCreateSkillCommand: DEFAULT_PAGE_CREATE_SKILL_COMMAND,
+      inspectCopySkillCommand: DEFAULT_INSPECT_COPY_SKILL_COMMAND,
+    };
+  }
+
+  return viewerSkills;
+}
 
 function readViewerSkills(projectRoot: string, config?: PrdkitConfig) {
   if (config?.viewerSkills) {
+    const normalized = config.viewerSkills;
     return {
-      inspectCopySkillCommand: config.viewerSkills.inspectCopySkillCommand || DEFAULT_VIEWER_SKILLS.inspectCopySkillCommand,
-      markCreateSkillCommand: config.viewerSkills.markCreateSkillCommand || DEFAULT_VIEWER_SKILLS.markCreateSkillCommand,
-      markUpdateSkillCommand: config.viewerSkills.markUpdateSkillCommand || DEFAULT_VIEWER_SKILLS.markUpdateSkillCommand,
-      copyTerminalGuide: config.viewerSkills.copyTerminalGuide || DEFAULT_VIEWER_SKILLS.copyTerminalGuide,
+      pageCreateSkillCommand: normalized.pageCreateSkillCommand || DEFAULT_VIEWER_SKILLS.pageCreateSkillCommand,
+      inspectCopySkillCommand: normalized.inspectCopySkillCommand || DEFAULT_VIEWER_SKILLS.inspectCopySkillCommand,
+      markCreateSkillCommand: normalized.markCreateSkillCommand || DEFAULT_VIEWER_SKILLS.markCreateSkillCommand,
+      markUpdateSkillCommand: normalized.markUpdateSkillCommand || DEFAULT_VIEWER_SKILLS.markUpdateSkillCommand,
+      copyTerminalGuide: normalized.copyTerminalGuide || DEFAULT_VIEWER_SKILLS.copyTerminalGuide,
     };
   }
 
@@ -33,6 +57,7 @@ function readViewerSkills(projectRoot: string, config?: PrdkitConfig) {
     const raw = fs.readFileSync(viewerSkillsPath, 'utf-8');
     const parsed = JSON.parse(raw) as {
       viewer?: {
+        pageCreateSkillCommand?: string;
         inspectCopySkillCommand?: string;
         markCreateSkillCommand?: string;
         markUpdateSkillCommand?: string;
@@ -40,11 +65,17 @@ function readViewerSkills(projectRoot: string, config?: PrdkitConfig) {
       };
     };
 
+    const hasExplicitPageCreateSkillCommand = Boolean(
+      parsed.viewer && Object.prototype.hasOwnProperty.call(parsed.viewer, 'pageCreateSkillCommand')
+    );
+    const normalized = normalizeViewerSkills(parsed.viewer || {}, hasExplicitPageCreateSkillCommand);
+
     return {
-      inspectCopySkillCommand: parsed.viewer?.inspectCopySkillCommand || DEFAULT_VIEWER_SKILLS.inspectCopySkillCommand,
-      markCreateSkillCommand: parsed.viewer?.markCreateSkillCommand || DEFAULT_VIEWER_SKILLS.markCreateSkillCommand,
-      markUpdateSkillCommand: parsed.viewer?.markUpdateSkillCommand || DEFAULT_VIEWER_SKILLS.markUpdateSkillCommand,
-      copyTerminalGuide: parsed.viewer?.copyTerminalGuide || DEFAULT_VIEWER_SKILLS.copyTerminalGuide,
+      pageCreateSkillCommand: normalized.pageCreateSkillCommand || DEFAULT_VIEWER_SKILLS.pageCreateSkillCommand,
+      inspectCopySkillCommand: normalized.inspectCopySkillCommand || DEFAULT_VIEWER_SKILLS.inspectCopySkillCommand,
+      markCreateSkillCommand: normalized.markCreateSkillCommand || DEFAULT_VIEWER_SKILLS.markCreateSkillCommand,
+      markUpdateSkillCommand: normalized.markUpdateSkillCommand || DEFAULT_VIEWER_SKILLS.markUpdateSkillCommand,
+      copyTerminalGuide: normalized.copyTerminalGuide || DEFAULT_VIEWER_SKILLS.copyTerminalGuide,
     };
   } catch (error) {
     console.error('读取 .prdkit/skills.json 失败，已回退默认 viewer skill 配置:', error);
@@ -425,15 +456,13 @@ export function createApiRouter(prototypesDir: string): Router {
   });
 
   // 获取项目配置
-  router.get('/config', (req: Request, res: Response) => {
+  router.get('/config', async (req: Request, res: Response) => {
     try {
-      const configPath = path.join(projectRoot, '.prdkit', 'config.json');
-
       let config: any = { projectName: 'PRDKit' };
 
-      if (fs.existsSync(configPath)) {
-        const configContent = fs.readFileSync(configPath, 'utf-8');
-        config = JSON.parse(configContent);
+      const loadedConfig = await loadConfig(projectRoot);
+      if (loadedConfig) {
+        config = loadedConfig;
       }
 
       // 添加 prototypes 目录的绝对路径

@@ -1,8 +1,8 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { DEFAULT_VIEWER_SKILLS } from "../src/lib/shared/index.js";
+import { DEFAULT_INSPECT_COPY_SKILL_COMMAND, DEFAULT_PAGE_CREATE_SKILL_COMMAND, DEFAULT_VIEWER_SKILLS } from "../src/lib/shared/index.js";
 import { loadConfig, resolveProjectRoot, saveConfig } from "../src/utils/config.js";
 
 describe("config", () => {
@@ -15,6 +15,7 @@ describe("config", () => {
       scaffoldRepo: "git@github.com:demo/scaffold.git",
       templateRepo: "git@github.com:demo/templates.git",
       viewerSkills: {
+        pageCreateSkillCommand: "/skill page-create-demo",
         inspectCopySkillCommand: "/skill inspect-demo",
         markCreateSkillCommand: "/skill mark-create-demo",
         markUpdateSkillCommand: "/skill mark-update-demo",
@@ -32,6 +33,7 @@ describe("config", () => {
       scaffoldRepo: "git@github.com:demo/scaffold.git",
       templateRepo: "git@github.com:demo/templates.git",
       viewerSkills: {
+        pageCreateSkillCommand: "/skill page-create-demo",
         inspectCopySkillCommand: "/skill inspect-demo",
         markCreateSkillCommand: "/skill mark-create-demo",
         markUpdateSkillCommand: "/skill mark-update-demo",
@@ -73,6 +75,35 @@ describe("config", () => {
 
     const loaded = await loadConfig(dir);
     expect(loaded?.viewerSkills).toEqual(DEFAULT_VIEWER_SKILLS);
+
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("migrates legacy inspect create command into separate create/update commands", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "prdkit-config-migrate-"));
+    await mkdir(path.join(dir, ".prdkit"), { recursive: true });
+    await writeFile(path.join(dir, ".prdkit", "config.json"), `${JSON.stringify({
+      version: 1,
+      projectName: "Legacy Skill Demo",
+      author: "Alice",
+      scaffoldRepo: "a",
+      templateRepo: "b",
+      viewerSkills: {
+        inspectCopySkillCommand: DEFAULT_PAGE_CREATE_SKILL_COMMAND,
+        markCreateSkillCommand: "/skill mark-create-demo",
+        markUpdateSkillCommand: "/skill mark-update-demo",
+        copyTerminalGuide: "复制后切到终端使用",
+      },
+    }, null, 2)}\n`);
+
+    const loaded = await loadConfig(dir);
+    expect(loaded?.viewerSkills).toEqual({
+      pageCreateSkillCommand: DEFAULT_PAGE_CREATE_SKILL_COMMAND,
+      inspectCopySkillCommand: DEFAULT_INSPECT_COPY_SKILL_COMMAND,
+      markCreateSkillCommand: "/skill mark-create-demo",
+      markUpdateSkillCommand: "/skill mark-update-demo",
+      copyTerminalGuide: "复制后切到终端使用",
+    });
 
     await rm(dir, { recursive: true, force: true });
   });
