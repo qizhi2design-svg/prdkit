@@ -104,8 +104,8 @@ export function registerCheckpoint(program: Command): void {
     .command("preview")
     .argument("<checkpoint-id>", "checkpoint ID")
     .description(COPY.checkpointPreviewDescription)
-    .option("--open", "生成后直接打开 index.html")
-    .option("--json", "以 JSON 输出")
+    .option("-o, --open", "生成后直接打开 index.html")
+    .option("-j, --json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointPreviewHelpAfter}`)
     .action(async (checkpointId: string, options: { open?: boolean; json?: boolean }) => {
       const { projectRoot } = await resolveCheckpointContext();
@@ -127,8 +127,8 @@ export function registerCheckpoint(program: Command): void {
     .command("create")
     .argument("<prototype-path>", "原型路径，例如 dashboard 或 foo/bar")
     .description(COPY.checkpointCreateDescription)
-    .option("--message <text>", "checkpoint 说明")
-    .option("--json", "以 JSON 输出")
+    .option("-m, --message <text>", "checkpoint 说明")
+    .option("-j, --json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointCreateHelpAfter}`)
     .action(async (prototypePath: string, options: CreateOptions) => {
       const { projectRoot, prototypesDir } = await resolveCheckpointContext();
@@ -160,8 +160,8 @@ export function registerCheckpoint(program: Command): void {
   session
     .command("start")
     .description(COPY.checkpointSessionStartDescription)
-    .option("--name <text>", "session 名称")
-    .option("--json", "以 JSON 输出")
+    .option("-n, --name <text>", "session 名称")
+    .option("-j, --json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointSessionStartHelpAfter}`)
     .action(async (options: SessionStartOptions) => {
       const { projectRoot } = await resolveCheckpointContext();
@@ -181,7 +181,7 @@ export function registerCheckpoint(program: Command): void {
   session
     .command("status")
     .description(COPY.checkpointSessionStatusDescription)
-    .option("--json", "以 JSON 输出")
+    .option("-j, --json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointSessionStatusHelpAfter}`)
     .action(async (options: CheckpointBaseOptions) => {
       const { projectRoot } = await resolveCheckpointContext();
@@ -208,7 +208,7 @@ export function registerCheckpoint(program: Command): void {
   session
     .command("end")
     .description(COPY.checkpointSessionEndDescription)
-    .option("--json", "以 JSON 输出")
+    .option("-j, --json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointSessionEndHelpAfter}`)
     .action(async (options: CheckpointBaseOptions) => {
       const { projectRoot } = await resolveCheckpointContext();
@@ -231,7 +231,7 @@ export function registerCheckpoint(program: Command): void {
     .command("list")
     .argument("[prototype-path]", "原型路径")
     .description(COPY.checkpointListDescription)
-    .option("--json", "以 JSON 输出")
+    .option("-j, --json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointListHelpAfter}`)
     .action(async (prototypePath: string | undefined, options: CheckpointBaseOptions) => {
       const { projectRoot } = await resolveCheckpointContext();
@@ -255,7 +255,7 @@ export function registerCheckpoint(program: Command): void {
     .command("show")
     .argument("<checkpoint-id>", "checkpoint ID")
     .description(COPY.checkpointShowDescription)
-    .option("--json", "以 JSON 输出")
+    .option("-j, --json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointShowHelpAfter}`)
     .action(async (checkpointId: string, options: CheckpointBaseOptions) => {
       const { projectRoot } = await resolveCheckpointContext();
@@ -277,7 +277,7 @@ export function registerCheckpoint(program: Command): void {
     .argument("<from-id>", "起始 checkpoint ID")
     .argument("<to-id>", "目标 checkpoint ID")
     .description(COPY.checkpointDiffDescription)
-    .option("--json", "以 JSON 输出")
+    .option("-j, --json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointDiffHelpAfter}`)
     .action(async (fromId: string, toId: string, options: CheckpointBaseOptions) => {
       const { projectRoot } = await resolveCheckpointContext();
@@ -301,8 +301,8 @@ export function registerCheckpoint(program: Command): void {
     .command("restore")
     .argument("<checkpoint-id>", "checkpoint ID")
     .description(COPY.checkpointRestoreDescription)
-    .option("--force", "存在未归档变更时先创建 pre-restore checkpoint 再恢复")
-    .option("--json", "以 JSON 输出")
+    .option("-f, --force", "存在未归档变更时先创建 pre-restore checkpoint 再恢复")
+    .option("-j, --json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointRestoreHelpAfter}`)
     .action(async (checkpointId: string, options: RestoreOptions) => {
       const { projectRoot, prototypesDir } = await resolveCheckpointContext();
@@ -327,7 +327,7 @@ export function registerCheckpoint(program: Command): void {
     .command("status")
     .argument("[prototype-path]", "原型路径")
     .description(COPY.checkpointStatusDescription)
-    .option("--json", "以 JSON 输出")
+    .option("-j, --json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointStatusHelpAfter}`)
     .action(async (prototypePath: string | undefined, options: CheckpointBaseOptions) => {
       const { projectRoot, prototypesDir } = await resolveCheckpointContext();
@@ -369,7 +369,7 @@ export function registerCheckpoint(program: Command): void {
     .command("prune")
     .argument("[prototype-path]", "原型路径")
     .description(COPY.checkpointPruneDescription)
-    .option("--json", "以 JSON 输出")
+    .option("-j, --json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointPruneHelpAfter}`)
     .action(async (prototypePath: string | undefined, options: CheckpointBaseOptions) => {
       const { projectRoot } = await resolveCheckpointContext();

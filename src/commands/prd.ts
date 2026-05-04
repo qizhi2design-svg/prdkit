@@ -397,12 +397,12 @@ export function registerPrd(program: Command): void {
     .command("create")
     .argument("[title]", "PRD 标题")
     .description(COPY.prdCreateDescription)
-    .option("--output <file-or-dir>", "输出文件路径或目录")
-    .option("--dir <dir>", "输出目录")
-    .option("--name <project-name>", "项目名称")
-    .option("--author <author>", "作者")
-    .option("--date <yyyy-mm-dd>", "文档日期")
-    .option("--from-plan <file>", "从第一阶段方案稿生成正式 PRD")
+    .option("-o, --output <file-or-dir>", "输出文件路径或目录")
+    .option("-d, --dir <dir>", "输出目录")
+    .option("-n, --name <project-name>", "项目名称")
+    .option("-a, --author <author>", "作者")
+    .option("-D, --date <yyyy-mm-dd>", "文档日期")
+    .option("-f, --from-plan <file>", "从第一阶段方案稿生成正式 PRD")
     .option("--non-interactive", "禁用交互式输入")
     .addHelpText("after", `\n${COPY.prdCreateHelpAfter}`)
     .action(async (titleArg: string | undefined, options: PrdCreateOptions) => {
@@ -441,7 +441,7 @@ export function registerPrd(program: Command): void {
     .command("check")
     .argument("[target]", "PRD 标题、文件名或路径")
     .description(COPY.prdCheckDescription)
-    .option("--json", "以 JSON 输出")
+    .option("-j, --json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.prdCheckHelpAfter}`)
     .action(async (target: string | undefined, options: PrdCheckOptions) => {
       const projectRoot = await resolveProjectRoot(process.cwd());
@@ -477,7 +477,7 @@ export function registerPrd(program: Command): void {
   prd
     .command("list")
     .description(COPY.prdListDescription)
-    .option("--json", "以 JSON 输出")
+    .option("-j, --json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.prdListHelpAfter}`)
     .action(async (options: PrdListOptions) => {
       const projectRoot = await resolveProjectRoot(process.cwd());

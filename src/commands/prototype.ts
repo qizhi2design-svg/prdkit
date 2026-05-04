@@ -59,12 +59,12 @@ export function registerPrototype(program: Command): void {
     .command("create")
     .argument("[title]", "原型标题")
     .description(COPY.prototypeCreateDescription)
-    .option("--template <type>", "原型模板类型：web | mobile | admin")
-    .option("--output <file-or-dir>", "输出文件路径或目录")
-    .option("--dir <dir>", "输出目录")
-    .option("--name <project-name>", "项目名称")
-    .option("--author <author>", "作者")
-    .option("--date <yyyy-mm-dd>", "文档日期")
+    .option("-t, --template <type>", "原型模板类型：web | mobile | admin")
+    .option("-o, --output <file-or-dir>", "输出文件路径或目录")
+    .option("-d, --dir <dir>", "输出目录")
+    .option("-n, --name <project-name>", "项目名称")
+    .option("-a, --author <author>", "作者")
+    .option("-D, --date <yyyy-mm-dd>", "文档日期")
     .option("--non-interactive", "禁用交互式输入")
     .addHelpText("after", `\n${COPY.prototypeCreateHelpAfter}`)
     .action(async (titleArg: string | undefined, options: PrototypeCreateOptions) => {
@@ -75,7 +75,7 @@ export function registerPrototype(program: Command): void {
   prototype
     .command("list")
     .description(COPY.prototypeListDescription)
-    .option("--json", "以 JSON 输出")
+    .option("-j, --json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.prototypeListHelpAfter}`)
     .action(async (options: PrototypeListOptions) => {
       const projectRoot = await resolveProjectRoot(process.cwd());

@@ -430,7 +430,7 @@ export function registerDoctor(program: Command): void {
   program
     .command("doctor")
     .description(COPY.doctorDescription)
-    .option("--fix", "自动修复发现的问题")
+    .option("-f, --fix", "自动修复发现的问题")
     .addHelpText("after", COPY.doctorHelpAfter)
     .action(async (options: DoctorOptions) => {
       const projectRoot = process.cwd();

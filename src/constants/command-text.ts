@@ -89,7 +89,7 @@ export const COPY = {
   checkpointCreateHelpAfter: `
 示例：
   prdkit checkpoint create dashboard
-  prdkit checkpoint create dashboard --message "首页导航改版"
+  prdkit checkpoint create dashboard -m "首页导航改版"
 
 说明：
   手动创建一个 checkpoint。

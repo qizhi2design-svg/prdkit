@@ -52,6 +52,7 @@ export interface PendingMarkInfo {
 }
 
 export interface ViewerSkillConfig {
+  pageCreateSkillCommand: string;
   inspectCopySkillCommand: string;
   markCreateSkillCommand: string;
   markUpdateSkillCommand: string;

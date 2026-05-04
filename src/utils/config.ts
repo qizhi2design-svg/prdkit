@@ -3,9 +3,10 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import type { PrdkitConfig } from "#types/index.js";
-import { DEFAULT_VIEWER_SKILLS } from "#lib/shared/index.js";
+import { DEFAULT_PAGE_CREATE_SKILL_COMMAND, DEFAULT_INSPECT_COPY_SKILL_COMMAND, DEFAULT_VIEWER_SKILLS } from "#lib/shared/index.js";
 
 const viewerSkillsSchema = z.object({
+  pageCreateSkillCommand: z.string().min(1).default(DEFAULT_VIEWER_SKILLS.pageCreateSkillCommand),
   inspectCopySkillCommand: z.string().min(1).default(DEFAULT_VIEWER_SKILLS.inspectCopySkillCommand),
   markCreateSkillCommand: z.string().min(1).default(DEFAULT_VIEWER_SKILLS.markCreateSkillCommand),
   markUpdateSkillCommand: z.string().min(1).default(DEFAULT_VIEWER_SKILLS.markUpdateSkillCommand),
@@ -26,6 +27,33 @@ const configSchema = z.object({
   viewerSkills: viewerSkillsSchema.optional().default(DEFAULT_VIEWER_SKILLS),
 });
 
+function normalizeViewerSkills(config: PrdkitConfig, hasExplicitPageCreateSkillCommand: boolean): PrdkitConfig {
+  const viewerSkills = config.viewerSkills ?? DEFAULT_VIEWER_SKILLS;
+
+  // 兼容旧配置：历史上 inspectCopySkillCommand 同时承担了“新建页面”和“编辑页面”的复制命令。
+  // 当旧项目仍保存为 /prdkit-page-create 且没有显式 pageCreateSkillCommand 时，自动迁移为：
+  // - 新建页面使用 create
+  // - 编辑模式使用 update
+  if (
+    viewerSkills.inspectCopySkillCommand === DEFAULT_PAGE_CREATE_SKILL_COMMAND &&
+    !hasExplicitPageCreateSkillCommand
+  ) {
+    return {
+      ...config,
+      viewerSkills: {
+        ...viewerSkills,
+        pageCreateSkillCommand: DEFAULT_PAGE_CREATE_SKILL_COMMAND,
+        inspectCopySkillCommand: DEFAULT_INSPECT_COPY_SKILL_COMMAND,
+      },
+    };
+  }
+
+  return {
+    ...config,
+    viewerSkills,
+  };
+}
+
 export function prdkitDir(cwd = process.cwd()): string {
   return path.join(cwd, ".prdkit");
 }
@@ -40,7 +68,11 @@ export async function loadConfig(cwd = process.cwd()): Promise<PrdkitConfig | un
   const file = configPath(projectRoot);
   if (!existsSync(file)) return undefined;
   const raw = await readFile(file, "utf8");
-  return configSchema.parse(JSON.parse(raw));
+  const parsedRaw = JSON.parse(raw) as { viewerSkills?: { pageCreateSkillCommand?: string } };
+  const hasExplicitPageCreateSkillCommand = Boolean(
+    parsedRaw.viewerSkills && Object.prototype.hasOwnProperty.call(parsedRaw.viewerSkills, "pageCreateSkillCommand")
+  );
+  return normalizeViewerSkills(configSchema.parse(parsedRaw), hasExplicitPageCreateSkillCommand);
 }
 
 export async function saveConfig(config: PrdkitConfig, cwd = process.cwd()): Promise<void> {

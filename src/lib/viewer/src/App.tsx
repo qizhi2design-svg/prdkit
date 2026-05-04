@@ -6,7 +6,7 @@ import Header from './components/Header';
 import MarkPanel from './components/MarkPanel';
 import PublishDrawer from './components/PublishDrawer';
 import HistoryDrawer from './components/HistoryDrawer';
-import { DEFAULT_COPY_TERMINAL_GUIDE, DEFAULT_INSPECT_COPY_SKILL_COMMAND, DEFAULT_MARK_CREATE_SKILL_COMMAND, DEFAULT_MARK_UPDATE_SKILL_COMMAND } from './constants/clipboard';
+import { DEFAULT_COPY_TERMINAL_GUIDE, DEFAULT_INSPECT_COPY_SKILL_COMMAND, DEFAULT_MARK_CREATE_SKILL_COMMAND, DEFAULT_MARK_UPDATE_SKILL_COMMAND, DEFAULT_PAGE_CREATE_SKILL_COMMAND } from './constants/clipboard';
 import { copySkillClipboardText } from './utils/clipboard';
 import type { ActiveCheckpointPreview, ViewMode, Mark, PendingMarkInfo, PrototypeNode, CheckpointDetail, CheckpointStatus, ViewerConfigResponse, ViewerSkillConfig } from './types';
 import './App.css';
@@ -33,6 +33,7 @@ function App() {
   const [projectName, setProjectName] = useState<string>(getInitialProjectName);
   const [prototypesDir, setPrototypesDir] = useState<string>('');
   const [viewerSkills, setViewerSkills] = useState<ViewerSkillConfig>({
+    pageCreateSkillCommand: DEFAULT_PAGE_CREATE_SKILL_COMMAND,
     inspectCopySkillCommand: DEFAULT_INSPECT_COPY_SKILL_COMMAND,
     markCreateSkillCommand: DEFAULT_MARK_CREATE_SKILL_COMMAND,
     markUpdateSkillCommand: DEFAULT_MARK_UPDATE_SKILL_COMMAND,
@@ -63,6 +64,8 @@ function App() {
   const [activeCheckpointPreview, setActiveCheckpointPreview] = useState<ActiveCheckpointPreview | null>(null);
   const [checkpointStatus, setCheckpointStatus] = useState<CheckpointStatus | null>(null);
   const [saveVersionSubmitting, setSaveVersionSubmitting] = useState(false);
+  const [historyRefreshVersion, setHistoryRefreshVersion] = useState(0);
+  const [historyTargetCheckpointId, setHistoryTargetCheckpointId] = useState<string | null>(null);
   const currentPrototypePath = selectedFile;
   const effectiveMarks = activeCheckpointPreview?.prototypePath === currentPrototypePath
     ? activeCheckpointPreview.marks
@@ -79,6 +82,7 @@ function App() {
         setProjectName(loadedProjectName);
         setPrototypesDir(configData.prototypesDir || '');
         setViewerSkills(configData.viewerSkills || {
+          pageCreateSkillCommand: DEFAULT_PAGE_CREATE_SKILL_COMMAND,
           inspectCopySkillCommand: DEFAULT_INSPECT_COPY_SKILL_COMMAND,
           markCreateSkillCommand: DEFAULT_MARK_CREATE_SKILL_COMMAND,
           markUpdateSkillCommand: DEFAULT_MARK_UPDATE_SKILL_COMMAND,
@@ -682,7 +686,7 @@ function App() {
     try {
       await copySkillClipboardText(
         {
-          skillCommand: viewerSkills.inspectCopySkillCommand,
+          skillCommand: viewerSkills.pageCreateSkillCommand,
           payload,
         },
         {
@@ -874,6 +878,8 @@ function App() {
       setSelectedMarkId(null);
       setPendingMarkInfo(null);
       setReloadVersion(prev => prev + 1);
+      setHistoryTargetCheckpointId(detail.checkpoint.id);
+      setHistoryRefreshVersion(prev => prev + 1);
       await loadMarks();
       await loadCheckpointStatus();
       message.success(`已还原 ${versionLabel}`);
@@ -905,6 +911,15 @@ function App() {
         throw new Error(data.message || data.error || '保存版本失败');
       }
 
+      const targetCheckpointId =
+        typeof data.duplicateOf === 'string' && data.duplicateOf
+          ? data.duplicateOf
+          : typeof data.record?.id === 'string' && data.record.id
+            ? data.record.id
+            : null;
+
+      setHistoryTargetCheckpointId(targetCheckpointId);
+      setHistoryRefreshVersion(prev => prev + 1);
       await loadCheckpointStatus();
       message.success(data.created ? `已保存 ${data.versionLabel}` : `没有检测到新变更，当前仍是${data.versionLabel}`);
     } catch (error) {
@@ -932,6 +947,7 @@ function App() {
         onSaveVersion={handleSaveVersion}
         historyDisabled={!currentPrototypePath}
         saveDisabled={!currentPrototypePath || !checkpointStatus?.hasChanges || Boolean(activeCheckpointPreview)}
+        saveHasChanges={Boolean(checkpointStatus?.hasChanges)}
         saveSubmitting={saveVersionSubmitting}
         saveChangeCount={checkpointStatus?.hasChanges ? checkpointStatus.changeCount : 0}
       />
@@ -1037,6 +1053,8 @@ function App() {
       <HistoryDrawer
         open={historyDrawerOpen}
         prototypePath={currentPrototypePath}
+        refreshVersion={historyRefreshVersion}
+        focusCheckpointId={historyTargetCheckpointId}
         onClose={() => {
           setHistoryDrawerOpen(false);
           handleExitCheckpointPreview();

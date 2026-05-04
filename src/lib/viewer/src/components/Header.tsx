@@ -16,6 +16,7 @@ interface HeaderProps {
   onSaveVersion: () => void;
   historyDisabled?: boolean;
   saveDisabled?: boolean;
+  saveHasChanges?: boolean;
   saveSubmitting?: boolean;
   saveChangeCount?: number;
 }
@@ -33,6 +34,7 @@ export default function Header({
   onSaveVersion,
   historyDisabled = false,
   saveDisabled = false,
+  saveHasChanges = false,
   saveSubmitting = false,
   saveChangeCount = 0,
 }: HeaderProps) {
@@ -44,6 +46,7 @@ export default function Header({
   };
 
   const fileName = getFileName(currentFile);
+  const displaySaveChangeCount = saveHasChanges && saveChangeCount > 0 ? saveChangeCount : 0;
 
   return (
     <div className="header-container">
@@ -94,7 +97,7 @@ export default function Header({
         >
           历史记录
         </Button>
-        <Badge count={saveChangeCount} size="small" offset={[-6, 6]} className="header-save-badge">
+        <Badge count={displaySaveChangeCount} size="small" offset={[-6, 6]} className="header-save-badge">
           <Button
             className="header-save-button"
             onClick={onSaveVersion}

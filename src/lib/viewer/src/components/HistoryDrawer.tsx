@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
   Drawer,
@@ -17,6 +17,8 @@ import './HistoryDrawer.css';
 interface HistoryDrawerProps {
   open: boolean;
   prototypePath: string | null;
+  refreshVersion?: number;
+  focusCheckpointId?: string | null;
   onClose: () => void;
   onPreview: (detail: CheckpointDetail) => void;
   onRestore: (detail: CheckpointDetail, versionLabel: string) => Promise<void>;
@@ -25,6 +27,8 @@ interface HistoryDrawerProps {
 export default function HistoryDrawer({
   open,
   prototypePath,
+  refreshVersion = 0,
+  focusCheckpointId = null,
   onClose,
   onPreview,
   onRestore,
@@ -34,6 +38,7 @@ export default function HistoryDrawer({
   const [checkpoints, setCheckpoints] = useState<CheckpointRecord[]>([]);
   const [detailCache, setDetailCache] = useState<Record<string, CheckpointDetail>>({});
   const [selectedCheckpointId, setSelectedCheckpointId] = useState<string | null>(null);
+  const lastAppliedFocusKeyRef = useRef<string | null>(null);
 
   const selectedRecord = useMemo(
     () => checkpoints.find((item) => item.id === selectedCheckpointId) ?? checkpoints[0] ?? null,
@@ -96,7 +101,24 @@ export default function HistoryDrawer({
   useEffect(() => {
     if (!open) return;
     void loadHistory();
-  }, [open, prototypePath]);
+  }, [open, prototypePath, refreshVersion]);
+
+  useEffect(() => {
+    if (!open || !focusCheckpointId) return;
+    const focusKey = `${refreshVersion}:${focusCheckpointId}`;
+    if (lastAppliedFocusKeyRef.current === focusKey) return;
+    if (!checkpoints.some((item) => item.id === focusCheckpointId)) return;
+
+    lastAppliedFocusKeyRef.current = focusKey;
+    setSelectedCheckpointId(focusCheckpointId);
+    void loadDetail(focusCheckpointId)
+      .then((detail) => {
+        onPreview(detail);
+      })
+      .catch((error) => {
+        console.error('切换到目标 checkpoint 失败:', error);
+      });
+  }, [checkpoints, focusCheckpointId, onPreview, open, refreshVersion]);
 
   const handlePreview = async (record: CheckpointRecord) => {
     try {
