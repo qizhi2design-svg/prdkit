@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Button, Input, List, Empty, Avatar, Typography, message, Popconfirm } from 'antd';
-import { DeleteOutlined, EditOutlined, ArrowLeftOutlined, UpOutlined, DownOutlined, DoubleRightOutlined, DoubleLeftOutlined, SearchOutlined, CopyOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
+import { Button, Input, List, Empty, Avatar, Tag, message, Popconfirm } from 'antd';
+import { DeleteOutlined, EditOutlined, ArrowLeftOutlined, UpOutlined, DownOutlined, DoubleRightOutlined, DoubleLeftOutlined, SearchOutlined, CopyOutlined, CheckOutlined, CloseOutlined, NodeIndexOutlined, DisconnectOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { copySkillClipboardText } from '../utils/clipboard';
-import type { Mark, PendingMarkInfo, ViewerSkillConfig } from '../types';
+import type { Mark, MarkUpdatePatch, PendingMarkInfo, ViewerSkillConfig } from '../types';
 import DomPathBreadcrumb from './DomPathBreadcrumb';
 import './MarkPanel.css';
 
 const { TextArea } = Input;
-const { Text } = Typography;
 
 type ViewMode = 'list' | 'create' | 'detail';
 
@@ -17,11 +16,15 @@ interface MarkPanelProps {
   marks: Mark[];
   selectedMarkId: string | null;
   pendingMarkInfo: PendingMarkInfo | null;
+  relinkingMarkId: string | null;
+  missingMarkIds: string[];
   viewerSkills: ViewerSkillConfig;
   onMarkSelect: (markId: string) => void;
   onMarkCreate: (title: string, description: string) => void;
-  onMarkUpdate: (markId: string, title: string, description: string) => void;
+  onMarkUpdate: (markId: string, patch: MarkUpdatePatch) => void;
   onMarkDelete: (markId: string) => void;
+  onMarkRelinkStart: (markId: string) => void;
+  onMarkRelinkCancel: () => void;
   onMarkCancel: () => void;
   onRefresh: () => void;
   collapsed?: boolean;
@@ -35,11 +38,15 @@ export default function MarkPanel({
   marks,
   selectedMarkId,
   pendingMarkInfo,
+  relinkingMarkId,
+  missingMarkIds,
   viewerSkills,
   onMarkSelect,
   onMarkCreate,
   onMarkUpdate,
   onMarkDelete,
+  onMarkRelinkStart,
+  onMarkRelinkCancel,
   onMarkCancel,
   collapsed = false,
   onCollapsedChange,
@@ -118,6 +125,7 @@ DOM 路径: ${domPath}`;
     : 'list';
 
   const selectedMark = marks.find(m => m.id === selectedMarkId);
+  const missingMarkIdSet = new Set(missingMarkIds);
 
   // 当进入创建视图时，自动生成标题
   useEffect(() => {
@@ -224,7 +232,10 @@ DOM 路径: ${domPath}`;
     if (selectedMarkId && editContent.trim()) {
       // 如果标题为空，使用原标题
       const finalTitle = editTitle.trim() || selectedMark?.title || '标记';
-      onMarkUpdate(selectedMarkId, finalTitle, editContent);
+      onMarkUpdate(selectedMarkId, {
+        title: finalTitle,
+        description: editContent,
+      });
       setIsEditing(false);
       setEditTitle('');
       setEditContent('');
@@ -376,10 +387,30 @@ DOM 路径: ${domPath}`;
                       </Avatar>
                     }
                     title={
-                      <Text ellipsis={{ tooltip: mark.title }}>
-                        {mark.title}
-                      </Text>
+                      <div className="mark-list-title-row">
+                        <span className="mark-list-title-text" title={mark.title}>
+                          {mark.title}
+                        </span>
+                      </div>
                     }
+                    description={missingMarkIdSet.has(mark.id) ? (
+                      <div className="mark-list-missing-row">
+                        <Tag color="error" className="mark-missing-tag">缺失</Tag>
+                        <Button
+                          type="link"
+                          size="small"
+                          icon={<NodeIndexOutlined />}
+                          className="mark-relink-link"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onMarkSelect(mark.id);
+                            onMarkRelinkStart(mark.id);
+                          }}
+                        >
+                          重新绑定
+                        </Button>
+                      </div>
+                    ) : null}
                   />
                 </List.Item>
               )}
@@ -521,11 +552,54 @@ DOM 路径: ${domPath}`;
           </div>
         </div>
         <div className="mark-panel-view">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <DomPathBreadcrumb domPath={selectedMark.domPath || selectedMark.selector} />
+          {!missingMarkIdSet.has(selectedMark.id) ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <DomPathBreadcrumb domPath={selectedMark.domPath || selectedMark.selector} />
+              </div>
             </div>
-          </div>
+          ) : null}
+          {missingMarkIdSet.has(selectedMark.id) ? (
+            <div className="mark-missing-card">
+              <div className="mark-missing-card-title">
+                <DisconnectOutlined />
+                <span>缺失标记</span>
+              </div>
+              <div className="mark-missing-card-description">
+                当前保存的元素路径已经无法在页面中找到，请重新选择页面中的目标元素。
+              </div>
+              <div className="mark-missing-card-actions">
+                <Button
+                  type="primary"
+                  size="small"
+                  icon={<NodeIndexOutlined />}
+                  onClick={() => onMarkRelinkStart(selectedMark.id)}
+                >
+                  重新绑定
+                </Button>
+                {relinkingMarkId === selectedMark.id ? (
+                  <Button size="small" onClick={onMarkRelinkCancel}>
+                    取消
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          ) : relinkingMarkId === selectedMark.id ? (
+            <div className="mark-missing-card editing">
+              <div className="mark-missing-card-title">
+                <NodeIndexOutlined />
+                <span>正在重新绑定</span>
+              </div>
+              <div className="mark-missing-card-description">
+                请直接点击页面中的新元素，系统会自动更新当前标记的元素路径。
+              </div>
+              <div className="mark-missing-card-actions">
+                <Button size="small" onClick={onMarkRelinkCancel}>
+                  取消
+                </Button>
+              </div>
+            </div>
+          ) : null}
           <div className="mark-panel-editor">
             {isEditing ? (
               <div className="mark-editor-card">

@@ -823,11 +823,15 @@ export function createApiRouter(prototypesDir: string): Router {
       const { prototypeName, markId } = req.params;
       const protoName = Array.isArray(prototypeName) ? prototypeName[0] : prototypeName;
       const markIdStr = Array.isArray(markId) ? markId[0] : markId;
-      const { title, description } = req.body;
+      const { title, description, selector, domPath, position, rect } = req.body;
 
       const updatedMark = updateMarkSync(prototypesDir, protoName, markIdStr, {
         title,
-        description: description === undefined ? undefined : stripMarkdownTitle(description)
+        description: description === undefined ? undefined : stripMarkdownTitle(description),
+        selector: selector === undefined ? undefined : String(selector),
+        domPath: domPath === undefined ? undefined : String(domPath),
+        position,
+        rect
       });
 
       res.json({ success: true, mark: updatedMark });

@@ -26,6 +26,10 @@ export interface MarkCreateInput {
 export interface MarkPatch {
   title?: string;
   description?: string;
+  selector?: string;
+  domPath?: string;
+  position?: unknown;
+  rect?: unknown;
 }
 
 export function stripMarkdownTitle(content: string): string {
@@ -96,7 +100,11 @@ export function updateMarkSync(
   const nextDescription = patch.description ?? currentDescription;
   const metadata = compactObject({
     ...data,
-    title: nextTitle
+    title: nextTitle,
+    selector: patch.selector ?? data.selector,
+    domPath: patch.domPath ?? data.domPath,
+    position: patch.position ?? data.position,
+    rect: patch.rect ?? data.rect
   }) as Record<string, unknown>;
 
   const body = buildMarkBody(nextTitle, nextDescription);

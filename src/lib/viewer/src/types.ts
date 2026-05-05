@@ -51,6 +51,15 @@ export interface PendingMarkInfo {
   };
 }
 
+export interface MarkUpdatePatch {
+  title?: string;
+  description?: string;
+  selector?: string;
+  domPath?: string;
+  position?: PendingMarkInfo['position'];
+  rect?: PendingMarkInfo['rect'];
+}
+
 export interface ViewerSkillConfig {
   pageCreateSkillCommand: string;
   inspectCopySkillCommand: string;

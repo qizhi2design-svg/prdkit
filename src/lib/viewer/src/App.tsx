@@ -8,7 +8,7 @@ import PublishDrawer from './components/PublishDrawer';
 import HistoryDrawer from './components/HistoryDrawer';
 import { DEFAULT_COPY_TERMINAL_GUIDE, DEFAULT_INSPECT_COPY_SKILL_COMMAND, DEFAULT_MARK_CREATE_SKILL_COMMAND, DEFAULT_MARK_UPDATE_SKILL_COMMAND, DEFAULT_PAGE_CREATE_SKILL_COMMAND } from './constants/clipboard';
 import { copySkillClipboardText } from './utils/clipboard';
-import type { ActiveCheckpointPreview, ViewMode, Mark, PendingMarkInfo, PrototypeNode, CheckpointDetail, CheckpointStatus, ViewerConfigResponse, ViewerSkillConfig } from './types';
+import type { ActiveCheckpointPreview, ViewMode, Mark, MarkUpdatePatch, PendingMarkInfo, PrototypeNode, CheckpointDetail, CheckpointStatus, ViewerConfigResponse, ViewerSkillConfig } from './types';
 import './App.css';
 
 const { Sider, Content } = Layout;
@@ -45,10 +45,12 @@ function App() {
   const [marks, setMarks] = useState<Mark[]>([]);
   const [selectedMarkId, setSelectedMarkId] = useState<string | null>(null);
   const [pendingMarkInfo, setPendingMarkInfo] = useState<PendingMarkInfo | null>(null);
-  const [markPanelWidth, setMarkPanelWidth] = useState(250);
+  const [relinkingMarkId, setRelinkingMarkId] = useState<string | null>(null);
+  const [missingMarkIds, setMissingMarkIds] = useState<string[]>([]);
+  const [markPanelWidth, setMarkPanelWidth] = useState(350);
   const [isResizingMarkPanel, setIsResizingMarkPanel] = useState(false);
   const [markPanelCollapsed, setMarkPanelCollapsed] = useState(false);
-  const [savedMarkPanelWidth, setSavedMarkPanelWidth] = useState(250);
+  const [savedMarkPanelWidth, setSavedMarkPanelWidth] = useState(350);
   const siderRef = useRef<HTMLDivElement>(null);
   const markPanelRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -239,7 +241,7 @@ function App() {
       if (animationFrameId === null) {
         animationFrameId = requestAnimationFrame(() => {
           const newWidth = window.innerWidth - latestMouseX;
-          if (newWidth >= 300 && newWidth <= 800) {
+          if (newWidth >= 350 && newWidth <= 800) {
             setMarkPanelWidth(newWidth);
           }
           animationFrameId = null;
@@ -406,6 +408,8 @@ function App() {
   useEffect(() => {
     setSelectedMarkId(null);
     setPendingMarkInfo(null);
+    setRelinkingMarkId(null);
+    setMissingMarkIds([]);
     setActiveCheckpointPreview(null);
   }, [selectedFile]);
 
@@ -436,26 +440,30 @@ function App() {
   };
 
   // 处理标记更新
-  const handleMarkUpdate = (markId: string, title: string, description: string) => {
+  const handleMarkUpdate = async (markId: string, patch: MarkUpdatePatch) => {
     if (activeCheckpointPreview) {
       message.info('历史版本预览中不可编辑标记，请先还原到该版本');
       return;
     }
     if (!currentPrototypePath) return;
 
-    fetch(`/api/marks/${encodeURIComponent(currentPrototypePath)}/${markId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, description }),
-    })
-      .then(res => res.json())
-      .then(() => {
-        // 重新加载标记数据以确保与文件系统同步
-        loadMarks();
-      })
-      .catch(error => {
-        console.error('更新标记失败:', error);
+    try {
+      const response = await fetch(`/api/marks/${encodeURIComponent(currentPrototypePath)}/${markId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
       });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.message || data?.error || '更新标记失败');
+      }
+
+      await loadMarks();
+    } catch (error) {
+      console.error('更新标记失败:', error);
+      message.error(error instanceof Error ? error.message : '更新标记失败');
+    }
   };
 
   // 处理标记删除
@@ -472,6 +480,9 @@ function App() {
       .then(() => {
         if (selectedMarkId === markId) {
           setSelectedMarkId(null);
+        }
+        if (relinkingMarkId === markId) {
+          setRelinkingMarkId(null);
         }
         // 重新加载标记数据以确保与文件系统同步
         loadMarks();
@@ -734,7 +745,43 @@ function App() {
 
   // 处理准备创建标记
   const handleMarkPrepare = (info: PendingMarkInfo) => {
+    setRelinkingMarkId(null);
     setPendingMarkInfo(info);
+  };
+
+  const handleMarkRelink = (markId: string, info: PendingMarkInfo) => {
+    const currentMark = marks.find((mark) => mark.id === markId);
+    if (!currentMark) return;
+
+    handleMarkUpdate(markId, {
+      title: currentMark.title,
+      description: currentMark.description,
+      selector: info.selector,
+      domPath: info.domPath,
+      position: info.position,
+      rect: info.rect,
+    });
+    setRelinkingMarkId(null);
+    setSelectedMarkId(markId);
+    setPendingMarkInfo(null);
+    message.success('已更新标记元素路径');
+  };
+
+  const handleMarkRelinkStart = (markId: string) => {
+    if (activeCheckpointPreview) {
+      message.info('历史版本预览中不可修改标记路径，请先还原到该版本');
+      return;
+    }
+
+    setViewMode('mark');
+    setSelectedMarkId(markId);
+    setPendingMarkInfo(null);
+    setRelinkingMarkId(markId);
+    message.info('请点击页面中的新元素，更新当前标记路径');
+  };
+
+  const handleMarkRelinkCancel = () => {
+    setRelinkingMarkId(null);
   };
 
   // 处理取消创建标记
@@ -1004,9 +1051,12 @@ function App() {
             marks={effectiveMarks}
             selectedMarkId={selectedMarkId}
             pendingMarkInfo={pendingMarkInfo}
+            relinkingMarkId={relinkingMarkId}
             onMarkPrepare={handleMarkPrepare}
+            onMarkRelink={handleMarkRelink}
             onMarkSelect={handleMarkSelect}
             onMarkCancel={handleMarkCancel}
+            onMarkResolutionChange={setMissingMarkIds}
             onToggleMarkPanel={handleToggleMarkPanel}
             previewUrlOverride={activeCheckpointPreview?.prototypePath === currentPrototypePath ? activeCheckpointPreview.previewUrl : null}
             previewReadonly={Boolean(activeCheckpointPreview && activeCheckpointPreview.prototypePath === currentPrototypePath)}
@@ -1022,11 +1072,15 @@ function App() {
               marks={effectiveMarks}
               selectedMarkId={selectedMarkId}
               pendingMarkInfo={pendingMarkInfo}
+              relinkingMarkId={relinkingMarkId}
+              missingMarkIds={missingMarkIds}
               viewerSkills={viewerSkills}
               onMarkSelect={handleMarkSelect}
               onMarkCreate={handleMarkCreate}
               onMarkUpdate={handleMarkUpdate}
               onMarkDelete={handleMarkDelete}
+              onMarkRelinkStart={handleMarkRelinkStart}
+              onMarkRelinkCancel={handleMarkRelinkCancel}
               onMarkCancel={handleMarkCancel}
               onRefresh={loadMarks}
               collapsed={markPanelCollapsed}

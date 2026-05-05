@@ -18,9 +18,12 @@ interface PreviewProps {
   marks: Mark[];
   selectedMarkId: string | null;
   pendingMarkInfo: PendingMarkInfo | null;
+  relinkingMarkId: string | null;
   onMarkPrepare: (info: PendingMarkInfo) => void;
+  onMarkRelink: (markId: string, info: PendingMarkInfo) => void;
   onMarkSelect: (markId: string) => void;
   onMarkCancel: () => void;
+  onMarkResolutionChange: (missingMarkIds: string[]) => void;
   onToggleMarkPanel?: () => void;
   htmlContent?: string; // 用于发布模式的 HTML 内容
   previewUrlOverride?: string | null;
@@ -46,9 +49,12 @@ export default function Preview({
   marks,
   selectedMarkId,
   pendingMarkInfo,
+  relinkingMarkId,
   onMarkPrepare,
+  onMarkRelink,
   onMarkSelect,
   onMarkCancel,
+  onMarkResolutionChange,
   onToggleMarkPanel,
   previewUrlOverride = null,
   previewReadonly = false,
@@ -312,6 +318,31 @@ export default function Preview({
         // 生成唯一选择器
         const selector = generateUniqueSelector(target);
 
+        if (relinkingMarkId) {
+          const duplicatedMark = marks.find((mark) => mark.selector === selector && mark.id !== relinkingMarkId);
+          if (duplicatedMark) {
+            message.warning(`该元素已绑定到标记“${duplicatedMark.title}”`);
+            return;
+          }
+
+          const rect = target.getBoundingClientRect();
+          onMarkRelink(relinkingMarkId, {
+            selector,
+            domPath: getElementPath(target),
+            position: {
+              x: e.clientX,
+              y: e.clientY,
+            },
+            rect: {
+              top: rect.top,
+              left: rect.left,
+              width: rect.width,
+              height: rect.height,
+            },
+          });
+          return;
+        }
+
         // 检查是否已经有标记使用这个选择器
         const existingMark = marks.find(mark => mark.selector === selector);
 
@@ -413,7 +444,36 @@ export default function Preview({
         currentCleanup();
       }
     };
-  }, [viewMode, filePath, projectName, prototypesDir, selectionMode, marksVisibleInCurrentMode, onMarkPrepare, previewReadonly, marks, onMarkSelect]);
+  }, [viewMode, filePath, projectName, prototypesDir, selectionMode, marksVisibleInCurrentMode, onMarkPrepare, previewReadonly, marks, onMarkSelect, onMarkRelink, relinkingMarkId]);
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    const updateMissingMarks = () => {
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!iframeDoc) return;
+
+      const nextMissingMarkIds = marks
+        .filter((mark) => {
+          try {
+            return !iframeDoc.querySelector(mark.selector);
+          } catch {
+            return true;
+          }
+        })
+        .map((mark) => mark.id);
+
+      onMarkResolutionChange(nextMissingMarkIds);
+    };
+
+    updateMissingMarks();
+    iframe.addEventListener('load', updateMissingMarks);
+
+    return () => {
+      iframe.removeEventListener('load', updateMissingMarks);
+    };
+  }, [marks, onMarkResolutionChange, reloadVersion, filePath]);
 
   // 清理选中元素（当切换模式时）
   useEffect(() => {
@@ -805,7 +865,9 @@ export default function Preview({
           <span className="preview-inspect-banner-text">
             {previewReadonly
               ? (marksVisible ? '历史版本预览中，仅支持查看标记' : '历史版本预览中（标记已隐藏）')
-              : (marksVisible ? '点击页面元素创建标记' : '预览模式（标记已隐藏）')}
+              : relinkingMarkId
+                ? '请点击页面中的新元素，重新绑定当前标记'
+                : (marksVisible ? '点击页面元素创建标记' : '预览模式（标记已隐藏）')}
             {marks.length > 0 && marksVisible && (
               <>
                 <Hotkey keys={['↑']} description="上一个" />
