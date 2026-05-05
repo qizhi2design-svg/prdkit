@@ -13,7 +13,6 @@ import { registerPrototype } from "#commands/prototype.js";
 import { registerServe } from "#commands/serve.js";
 import { registerUpdate } from "#commands/update.js";
 import { registerPublish } from "#commands/publish.js";
-import { registerCheckpoint } from "#commands/checkpoint.js";
 import { registerInfo } from "#commands/info.js";
 import { handleError } from "#utils/error-handler.js";
 import { UserCancelledError } from "#utils/errors.js";
@@ -52,7 +51,6 @@ registerDoctor(program);
 registerServe(program);
 registerUpdate(program);
 registerPublish(program);
-registerCheckpoint(program);
 
 program.parseAsync(process.argv).catch((error: unknown) => {
   // 用户取消操作（Ctrl+C）
