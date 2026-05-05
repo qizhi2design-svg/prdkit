@@ -20,7 +20,7 @@ import {
 } from "#utils/templates.js";
 import { resolveOutputPath, assertFileDoesNotExist, writeTextFile } from "#utils/files.js";
 import path from "node:path";
-import { createCheckpoint } from "#lib/checkpoint/store.js";
+import { createCheckpoint } from "#lib/checkpoints/prototype/store.js";
 
 /**
  * Create 命令选项

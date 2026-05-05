@@ -4,6 +4,8 @@ import path from "node:path";
 import { z } from "zod";
 import type { PrdkitConfig } from "#types/index.js";
 import { DEFAULT_PAGE_CREATE_SKILL_COMMAND, DEFAULT_INSPECT_COPY_SKILL_COMMAND, DEFAULT_VIEWER_SKILLS } from "#lib/shared/index.js";
+import { needsMigration, migrateCheckpointStorage } from "#lib/checkpoints/migration.js";
+import { logger } from "./logger.js";
 
 const viewerSkillsSchema = z.object({
   pageCreateSkillCommand: z.string().min(1).default(DEFAULT_VIEWER_SKILLS.pageCreateSkillCommand),
@@ -84,7 +86,18 @@ export async function saveConfig(config: PrdkitConfig, cwd = process.cwd()): Pro
 export async function resolveProjectRoot(cwd = process.cwd()): Promise<string | undefined> {
   let current = path.resolve(cwd);
   while (true) {
-    if (existsSync(configPath(current))) return current;
+    if (existsSync(configPath(current))) {
+      // 自动检测并执行 checkpoint 迁移
+      if (needsMigration(current)) {
+        try {
+          migrateCheckpointStorage(current);
+          logger.info("Checkpoint 存储结构已自动升级");
+        } catch (error) {
+          logger.warn("Checkpoint 存储迁移失败，将继续使用旧格式");
+        }
+      }
+      return current;
+    }
     const parent = path.dirname(current);
     if (parent === current) return undefined;
     current = parent;

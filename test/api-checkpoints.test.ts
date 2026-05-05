@@ -5,7 +5,7 @@ import os from "node:os";
 import http from "node:http";
 import express from "express";
 import { createApiRouter } from "../src/lib/server/api.js";
-import { createCheckpoint } from "../src/lib/checkpoint/store.js";
+import { createCheckpoint } from "../src/lib/checkpoints/prototype/store.js";
 
 function makeRequest(
   app: express.Express,

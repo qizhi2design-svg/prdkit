@@ -35,7 +35,7 @@ function sha256(value: Buffer | string): string {
 }
 
 function checkpointRoot(projectRoot: string): string {
-  return path.join(projectRoot, ".prdkit", "checkpoints");
+  return path.join(projectRoot, ".prdkit", "checkpoints", "prototype");
 }
 
 function checkpointIndexPath(projectRoot: string): string {

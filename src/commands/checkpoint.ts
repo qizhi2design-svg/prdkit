@@ -10,10 +10,10 @@ import { ConfigError, FileSystemError, PrototypeError } from "#utils/errors.js";
 import {
   diffCheckpoints,
   diffCurrentAgainstLatest
-} from "#lib/checkpoint/diff.js";
-import { materializeCheckpointPreview } from "#lib/checkpoint/preview.js";
-import { pruneAutoCheckpoints } from "#lib/checkpoint/retention.js";
-import { restoreCheckpoint } from "#lib/checkpoint/restore.js";
+} from "#lib/checkpoints/prototype/diff.js";
+import { materializeCheckpointPreview } from "#lib/checkpoints/prototype/preview.js";
+import { pruneAutoCheckpoints } from "#lib/checkpoints/prototype/retention.js";
+import { restoreCheckpoint } from "#lib/checkpoints/prototype/restore.js";
 import {
   createCheckpoint,
   endCheckpointSession,
@@ -23,10 +23,10 @@ import {
   listCheckpointRecords,
   readCheckpointData,
   startCheckpointSession
-} from "#lib/checkpoint/store.js";
-import { collectPrototypeSnapshot } from "#lib/checkpoint/snapshot.js";
+} from "#lib/checkpoints/prototype/store.js";
+import { collectPrototypeSnapshot } from "#lib/checkpoints/prototype/snapshot.js";
 import { flattenPrototypes, scanPrototypes } from "#lib/server/scanner.js";
-import type { CheckpointDiffSummary, CheckpointRecord } from "#lib/checkpoint/types.js";
+import type { CheckpointDiffSummary, CheckpointRecord } from "#lib/checkpoints/prototype/types.js";
 
 interface CheckpointBaseOptions {
   json?: boolean;

@@ -70,7 +70,9 @@ export class WatchContentTracker {
 }
 
 export function shouldIgnoreWatchPath(targetPath: string): boolean {
-  return /(^|[\/\\])\./.test(targetPath) || targetPath.includes(`${path.sep}.prdkit${path.sep}checkpoints${path.sep}`);
+  return /(^|[\/\\])\./.test(targetPath) ||
+         targetPath.includes(`${path.sep}.prdkit${path.sep}checkpoints${path.sep}prototype${path.sep}`) ||
+         targetPath.includes(`${path.sep}.prdkit${path.sep}checkpoints${path.sep}prd${path.sep}`);
 }
 
 export function resolvePrototypePathFromWatchEvent(prototypesDir: string, targetPath: string): string | null {

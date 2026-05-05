@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { saveConfig } from "../src/utils/config.js";
 import { runCreateTemplate } from "../src/core/create-command.js";
-import { listCheckpointRecords } from "../src/lib/checkpoint/store.js";
+import { listCheckpointRecords } from "../src/lib/checkpoints/prototype/store.js";
 import { loadPrdPlan } from "../src/commands/prd.js";
 
 const tempDirs: string[] = [];

@@ -3,9 +3,9 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { saveConfig } from "../src/utils/config.js";
-import { createPrdCheckpoint, listPrdCheckpointRecords, loadPrdCheckpointIndex } from "../src/lib/prd-checkpoint/store.js";
-import { diffCurrentPrdAgainstLatest, diffPrdCheckpoints } from "../src/lib/prd-checkpoint/diff.js";
-import { restorePrdCheckpoint } from "../src/lib/prd-checkpoint/restore.js";
+import { createPrdCheckpoint, listPrdCheckpointRecords, loadPrdCheckpointIndex } from "../src/lib/checkpoints/prd/store.js";
+import { diffCurrentPrdAgainstLatest, diffPrdCheckpoints } from "../src/lib/checkpoints/prd/diff.js";
+import { restorePrdCheckpoint } from "../src/lib/checkpoints/prd/restore.js";
 
 const tempDirs: string[] = [];
 

@@ -5,7 +5,7 @@ import {
   readPrototypeMarksSync,
   stripMarkdownTitle,
   type MarkRecord
-} from "../server/marks.js";
+} from "../../server/marks.js";
 import type {
   CheckpointFileEntry,
   CheckpointMarkEntry,

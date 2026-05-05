@@ -16,7 +16,7 @@ import type {
 const CHECKPOINT_VERSION = 1;
 
 function prdCheckpointRoot(projectRoot: string): string {
-  return path.join(projectRoot, ".prdkit", "prd-checkpoints");
+  return path.join(projectRoot, ".prdkit", "checkpoints", "prd");
 }
 
 function indexPath(projectRoot: string): string {

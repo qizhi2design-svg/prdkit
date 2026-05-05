@@ -14,7 +14,7 @@ import {
 } from "#lib/server/marks.js";
 import { logger } from "#utils/logger.js";
 import { ConfigError, PrototypeError, ValidationError } from "#utils/errors.js";
-import { createCheckpoint } from "#lib/checkpoint/store.js";
+import { createCheckpoint } from "#lib/checkpoints/prototype/store.js";
 
 interface MarkCommonOptions {
   prototype: string;

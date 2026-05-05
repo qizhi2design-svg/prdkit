@@ -5,7 +5,7 @@ import path from 'path';
 import chalk from 'chalk';
 import { createApiRouter } from './api.js';
 import { createWatcher, broadcastReload } from './watcher.js';
-import { checkpointStoreRoot } from '../checkpoint/store.js';
+import { checkpointStoreRoot } from '../checkpoints/prototype/store.js';
 
 export interface ServerOptions {
   port: number;
