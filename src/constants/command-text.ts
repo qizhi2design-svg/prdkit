@@ -62,6 +62,62 @@ export const COPY = {
 说明：
   输出 workspace/prds 下的所有 PRD 文档列表。
 `,
+  prdCheckpointDescription: "管理 PRD 文档的 checkpoint",
+  prdCheckpointCreateDescription: "为指定 PRD 创建 checkpoint",
+  prdCheckpointCreateHelpAfter: `
+示例：
+  prdkit prd checkpoint create
+  prdkit prd checkpoint create "支付流程优化" -m "补充验收标准"
+
+说明：
+  默认选择最近修改的一份 PRD。
+  如果内容与最近一次 checkpoint 完全一致，则不会重复创建。
+`,
+  prdCheckpointListDescription: "列出 PRD checkpoint 时间线",
+  prdCheckpointListHelpAfter: `
+示例：
+  prdkit prd checkpoint list
+  prdkit prd checkpoint list "支付流程优化" --json
+
+说明：
+  可按单份 PRD 过滤，也可查看整个项目下的所有 PRD checkpoint。
+`,
+  prdCheckpointShowDescription: "查看单个 PRD checkpoint 详情",
+  prdCheckpointShowHelpAfter: `
+示例：
+  prdkit prd checkpoint show prd-manual-2026-05-06T00-00-00-000Z-ab12cd
+
+说明：
+  展示 checkpoint 的元信息、文档大小与行数。
+`,
+  prdCheckpointDiffDescription: "对比两个 PRD checkpoint 的文本差异摘要",
+  prdCheckpointDiffHelpAfter: `
+示例：
+  prdkit prd checkpoint diff checkpoint-a checkpoint-b
+  prdkit prd checkpoint diff checkpoint-a checkpoint-b --json
+
+说明：
+  输出文本是否变化，以及新增/删除的行数摘要。
+`,
+  prdCheckpointStatusDescription: "查看当前 PRD 相对最近 checkpoint 的状态",
+  prdCheckpointStatusHelpAfter: `
+示例：
+  prdkit prd checkpoint status
+  prdkit prd checkpoint status "支付流程优化" --json
+
+说明：
+  默认选择最近修改的一份 PRD，并输出当前工作区的变化摘要。
+`,
+  prdCheckpointRestoreDescription: "恢复到指定 PRD checkpoint",
+  prdCheckpointRestoreHelpAfter: `
+示例：
+  prdkit prd checkpoint restore checkpoint-a
+  prdkit prd checkpoint restore checkpoint-a --force
+
+说明：
+  默认遇到未归档变更会停止。
+  使用 --force 时会先创建 pre-restore checkpoint 再恢复。
+`,
   prototypeDescription: "原型相关命令",
   prototypeCreateDescription: "创建原型文档",
   prototypeCreateHelpAfter: `
