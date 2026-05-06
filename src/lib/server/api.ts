@@ -149,13 +149,35 @@ export function createApiRouter(prototypesDir: string): Router {
     let candidateName = leafName;
     let movedPath = buildCandidate(candidateName);
     let movedDir = path.resolve(prototypesDir, movedPath);
-    let suffix = 1;
 
+    if (!fs.existsSync(movedDir)) {
+      return {
+        movedPath,
+        movedDir,
+        movedName: candidateName,
+      };
+    }
+
+    // 第一次冲突：尝试 "名称-副本"
+    candidateName = `${leafName}-副本`;
+    movedPath = buildCandidate(candidateName);
+    movedDir = path.resolve(prototypesDir, movedPath);
+
+    if (!fs.existsSync(movedDir)) {
+      return {
+        movedPath,
+        movedDir,
+        movedName: candidateName,
+      };
+    }
+
+    // 后续冲突：尝试 "名称-副本2", "名称-副本3" ...
+    let suffix = 2;
     while (fs.existsSync(movedDir)) {
-      suffix += 1;
-      candidateName = `${leafName}-副本${suffix - 1}`;
+      candidateName = `${leafName}-副本${suffix}`;
       movedPath = buildCandidate(candidateName);
       movedDir = path.resolve(prototypesDir, movedPath);
+      suffix += 1;
     }
 
     return {
@@ -376,6 +398,23 @@ export function createApiRouter(prototypesDir: string): Router {
         (normalizedTargetFolderPath && normalizedTargetFolderPath.startsWith(sourcePrefix))
       ) {
         return res.status(400).json({ error: '不能将页面移动到自身目录中' });
+      }
+
+      // 检查源文件的父目录是否与目标文件夹相同
+      const sourceSegments = normalizedPrototypePath.split('/');
+      sourceSegments.pop(); // 移除文件名，得到父目录
+      const sourceParentPath = sourceSegments.join('/');
+
+      if (sourceParentPath === normalizedTargetFolderPath) {
+        // 位置未变化，直接返回成功（不执行实际移动）
+        const leafName = normalizedPrototypePath.split('/').pop() || '';
+        return res.json({
+          success: true,
+          sourcePath: prototypePath,
+          movedPath: prototypePath,
+          movedName: leafName,
+          unchanged: true,
+        });
       }
 
       const { movedPath, movedDir, movedName } = buildMovedPrototypePath(prototypePath, normalizedTargetFolderPath);
