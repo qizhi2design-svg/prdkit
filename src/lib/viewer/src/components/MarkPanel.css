@@ -146,7 +146,7 @@
 .mark-list-delete-button {
   opacity: 0;
   pointer-events: none;
-  color: #ff4d4f;
+  color: var(--color-error);
   transition: opacity 0.2s ease, background-color 0.2s ease;
 }
 
@@ -156,7 +156,7 @@
 }
 
 .mark-list-delete-button:hover {
-  background: rgba(255, 77, 79, 0.08) !important;
+  background: var(--color-error-alpha-8) !important;
 }
 
 .mark-list-item .ant-avatar {

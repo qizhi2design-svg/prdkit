@@ -192,7 +192,7 @@
 }
 
 .file-tree-delete-button {
-  color: #ff4d4f;
+  color: var(--color-error);
 }
 
 .file-tree-content .ant-tree-node-content-wrapper:hover .file-tree-copy-button,
@@ -241,7 +241,7 @@
 }
 
 .file-tree-delete-button:hover {
-  background: rgba(255, 77, 79, 0.08) !important;
+  background: var(--color-error-alpha-8) !important;
 }
 
 .file-tree-loading {

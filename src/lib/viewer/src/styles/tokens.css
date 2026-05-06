@@ -28,15 +28,17 @@
 
   /* ========== 功能色 ========== */
   --color-success: #52c41a;
-  --color-success-light: rgba(82, 196, 26, 0.1);
+  --color-success-alpha-10: rgba(82, 196, 26, 0.1);
+  --color-success-alpha-15: rgba(82, 196, 26, 0.15);
   --color-success-border: #52c41a;
 
   --color-warning: #faad14;
+  --color-warning-alpha-15: rgba(250, 173, 20, 0.15);
   --color-warning-light: #fff7e8;
   --color-warning-border: #ffd6bf;
 
   --color-error: #ff4d4f;
-  --color-error-light: rgba(255, 77, 79, 0.08);
+  --color-error-alpha-8: rgba(255, 77, 79, 0.08);
   --color-error-hover: #cf1322;
 
   --color-info: #1677ff;
