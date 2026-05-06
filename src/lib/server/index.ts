@@ -26,7 +26,7 @@ function logConnectionStatus(count: number) {
   console.log(`${getTimestamp()} ${color(icon)} 活跃连接: ${color(count)}`);
 }
 
-export function startServer(options: ServerOptions) {
+export async function startServer(options: ServerOptions) {
   const { port, prototypesDir, viewerDir } = options;
   const projectRoot = path.dirname(path.dirname(prototypesDir));
 
@@ -115,39 +115,41 @@ export function startServer(options: ServerOptions) {
     }
   });
 
-  // 启动服务器
-  server.listen(port, () => {
-    console.log('');
-    console.log(chalk.green.bold('✓ PRDKit 预览服务器已启动'));
-    console.log('');
-    console.log(`  ${chalk.cyan('➜')} 本地访问: ${chalk.cyan.underline(`http://localhost:${port}`)}`);
-    console.log(`  ${chalk.gray('➜')} 按 ${chalk.yellow('Ctrl+C')} 停止服务器`);
-    console.log('');
-    console.log(chalk.gray('─'.repeat(50)));
-    console.log('');
-  });
+  // 启动服务器（返回 Promise，resolve 时服务器已就绪）
+  await new Promise<void>((resolve, reject) => {
+    server.listen(port, () => {
+      console.log('');
+      console.log(chalk.green.bold('✓ PRDKit 预览服务器已启动'));
+      console.log('');
+      console.log(`  ${chalk.cyan('➜')} 本地访问: ${chalk.cyan.underline(`http://localhost:${port}`)}`);
+      console.log(`  ${chalk.gray('➜')} 按 ${chalk.yellow('Ctrl+C')} 停止服务器`);
+      console.log('');
+      console.log(chalk.gray('─'.repeat(50)));
+      console.log('');
+      resolve();
+    });
 
-  // 错误处理
-  server.on('error', (error: NodeJS.ErrnoException) => {
-    if (error.code === 'EADDRINUSE') {
-      console.error('');
-      console.error(chalk.red.bold('✗ 端口已被占用'));
-      console.error('');
-      console.error(`  端口 ${chalk.yellow(port)} 已被其他程序使用`);
-      console.error(`  请尝试以下方法：`);
-      console.error(`  ${chalk.gray('1.')} 关闭占用该端口的程序`);
-      console.error(`  ${chalk.gray('2.')} 使用 ${chalk.cyan('--port')} 参数指定其他端口`);
-      console.error(`  ${chalk.gray('3.')} 不指定端口，让系统自动选择可用端口`);
-      console.error('');
-      process.exit(1);
-    } else {
-      console.error('');
-      console.error(chalk.red.bold('✗ 服务器启动失败'));
-      console.error('');
-      console.error(`  ${error.message}`);
-      console.error('');
-      process.exit(1);
-    }
+    server.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error('');
+        console.error(chalk.red.bold('✗ 端口已被占用'));
+        console.error('');
+        console.error(`  端口 ${chalk.yellow(port)} 已被其他程序使用`);
+        console.error(`  请尝试以下方法：`);
+        console.error(`  ${chalk.gray('1.')} 关闭占用该端口的程序`);
+        console.error(`  ${chalk.gray('2.')} 使用 ${chalk.cyan('--port')} 参数指定其他端口`);
+        console.error(`  ${chalk.gray('3.')} 不指定端口，让系统自动选择可用端口`);
+        console.error('');
+        reject(error);
+      } else {
+        console.error('');
+        console.error(chalk.red.bold('✗ 服务器启动失败'));
+        console.error('');
+        console.error(`  ${error.message}`);
+        console.error('');
+        reject(error);
+      }
+    });
   });
 
   // 优雅关闭

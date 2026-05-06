@@ -103,7 +103,7 @@ export function registerServe(program: Command) {
       });
 
       if (options.dev) {
-        startServer({
+        await startServer({
           port: apiPort!,
           prototypesDir
         });
@@ -139,7 +139,7 @@ export function registerServe(program: Command) {
       } else {
         const viewerDir = path.join(path.dirname(new URL(import.meta.url).pathname), '../viewer');
 
-        startServer({
+        await startServer({
           port,
           prototypesDir,
           viewerDir
