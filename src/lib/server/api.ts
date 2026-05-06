@@ -211,6 +211,42 @@ export function createApiRouter(prototypesDir: string): Router {
     }
   });
 
+  // 删除文件夹（必须在正则路由之前，避免被 /prototypes/(.+) 拦截）
+  router.delete('/prototypes/folders', async (req: Request, res: Response) => {
+    try {
+      const folderPathRaw = req.query.folderPath;
+      const folderPath = Array.isArray(folderPathRaw) ? folderPathRaw[0] : folderPathRaw;
+
+      if (!folderPath || typeof folderPath !== 'string') {
+        return res.status(400).json({ error: '缺少 folderPath' });
+      }
+
+      const targetDir = resolvePrototypeDir(folderPath);
+
+      if (!fs.existsSync(targetDir)) {
+        return res.status(404).json({ error: '文件夹不存在' });
+      }
+
+      const targetStat = fs.statSync(targetDir);
+      if (!targetStat.isDirectory()) {
+        return res.status(400).json({ error: '目标不是文件夹' });
+      }
+
+      fs.rmSync(targetDir, { recursive: true, force: true });
+
+      res.json({
+        success: true,
+        folderPath,
+      });
+    } catch (error) {
+      console.error('删除文件夹失败:', error);
+      res.status(500).json({
+        error: '删除文件夹失败',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
   router.delete(/^\/prototypes\/(.+)$/, async (req: Request, res: Response) => {
     try {
       const prototypePathRaw = req.params[0];
@@ -317,41 +353,6 @@ export function createApiRouter(prototypesDir: string): Router {
       console.error('新建文件夹失败:', error);
       res.status(500).json({
         error: '新建文件夹失败',
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  });
-
-  router.delete('/prototypes/folders', async (req: Request, res: Response) => {
-    try {
-      const folderPathRaw = req.query.folderPath;
-      const folderPath = Array.isArray(folderPathRaw) ? folderPathRaw[0] : folderPathRaw;
-
-      if (!folderPath || typeof folderPath !== 'string') {
-        return res.status(400).json({ error: '缺少 folderPath' });
-      }
-
-      const targetDir = resolvePrototypeDir(folderPath);
-
-      if (!fs.existsSync(targetDir)) {
-        return res.status(404).json({ error: '文件夹不存在' });
-      }
-
-      const targetStat = fs.statSync(targetDir);
-      if (!targetStat.isDirectory()) {
-        return res.status(400).json({ error: '目标不是文件夹' });
-      }
-
-      fs.rmSync(targetDir, { recursive: true, force: true });
-
-      res.json({
-        success: true,
-        folderPath,
-      });
-    } catch (error) {
-      console.error('删除文件夹失败:', error);
-      res.status(500).json({
-        error: '删除文件夹失败',
         message: error instanceof Error ? error.message : String(error),
       });
     }
