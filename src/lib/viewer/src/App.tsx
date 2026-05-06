@@ -1,80 +1,110 @@
 import { Layout, message, ConfigProvider } from 'antd';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import FileTree from './components/FileTree';
 import Preview from './components/Preview';
 import Header from './components/Header';
 import MarkPanel from './components/MarkPanel';
 import PublishDrawer from './components/PublishDrawer';
 import HistoryDrawer from './components/HistoryDrawer';
+import PreferencesDrawer from './components/PreferencesDrawer';
+import { AppConfigProvider } from './contexts/AppConfigContext';
+import { useViewerStore } from './stores/useViewerStore';
+import { useTheme } from './hooks/ui/useTheme';
+import { useResizablePanel } from './hooks/layout/useResizablePanel';
+import { useMarkPanel } from './hooks/layout/useMarkPanel';
+import { useMarks } from './hooks/data/useMarks';
+import { useCheckpoint } from './hooks/data/useCheckpoint';
+import { useFileNavigation } from './hooks/data/useFileNavigation';
+import { useWebSocket } from './hooks/network/useWebSocket';
+import { usePublish } from './hooks/features/usePublish';
 import { DEFAULT_COPY_TERMINAL_GUIDE, DEFAULT_INSPECT_COPY_SKILL_COMMAND, DEFAULT_MARK_CREATE_SKILL_COMMAND, DEFAULT_MARK_UPDATE_SKILL_COMMAND, DEFAULT_PAGE_CREATE_SKILL_COMMAND } from './constants/clipboard';
 import { copySkillClipboardText } from './utils/clipboard';
-import type { ActiveCheckpointPreview, ViewMode, Mark, MarkUpdatePatch, PendingMarkInfo, PrototypeNode, CheckpointDetail, CheckpointStatus, ViewerConfigResponse, ViewerSkillConfig } from './types';
+import type { PrototypeNode, ViewMode, ViewerConfigResponse } from './types';
+import type { AppConfig } from './contexts/AppConfigContext';
 import { antdTheme } from './theme/antd-theme';
 import './App.css';
 
 const { Sider, Content } = Layout;
 
 function App() {
-  // 从 URL query 参数读取初始文件路径
-  const getInitialFile = () => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('p');
-  };
-
-  // 从 URL query 参数读取初始项目名称
-  const getInitialProjectName = () => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('projectname') || 'PRDKit';
-  };
-
-  const [selectedFile, setSelectedFile] = useState<string | null>(getInitialFile);
-  const [prototypeRefreshVersion, setPrototypeRefreshVersion] = useState(0);
-  const [collapsed, setCollapsed] = useState(false);
-  const [fileList, setFileList] = useState<string[]>([]);
-  const [projectName, setProjectName] = useState<string>(getInitialProjectName);
-  const [prototypesDir, setPrototypesDir] = useState<string>('');
-  const [viewerSkills, setViewerSkills] = useState<ViewerSkillConfig>({
-    pageCreateSkillCommand: DEFAULT_PAGE_CREATE_SKILL_COMMAND,
-    inspectCopySkillCommand: DEFAULT_INSPECT_COPY_SKILL_COMMAND,
-    markCreateSkillCommand: DEFAULT_MARK_CREATE_SKILL_COMMAND,
-    markUpdateSkillCommand: DEFAULT_MARK_UPDATE_SKILL_COMMAND,
-    copyTerminalGuide: DEFAULT_COPY_TERMINAL_GUIDE,
-  });
-  const [siderWidth, setSiderWidth] = useState(200);
-  const [isResizing, setIsResizing] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('preview');
-  const [marks, setMarks] = useState<Mark[]>([]);
-  const [selectedMarkId, setSelectedMarkId] = useState<string | null>(null);
-  const [pendingMarkInfo, setPendingMarkInfo] = useState<PendingMarkInfo | null>(null);
-  const [relinkingMarkId, setRelinkingMarkId] = useState<string | null>(null);
-  const [missingMarkIds, setMissingMarkIds] = useState<string[]>([]);
-  const [markPanelWidth, setMarkPanelWidth] = useState(350);
-  const [isResizingMarkPanel, setIsResizingMarkPanel] = useState(false);
-  const [markPanelCollapsed, setMarkPanelCollapsed] = useState(false);
-  const [savedMarkPanelWidth, setSavedMarkPanelWidth] = useState(350);
-  const siderRef = useRef<HTMLDivElement>(null);
-  const markPanelRef = useRef<HTMLDivElement>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const loadMarksRef = useRef<() => void>(() => {});
-  const loadCheckpointStatusRef = useRef<() => void>(() => {});
-  const [wsConnected, setWsConnected] = useState(false);
+  // ========== 全局配置 ==========
+  const [config, setConfig] = useState<AppConfig | null>(null);
   const [reloadVersion, setReloadVersion] = useState(0);
-  const [publishDrawerOpen, setPublishDrawerOpen] = useState(false);
-  const [publishLoading, setPublishLoading] = useState(false);
-  const [publishSubmitting, setPublishSubmitting] = useState(false);
-  const [defaultPublishPath, setDefaultPublishPath] = useState('');
-  const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
-  const [activeCheckpointPreview, setActiveCheckpointPreview] = useState<ActiveCheckpointPreview | null>(null);
-  const [checkpointStatus, setCheckpointStatus] = useState<CheckpointStatus | null>(null);
-  const [saveVersionSubmitting, setSaveVersionSubmitting] = useState(false);
-  const [historyRefreshVersion, setHistoryRefreshVersion] = useState(0);
-  const [historyTargetCheckpointId, setHistoryTargetCheckpointId] = useState<string | null>(null);
-  const currentPrototypePath = selectedFile;
-  const effectiveMarks = activeCheckpointPreview?.prototypePath === currentPrototypePath
-    ? activeCheckpointPreview.marks
-    : marks;
 
-  // 获取文件列表
+  // ========== Zustand 全局状态 ==========
+  const siderCollapsed = useViewerStore((state) => state.siderCollapsed);
+  const setSiderCollapsed = useViewerStore((state) => state.setSiderCollapsed);
+  const preferences = useViewerStore((state) => state.preferences);
+
+  // ========== 主题 ==========
+  useTheme(); // 自动应用主题到 document
+
+  // ========== 布局状态（持久化到 Zustand）==========
+  const sider = useResizablePanel({
+    initialWidth: 200,
+    minWidth: 200,
+    maxWidth: 600,
+    direction: 'left',
+    persistKey: 'siderWidth', // 持久化
+  });
+
+  const markPanelResize = useResizablePanel({
+    initialWidth: 350,
+    minWidth: 350,
+    maxWidth: 800,
+    direction: 'right',
+    persistKey: 'markPanelWidth', // 持久化
+  });
+
+  const markPanel = useMarkPanel(350);
+
+  // ========== 视图模式（使用偏好设置的默认值）==========
+  const [viewMode, setViewMode] = useState<ViewMode>(preferences.defaultViewMode);
+
+  // ========== 文件导航 ==========
+  const fileNav = useFileNavigation({ projectName: config?.projectName || 'PRDKit' });
+
+  // ========== 版本历史 ==========
+  const checkpoint = useCheckpoint({ prototypePath: fileNav.selectedFile });
+
+  // ========== 标记管理 ==========
+  const marks = useMarks({
+    prototypePath: fileNav.selectedFile,
+    viewMode,
+    activeCheckpointPreview: checkpoint.activePreview,
+  });
+
+  // ========== WebSocket ==========
+  const getWebSocketUrl = () => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    if (!import.meta.env.DEV) {
+      // 生产模式：直接连接到同一 host
+      return `${protocol}//${window.location.host}`;
+    }
+    // 开发模式：通过 Vite 代理连接（/ws 会被代理到 API 服务器）
+    return `${protocol}//${window.location.host}/ws`;
+  };
+
+  const ws = useWebSocket({
+    url: getWebSocketUrl(),
+    onMessage: (message) => {
+      if (message.type === 'reload') {
+        console.log('检测到文件变更，刷新预览并重新加载标记数据');
+        setReloadVersion((prev) => prev + 1);
+        marks.loadMarksRef.current();
+        checkpoint.loadStatusRef.current();
+      }
+    },
+    reconnect: true,
+  });
+
+  // ========== 发布功能 ==========
+  const publish = usePublish();
+
+  // ========== 偏好设置抽屉 ==========
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
+
+  // ========== 初始化加载配置和文件列表 ==========
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -82,14 +112,17 @@ function App() {
         const configRes = await fetch('/api/config', { cache: 'no-store' });
         const configData: ViewerConfigResponse = await configRes.json();
         const loadedProjectName = configData.projectName || 'PRDKit';
-        setProjectName(loadedProjectName);
-        setPrototypesDir(configData.prototypesDir || '');
-        setViewerSkills(configData.viewerSkills || {
-          pageCreateSkillCommand: DEFAULT_PAGE_CREATE_SKILL_COMMAND,
-          inspectCopySkillCommand: DEFAULT_INSPECT_COPY_SKILL_COMMAND,
-          markCreateSkillCommand: DEFAULT_MARK_CREATE_SKILL_COMMAND,
-          markUpdateSkillCommand: DEFAULT_MARK_UPDATE_SKILL_COMMAND,
-          copyTerminalGuide: DEFAULT_COPY_TERMINAL_GUIDE,
+
+        setConfig({
+          projectName: loadedProjectName,
+          prototypesDir: configData.prototypesDir || '',
+          viewerSkills: configData.viewerSkills || {
+            pageCreateSkillCommand: DEFAULT_PAGE_CREATE_SKILL_COMMAND,
+            inspectCopySkillCommand: DEFAULT_INSPECT_COPY_SKILL_COMMAND,
+            markCreateSkillCommand: DEFAULT_MARK_CREATE_SKILL_COMMAND,
+            markUpdateSkillCommand: DEFAULT_MARK_UPDATE_SKILL_COMMAND,
+            copyTerminalGuide: DEFAULT_COPY_TERMINAL_GUIDE,
+          },
         });
 
         const prototypesRes = await fetch('/api/prototypes', { cache: 'no-store' });
@@ -97,7 +130,7 @@ function App() {
 
         const files: string[] = [];
         const extractFiles = (nodes: PrototypeNode[]) => {
-          nodes.forEach(node => {
+          nodes.forEach((node) => {
             if (node.type === 'file' && node.path) {
               files.push(node.path);
             }
@@ -109,13 +142,13 @@ function App() {
         if (prototypesData.children) {
           extractFiles(prototypesData.children);
         }
-        setFileList(files);
+        fileNav.updateFileList(files);
 
         // 如果 URL 中没有指定文件且有文件列表，自动选中第一个
         const urlParams = new URLSearchParams(window.location.search);
         const urlFile = urlParams.get('p');
         if (!urlFile && files.length > 0) {
-          setSelectedFile(files[0]);
+          fileNav.selectFile(files[0]);
         }
       } catch (error) {
         console.error('加载数据失败:', error);
@@ -125,376 +158,24 @@ function App() {
     loadData();
   }, []);
 
-  // 当项目名称变化时，同步更新 URL
+  // ========== 联动逻辑 ==========
+  // 切换文件时清空状态
   useEffect(() => {
-    if (selectedFile && projectName) {
-      const url = new URL(window.location.href);
-      url.searchParams.set('projectname', projectName);
-      window.history.replaceState({}, '', url);
-    }
-  }, [projectName, selectedFile]);
+    marks.selectMark(null);
+    marks.cancelMark();
+    checkpoint.exitPreview();
+  }, [fileNav.selectedFile]);
 
-  // 当选中文件变化时，更新 URL query 参数
-  const handleFileSelect = (path: string | null) => {
-    setSelectedFile(path);
-
-    const url = new URL(window.location.href);
-    if (path) {
-      url.searchParams.set('p', path);
-      url.searchParams.set('projectname', projectName);
-    } else {
-      url.searchParams.delete('p');
-      url.searchParams.delete('projectname');
-    }
-    window.history.pushState({}, '', url);
-  };
-
-  const handleFilesUpdate = (files: string[]) => {
-    setFileList(files);
-  };
-
-  // 导航到上一个/下一个文件
-  const handleNavigate = (direction: 'prev' | 'next') => {
-    if (fileList.length === 0) return;
-
-    const currentIndex = selectedFile ? fileList.indexOf(selectedFile) : -1;
-    let newIndex: number;
-
-    if (direction === 'prev') {
-      newIndex = currentIndex <= 0 ? fileList.length - 1 : currentIndex - 1;
-    } else {
-      newIndex = currentIndex >= fileList.length - 1 ? 0 : currentIndex + 1;
-    }
-
-    handleFileSelect(fileList[newIndex]);
-  };
-
-  // 处理侧边栏拖拽调整宽度
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  };
-
-  // 处理 MarkPanel 拖拽调整宽度
-  const handleMarkPanelMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizingMarkPanel(true);
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  };
-
+  // 创建/选择标记时自动展开面板
   useEffect(() => {
-    let animationFrameId: number | null = null;
-    let latestMouseX = 0;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizing) return;
-
-      latestMouseX = e.clientX;
-
-      if (animationFrameId === null) {
-        animationFrameId = requestAnimationFrame(() => {
-          const newWidth = latestMouseX;
-          if (newWidth >= 200 && newWidth <= 600) {
-            setSiderWidth(newWidth);
-          }
-          animationFrameId = null;
-        });
-      }
-    };
-
-    const handleMouseUp = () => {
-      setIsResizing(false);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      if (animationFrameId !== null) {
-        cancelAnimationFrame(animationFrameId);
-        animationFrameId = null;
-      }
-    };
-
-    if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+    if ((marks.pendingMarkInfo || marks.selectedMarkId) && markPanel.state.collapsed) {
+      markPanel.actions.expand();
     }
+  }, [marks.pendingMarkInfo, marks.selectedMarkId, markPanel.state.collapsed]);
 
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      if (animationFrameId !== null) {
-        cancelAnimationFrame(animationFrameId);
-      }
-    };
-  }, [isResizing]);
-
-  // MarkPanel 拖拽效果
-  useEffect(() => {
-    let animationFrameId: number | null = null;
-    let latestMouseX = 0;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizingMarkPanel) return;
-
-      latestMouseX = e.clientX;
-
-      if (animationFrameId === null) {
-        animationFrameId = requestAnimationFrame(() => {
-          const newWidth = window.innerWidth - latestMouseX;
-          if (newWidth >= 350 && newWidth <= 800) {
-            setMarkPanelWidth(newWidth);
-          }
-          animationFrameId = null;
-        });
-      }
-    };
-
-    const handleMouseUp = () => {
-      setIsResizingMarkPanel(false);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      if (animationFrameId !== null) {
-        cancelAnimationFrame(animationFrameId);
-        animationFrameId = null;
-      }
-    };
-
-    if (isResizingMarkPanel) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      if (animationFrameId !== null) {
-        cancelAnimationFrame(animationFrameId);
-      }
-    };
-  }, [isResizingMarkPanel]);
-
-  // 加载标记数据的函数
-  const loadMarks = useCallback(async () => {
-    if (!currentPrototypePath || viewMode !== 'mark') return;
-
-    try {
-      // 从 API 加载
-      const response = await fetch(`/api/marks/${encodeURIComponent(currentPrototypePath)}?t=${Date.now()}`, {
-        cache: 'no-store'
-      });
-      const data = await response.json();
-      setMarks(data.marks || []);
-    } catch (error) {
-      console.error('加载标记失败:', error);
-      setMarks([]);
-    }
-  }, [currentPrototypePath, viewMode]);
-
-  useEffect(() => {
-    loadMarksRef.current = loadMarks;
-  }, [loadMarks]);
-
-  const loadCheckpointStatus = useCallback(async () => {
-    if (!currentPrototypePath) {
-      setCheckpointStatus(null);
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/checkpoints/status?prototypePath=${encodeURIComponent(currentPrototypePath)}&t=${Date.now()}`, {
-        cache: 'no-store',
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || data.error || '读取版本状态失败');
-      }
-      setCheckpointStatus(data as CheckpointStatus);
-    } catch (error) {
-      console.error('读取版本状态失败:', error);
-      setCheckpointStatus(null);
-    }
-  }, [currentPrototypePath]);
-
-  // 加载标记数据
-  useEffect(() => {
-    loadMarks();
-  }, [loadMarks]);
-
-  useEffect(() => {
-    void loadCheckpointStatus();
-  }, [loadCheckpointStatus]);
-
-  useEffect(() => {
-    loadCheckpointStatusRef.current = () => {
-      void loadCheckpointStatus();
-    };
-  }, [loadCheckpointStatus]);
-
-  // WebSocket 连接用于文件热重载
-  useEffect(() => {
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    let reconnectAttempt = 0;
-    let unmounted = false;
-
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = (() => {
-      if (!import.meta.env.DEV) {
-        return `${protocol}//${window.location.host}`;
-      }
-
-      const currentPort = parseInt(window.location.port, 10) || 3000;
-      const apiPort = currentPort + 1;
-      return `${protocol}//${window.location.hostname}:${apiPort}`;
-    })();
-
-    const connect = () => {
-      if (unmounted) return;
-
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        console.log('WebSocket 已连接');
-        setWsConnected(true);
-        reconnectAttempt = 0;
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data);
-          if (message.type === 'reload') {
-            console.log('检测到文件变更，刷新预览并重新加载标记数据');
-            setReloadVersion(prev => prev + 1);
-            loadMarksRef.current();
-            loadCheckpointStatusRef.current();
-          }
-        } catch (error) {
-          console.error('解析 WebSocket 消息失败:', error);
-        }
-      };
-
-      ws.onerror = () => {
-        // onerror 之后通常会进入 onclose，这里不重复输出噪音日志
-      };
-
-      ws.onclose = () => {
-        setWsConnected(false);
-        wsRef.current = null;
-
-        if (!unmounted) {
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttempt), 30000);
-          reconnectAttempt += 1;
-          reconnectTimer = setTimeout(connect, delay);
-        }
-      };
-    };
-
-    connect();
-
-    return () => {
-      unmounted = true;
-      if (reconnectTimer) {
-        clearTimeout(reconnectTimer);
-      }
-      if (wsRef.current) {
-        wsRef.current.onclose = null;
-        wsRef.current.close();
-        wsRef.current = null;
-      }
-    };
-  }, []);
-
-  // 切换页面时，退出创建视图和详情视图
-  useEffect(() => {
-    setSelectedMarkId(null);
-    setPendingMarkInfo(null);
-    setRelinkingMarkId(null);
-    setMissingMarkIds([]);
-    setActiveCheckpointPreview(null);
-  }, [selectedFile]);
-
-  // 处理 MarkPanel 折叠状态变化
-  useEffect(() => {
-    if (markPanelCollapsed) {
-      // 折叠时保存当前宽度，并设置为 40px
-      setSavedMarkPanelWidth(markPanelWidth);
-      setMarkPanelWidth(40);
-    } else {
-      // 展开时恢复之前的宽度
-      setMarkPanelWidth(savedMarkPanelWidth);
-    }
-  }, [markPanelCollapsed]);
-
-  // 当创建标记或选择标记时，自动展开 MarkPanel
-  useEffect(() => {
-    if ((pendingMarkInfo || selectedMarkId) && markPanelCollapsed) {
-      setMarkPanelCollapsed(false);
-    }
-  }, [pendingMarkInfo, selectedMarkId]);
-
-  // 处理标记选择
-  const handleMarkSelect = (markId: string) => {
-    setSelectedMarkId(markId);
-    // 选择已存在的标记时，清空待创建的标记
-    setPendingMarkInfo(null);
-  };
-
-  // 处理标记更新
-  const handleMarkUpdate = async (markId: string, patch: MarkUpdatePatch) => {
-    if (activeCheckpointPreview) {
-      message.info('历史版本预览中不可编辑标记，请先还原到该版本');
-      return;
-    }
-    if (!currentPrototypePath) return;
-
-    try {
-      const response = await fetch(`/api/marks/${encodeURIComponent(currentPrototypePath)}/${markId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
-      });
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(data?.message || data?.error || '更新标记失败');
-      }
-
-      await loadMarks();
-    } catch (error) {
-      console.error('更新标记失败:', error);
-      message.error(error instanceof Error ? error.message : '更新标记失败');
-    }
-  };
-
-  // 处理标记删除
-  const handleMarkDelete = (markId: string) => {
-    if (activeCheckpointPreview) {
-      message.info('历史版本预览中不可删除标记，请先还原到该版本');
-      return;
-    }
-    if (!currentPrototypePath) return;
-
-    fetch(`/api/marks/${encodeURIComponent(currentPrototypePath)}/${markId}`, {
-      method: 'DELETE',
-    })
-      .then(() => {
-        if (selectedMarkId === markId) {
-          setSelectedMarkId(null);
-        }
-        if (relinkingMarkId === markId) {
-          setRelinkingMarkId(null);
-        }
-        // 重新加载标记数据以确保与文件系统同步
-        loadMarks();
-      })
-      .catch(error => {
-        console.error('删除标记失败:', error);
-      });
-  };
-
+  // ========== 文件操作处理函数 ==========
   const handlePrototypeDelete = async (prototypePath: string) => {
-    if (activeCheckpointPreview) {
+    if (checkpoint.activePreview) {
       message.info('历史版本预览中不可删除页面，请先退出预览');
       return;
     }
@@ -509,21 +190,16 @@ function App() {
         throw new Error(data?.message || data?.error || '删除页面失败');
       }
 
-      const remainingFiles = fileList.filter((file) => file !== prototypePath);
+      const remainingFiles = fileNav.fileList.filter((file) => file !== prototypePath);
 
-      if (selectedFile === prototypePath) {
-        const deletedIndex = fileList.indexOf(prototypePath);
+      if (fileNav.selectedFile === prototypePath) {
+        const deletedIndex = fileNav.fileList.indexOf(prototypePath);
         const nextFile = remainingFiles[deletedIndex] || remainingFiles[deletedIndex - 1] || null;
-        handleFileSelect(nextFile);
+        fileNav.selectFile(nextFile);
       }
 
-      setMarks([]);
-      setSelectedMarkId(null);
-      setPendingMarkInfo(null);
-      setActiveCheckpointPreview(null);
-      setCheckpointStatus(null);
-      setFileList(remainingFiles);
-      setPrototypeRefreshVersion((prev) => prev + 1);
+      fileNav.updateFileList(remainingFiles);
+      fileNav.refreshPrototypes();
       message.success('页面已删除，checkpoint 历史已保留');
     } catch (error) {
       console.error('删除页面失败:', error);
@@ -532,7 +208,7 @@ function App() {
   };
 
   const handlePrototypeDuplicate = async (prototypePath: string) => {
-    if (activeCheckpointPreview) {
+    if (checkpoint.activePreview) {
       message.info('历史版本预览中不可复制页面，请先退出预览');
       return;
     }
@@ -551,10 +227,10 @@ function App() {
 
       const duplicatePath = typeof data?.duplicatePath === 'string' ? data.duplicatePath : null;
       if (duplicatePath) {
-        handleFileSelect(duplicatePath);
+        fileNav.selectFile(duplicatePath);
       }
 
-      setPrototypeRefreshVersion((prev) => prev + 1);
+      fileNav.refreshPrototypes();
       message.success(`页面已复制为 ${data?.duplicateName || '副本'}`);
     } catch (error) {
       console.error('复制页面失败:', error);
@@ -563,7 +239,7 @@ function App() {
   };
 
   const handleFolderDelete = async (folderPath: string) => {
-    if (activeCheckpointPreview) {
+    if (checkpoint.activePreview) {
       message.info('历史版本预览中不可删除文件夹，请先退出预览');
       return;
     }
@@ -578,16 +254,11 @@ function App() {
         throw new Error(data?.message || data?.error || '删除文件夹失败');
       }
 
-      if (selectedFile && (selectedFile === folderPath || selectedFile.startsWith(`${folderPath}/`))) {
-        handleFileSelect(null);
+      if (fileNav.selectedFile && (fileNav.selectedFile === folderPath || fileNav.selectedFile.startsWith(`${folderPath}/`))) {
+        fileNav.selectFile(null);
       }
 
-      setMarks([]);
-      setSelectedMarkId(null);
-      setPendingMarkInfo(null);
-      setActiveCheckpointPreview(null);
-      setCheckpointStatus(null);
-      setPrototypeRefreshVersion((prev) => prev + 1);
+      fileNav.refreshPrototypes();
       message.success('文件夹已删除，包含的页面和标记已一并清理');
     } catch (error) {
       console.error('删除文件夹失败:', error);
@@ -596,7 +267,7 @@ function App() {
   };
 
   const handleCreateFolder = async (folderName: string) => {
-    if (activeCheckpointPreview) {
+    if (checkpoint.activePreview) {
       message.info('历史版本预览中不可新建文件夹，请先退出预览');
       return;
     }
@@ -612,12 +283,12 @@ function App() {
       throw new Error(data?.message || data?.error || '新建文件夹失败');
     }
 
-    setPrototypeRefreshVersion((prev) => prev + 1);
+    fileNav.refreshPrototypes();
     message.success(`已创建文件夹 ${data?.folderName || folderName}`);
   };
 
   const handleRenameNode = async (sourcePath: string, targetName: string) => {
-    if (activeCheckpointPreview) {
+    if (checkpoint.activePreview) {
       message.info('历史版本预览中不可重命名，请先退出预览');
       return;
     }
@@ -634,20 +305,20 @@ function App() {
     }
 
     const renamedPath = typeof data?.renamedPath === 'string' ? data.renamedPath : null;
-    if (selectedFile && renamedPath) {
-      if (selectedFile === sourcePath) {
-        handleFileSelect(renamedPath);
-      } else if (selectedFile.startsWith(`${sourcePath}/`)) {
-        handleFileSelect(selectedFile.replace(sourcePath, renamedPath));
+    if (fileNav.selectedFile && renamedPath) {
+      if (fileNav.selectedFile === sourcePath) {
+        fileNav.selectFile(renamedPath);
+      } else if (fileNav.selectedFile.startsWith(`${sourcePath}/`)) {
+        fileNav.selectFile(fileNav.selectedFile.replace(sourcePath, renamedPath));
       }
     }
 
-    setPrototypeRefreshVersion((prev) => prev + 1);
+    fileNav.refreshPrototypes();
     message.success(`已重命名为 ${data?.renamedName || targetName}`);
   };
 
   const handleMovePrototype = async (prototypePath: string, targetFolderPath: string) => {
-    if (activeCheckpointPreview) {
+    if (checkpoint.activePreview) {
       message.info('历史版本预览中不可移动页面，请先退出预览');
       return;
     }
@@ -665,11 +336,11 @@ function App() {
       }
 
       const movedPath = typeof data?.movedPath === 'string' ? data.movedPath : null;
-      if (selectedFile === prototypePath && movedPath) {
-        handleFileSelect(movedPath);
+      if (fileNav.selectedFile === prototypePath && movedPath) {
+        fileNav.selectFile(movedPath);
       }
 
-      setPrototypeRefreshVersion((prev) => prev + 1);
+      fileNav.refreshPrototypes();
       message.success(`页面已移动到 ${targetFolderPath || '根目录'}`);
     } catch (error) {
       console.error('移动页面失败:', error);
@@ -679,16 +350,16 @@ function App() {
 
   const handleCreatePageWithAi = async () => {
     const suggestedParent = (() => {
-      if (!selectedFile) return '根目录';
-      const segments = selectedFile.split('/');
+      if (!fileNav.selectedFile) return '根目录';
+      const segments = fileNav.selectedFile.split('/');
       segments.pop();
       return segments.length > 0 ? segments.join('/') : '根目录';
     })();
 
-    const payload = `项目名: ${projectName}
-原型目录: ${prototypesDir}
+    const payload = `项目名: ${config?.projectName || 'PRDKit'}
+原型目录: ${config?.prototypesDir || ''}
 建议放置目录: ${suggestedParent}
-当前参考页面: ${selectedFile || '无'}
+当前参考页面: ${fileNav.selectedFile || '无'}
 
 请创建一个新的原型页面，并说明：
 1. 建议的页面名称
@@ -698,12 +369,12 @@ function App() {
     try {
       await copySkillClipboardText(
         {
-          skillCommand: viewerSkills.pageCreateSkillCommand,
+          skillCommand: config?.viewerSkills.pageCreateSkillCommand || DEFAULT_PAGE_CREATE_SKILL_COMMAND,
           payload,
         },
         {
           successPrefix: '已复制新建页面 skill 指令',
-          terminalGuide: viewerSkills.copyTerminalGuide,
+          terminalGuide: config?.viewerSkills.copyTerminalGuide || DEFAULT_COPY_TERMINAL_GUIDE,
         }
       );
     } catch (error) {
@@ -712,427 +383,157 @@ function App() {
     }
   };
 
-  // 处理新增标记
-  const handleMarkCreate = (title: string, description: string) => {
-    if (!pendingMarkInfo) return;
-    if (activeCheckpointPreview) {
-      message.info('历史版本预览中不可新增标记，请先还原到该版本');
-      return;
-    }
-    if (!currentPrototypePath) return;
-
-    const markPayload = {
-      title,
-      ...pendingMarkInfo,
-      description,
-    };
-
-    fetch(`/api/marks/${encodeURIComponent(currentPrototypePath)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(markPayload),
-    })
-      .then(res => res.json())
-      .then((data) => {
-        setSelectedMarkId(data?.mark?.id || null);
-        setPendingMarkInfo(null);
-        // 重新加载标记数据以确保与文件系统同步
-        loadMarks();
-      })
-      .catch(error => {
-        console.error('创建标记失败:', error);
-      });
-  };
-
-  // 处理准备创建标记
-  const handleMarkPrepare = (info: PendingMarkInfo) => {
-    setRelinkingMarkId(null);
-    setPendingMarkInfo(info);
-  };
-
-  const handleMarkRelink = (markId: string, info: PendingMarkInfo) => {
-    const currentMark = marks.find((mark) => mark.id === markId);
-    if (!currentMark) return;
-
-    handleMarkUpdate(markId, {
-      title: currentMark.title,
-      description: currentMark.description,
-      selector: info.selector,
-      domPath: info.domPath,
-      position: info.position,
-      rect: info.rect,
-    });
-    setRelinkingMarkId(null);
-    setSelectedMarkId(markId);
-    setPendingMarkInfo(null);
-    message.success('已更新标记元素路径');
-  };
-
-  const handleMarkRelinkStart = (markId: string) => {
-    if (activeCheckpointPreview) {
-      message.info('历史版本预览中不可修改标记路径，请先还原到该版本');
-      return;
-    }
-
-    setViewMode('mark');
-    setSelectedMarkId(markId);
-    setPendingMarkInfo(null);
-    setRelinkingMarkId(markId);
-    message.info('请点击页面中的新元素，更新当前标记路径');
-  };
-
-  const handleMarkRelinkCancel = () => {
-    setRelinkingMarkId(null);
-  };
-
-  // 处理取消创建标记
-  const handleMarkCancel = () => {
-    setPendingMarkInfo(null);
-  };
-
-  // 处理切换 MarkPanel 折叠状态
-  const handleToggleMarkPanel = () => {
-    setMarkPanelCollapsed(prev => !prev);
-  };
-
-  const handleOpenPublish = async () => {
-    setPublishDrawerOpen(true);
-    setPublishLoading(true);
-
-    try {
-      const response = await fetch(`/api/publish/options?t=${Date.now()}`, { cache: 'no-store' });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || data.error || '读取发布配置失败');
-      }
-
-      setDefaultPublishPath(data.suggestedOutputPath || '');
-    } catch (error) {
-      console.error('读取发布配置失败:', error);
-      message.error(error instanceof Error ? error.message : '读取发布配置失败');
-    } finally {
-      setPublishLoading(false);
-    }
-  };
-
-  const handlePublishSubmit = async ({
-    outputPath,
-    entryFiles,
-    openAfterPublish,
-  }: {
-    outputPath: string;
-    entryFiles: string[];
-    openAfterPublish: boolean;
-  }) => {
-    setPublishSubmitting(true);
-
-    try {
-      const response = await fetch('/api/publish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          outputPath,
-          entryFiles,
-          projectName,
-        }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || data.error || '发布失败');
-      }
-
-      if (openAfterPublish) {
-        const openResponse = await fetch('/api/system/open-path', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ targetPath: data.outputDir }),
-        });
-
-        if (!openResponse.ok) {
-          const openData = await openResponse.json().catch(() => null);
-          throw new Error(openData?.message || openData?.error || '发布成功，但打开输出目录失败');
-        }
-      }
-
-      message.success(`发布完成：${data.outputDir}`);
-      setPublishDrawerOpen(false);
-    } catch (error) {
-      console.error('发布失败:', error);
-      message.error(error instanceof Error ? error.message : '发布失败');
-    } finally {
-      setPublishSubmitting(false);
-    }
-  };
-
-  const handlePickPublishDirectory = async (currentOutputPath: string) => {
-    try {
-      const response = await fetch('/api/system/select-directory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ defaultPath: currentOutputPath || defaultPublishPath }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || data.error || '打开目录选择器失败');
-      }
-
-      if (data.canceled || !data.path) {
-        return null;
-      }
-
-      const currentName = extractPathBasename(currentOutputPath || defaultPublishPath || 'prototype-artifact');
-      return joinPathSegments(data.path, currentName);
-    } catch (error) {
-      console.error('打开目录选择器失败:', error);
-      message.error(error instanceof Error ? error.message : '打开目录选择器失败');
-      return null;
-    }
-  };
-
-  const handleCheckpointPreview = (detail: CheckpointDetail) => {
-    if (!detail.previewUrl) {
-      message.error('该 checkpoint 暂时无法预览');
-      return;
-    }
-
-    setActiveCheckpointPreview({
-      checkpointId: detail.checkpoint.id,
-      prototypePath: detail.checkpoint.prototypePath,
-      previewUrl: detail.previewUrl,
-      marks: detail.marks || [],
-      message: detail.checkpoint.message
-    });
-    setSelectedMarkId(null);
-    setPendingMarkInfo(null);
-  };
-
-  const handleCheckpointRestore = async (detail: CheckpointDetail, versionLabel: string) => {
-    try {
-      const response = await fetch(`/api/checkpoints/${encodeURIComponent(detail.checkpoint.id)}/restore`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ force: true }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || data.error || '还原失败');
-      }
-
-      setActiveCheckpointPreview(null);
-      setSelectedMarkId(null);
-      setPendingMarkInfo(null);
-      setReloadVersion(prev => prev + 1);
-      setHistoryTargetCheckpointId(detail.checkpoint.id);
-      setHistoryRefreshVersion(prev => prev + 1);
-      await loadMarks();
-      await loadCheckpointStatus();
-      message.success(`已还原 ${versionLabel}`);
-    } catch (error) {
-      console.error('还原 checkpoint 失败:', error);
-      message.error(error instanceof Error ? error.message : '还原 checkpoint 失败');
-    }
-  };
-
-  const handleExitCheckpointPreview = () => {
-    setActiveCheckpointPreview(null);
-  };
-
-  const handleSaveVersion = async () => {
-    if (!currentPrototypePath || !checkpointStatus?.hasChanges || activeCheckpointPreview) {
-      return;
-    }
-
-    try {
-      setSaveVersionSubmitting(true);
-      const response = await fetch('/api/checkpoints', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prototypePath: currentPrototypePath }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || data.error || '保存版本失败');
-      }
-
-      const targetCheckpointId =
-        typeof data.duplicateOf === 'string' && data.duplicateOf
-          ? data.duplicateOf
-          : typeof data.record?.id === 'string' && data.record.id
-            ? data.record.id
-            : null;
-
-      setHistoryTargetCheckpointId(targetCheckpointId);
-      setHistoryRefreshVersion(prev => prev + 1);
-      await loadCheckpointStatus();
-      message.success(data.created ? `已保存 ${data.versionLabel}` : `没有检测到新变更，当前仍是${data.versionLabel}`);
-    } catch (error) {
-      console.error('保存版本失败:', error);
-      message.error(error instanceof Error ? error.message : '保存版本失败');
-    } finally {
-      setSaveVersionSubmitting(false);
-    }
-  };
-
-  const currentIndex = selectedFile ? fileList.indexOf(selectedFile) + 1 : 0;
-
   return (
     <ConfigProvider theme={antdTheme}>
-      <Layout className="app-layout">
-      <Header
-        collapsed={collapsed}
-        onToggle={() => setCollapsed(!collapsed)}
-        currentFile={selectedFile}
-        currentIndex={currentIndex}
-        totalFiles={fileList.length}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        onOpenPublish={handleOpenPublish}
-        onOpenHistory={() => setHistoryDrawerOpen(true)}
-        onSaveVersion={handleSaveVersion}
-        historyDisabled={!currentPrototypePath}
-        saveDisabled={!currentPrototypePath || !checkpointStatus?.hasChanges || Boolean(activeCheckpointPreview)}
-        saveHasChanges={Boolean(checkpointStatus?.hasChanges)}
-        saveSubmitting={saveVersionSubmitting}
-        saveChangeCount={checkpointStatus?.hasChanges ? checkpointStatus.changeCount : 0}
-      />
-      <Layout className="app-content-layout">
-        <Sider
-          ref={siderRef}
-          width={siderWidth}
-          theme="light"
-          className="app-sider"
-          collapsed={collapsed}
-          collapsedWidth={0}
-          trigger={null}
-        >
-          <FileTree
-            onSelect={handleFileSelect}
-            selectedFile={selectedFile}
-            onNavigate={handleNavigate}
-            onDeletePrototype={handlePrototypeDelete}
-            onDeleteFolder={handleFolderDelete}
-            onDuplicatePrototype={handlePrototypeDuplicate}
-            onRenameNode={handleRenameNode}
-            onCreateFolder={handleCreateFolder}
-            onMovePrototype={handleMovePrototype}
-            onCreatePageWithAi={handleCreatePageWithAi}
-            refreshVersion={prototypeRefreshVersion}
-            onFilesUpdate={handleFilesUpdate}
-          />
-        </Sider>
-        {!collapsed && (
-          <div
-            onMouseDown={handleMouseDown}
-            className={`app-resize-handle ${isResizing ? 'resizing' : ''}`}
-            style={{
-              left: siderWidth,
-            }}
-          />
-        )}
-        <Content
-          className="app-content"
-          style={{
-            pointerEvents: isResizing || isResizingMarkPanel ? 'none' : 'auto',
-            marginRight: viewMode === 'mark' ? markPanelWidth : 0,
-            transition: isResizingMarkPanel ? 'none' : 'margin-right 0.2s'
-          }}
-        >
-          <Preview
-            filePath={selectedFile}
+      <AppConfigProvider value={config}>
+        <Layout className="app-layout">
+          <Header
+            collapsed={siderCollapsed}
+            onToggle={() => setSiderCollapsed(!siderCollapsed)}
+            currentFile={fileNav.selectedFile}
+            currentIndex={fileNav.currentIndex}
+            totalFiles={fileNav.fileList.length}
             viewMode={viewMode}
-            projectName={projectName}
-            prototypesDir={prototypesDir}
-            wsConnected={wsConnected}
-            reloadVersion={reloadVersion}
-            viewerSkills={viewerSkills}
-            marks={effectiveMarks}
-            selectedMarkId={selectedMarkId}
-            pendingMarkInfo={pendingMarkInfo}
-            relinkingMarkId={relinkingMarkId}
-            onMarkPrepare={handleMarkPrepare}
-            onMarkRelink={handleMarkRelink}
-            onMarkSelect={handleMarkSelect}
-            onMarkCancel={handleMarkCancel}
-            onMarkResolutionChange={setMissingMarkIds}
-            onToggleMarkPanel={handleToggleMarkPanel}
-            previewUrlOverride={activeCheckpointPreview?.prototypePath === currentPrototypePath ? activeCheckpointPreview.previewUrl : null}
-            previewReadonly={Boolean(activeCheckpointPreview && activeCheckpointPreview.prototypePath === currentPrototypePath)}
+            onViewModeChange={setViewMode}
+            onOpenPublish={publish.open}
+            onOpenHistory={checkpoint.openHistory}
+            onSaveVersion={checkpoint.saveVersion}
+            historyDisabled={!fileNav.selectedFile}
+            saveDisabled={!fileNav.selectedFile || !checkpoint.status?.hasChanges || Boolean(checkpoint.activePreview)}
+            saveHasChanges={Boolean(checkpoint.status?.hasChanges)}
+            saveSubmitting={checkpoint.saveSubmitting}
+            saveChangeCount={checkpoint.status?.hasChanges ? checkpoint.status.changeCount : 0}
           />
-        </Content>
-        {viewMode === 'mark' && (
-          <div ref={markPanelRef} className="mark-panel-container" style={{ width: markPanelWidth }}>
-            <div
-              onMouseDown={handleMarkPanelMouseDown}
-              className={`app-resize-handle mark-panel-resize ${isResizingMarkPanel ? 'resizing' : ''}`}
-            />
-            <MarkPanel
-              marks={effectiveMarks}
-              selectedMarkId={selectedMarkId}
-              pendingMarkInfo={pendingMarkInfo}
-              relinkingMarkId={relinkingMarkId}
-              missingMarkIds={missingMarkIds}
-              viewerSkills={viewerSkills}
-              onMarkSelect={handleMarkSelect}
-              onMarkCreate={handleMarkCreate}
-              onMarkUpdate={handleMarkUpdate}
-              onMarkDelete={handleMarkDelete}
-              onMarkRelinkStart={handleMarkRelinkStart}
-              onMarkRelinkCancel={handleMarkRelinkCancel}
-              onMarkCancel={handleMarkCancel}
-              onRefresh={loadMarks}
-              collapsed={markPanelCollapsed}
-              onCollapsedChange={setMarkPanelCollapsed}
-              projectName={projectName}
-              filePath={selectedFile}
-              prototypesDir={prototypesDir}
-            />
-          </div>
-        )}
-      </Layout>
-      <PublishDrawer
-        open={publishDrawerOpen}
-        loading={publishLoading}
-        submitting={publishSubmitting}
-        projectName={projectName}
-        currentFile={selectedFile}
-        fileList={fileList}
-        defaultOutputPath={defaultPublishPath}
-        onClose={() => setPublishDrawerOpen(false)}
-        onPickOutputDirectory={handlePickPublishDirectory}
-        onSubmit={handlePublishSubmit}
-      />
-      <HistoryDrawer
-        open={historyDrawerOpen}
-        prototypePath={currentPrototypePath}
-        refreshVersion={historyRefreshVersion}
-        focusCheckpointId={historyTargetCheckpointId}
-        onClose={() => {
-          setHistoryDrawerOpen(false);
-          handleExitCheckpointPreview();
-        }}
-        onPreview={handleCheckpointPreview}
-        onRestore={handleCheckpointRestore}
-      />
-    </Layout>
+          <Layout className="app-content-layout">
+            <Sider
+              ref={sider.panelRef}
+              width={sider.width}
+              theme="light"
+              className="app-sider"
+              collapsed={siderCollapsed}
+              collapsedWidth={0}
+              trigger={null}
+            >
+              <FileTree
+                onSelect={fileNav.selectFile}
+                selectedFile={fileNav.selectedFile}
+                onNavigate={(direction) => direction === 'prev' ? fileNav.navigatePrev() : fileNav.navigateNext()}
+                onDeletePrototype={handlePrototypeDelete}
+                onDeleteFolder={handleFolderDelete}
+                onDuplicatePrototype={handlePrototypeDuplicate}
+                onRenameNode={handleRenameNode}
+                onCreateFolder={handleCreateFolder}
+                onMovePrototype={handleMovePrototype}
+                onCreatePageWithAi={handleCreatePageWithAi}
+                refreshVersion={fileNav.prototypeRefreshVersion}
+                onFilesUpdate={fileNav.updateFileList}
+              />
+            </Sider>
+            {!siderCollapsed && (
+              <div
+                onMouseDown={sider.handleMouseDown}
+                className={`app-resize-handle ${sider.isResizing ? 'resizing' : ''}`}
+                style={{ left: sider.width }}
+              />
+            )}
+            <Content
+              className="app-content"
+              style={{
+                pointerEvents: sider.isResizing || markPanelResize.isResizing ? 'none' : 'auto',
+                marginRight: viewMode === 'mark' ? markPanel.state.width : 0,
+                transition: markPanelResize.isResizing ? 'none' : 'margin-right 0.2s',
+              }}
+            >
+              <Preview
+                filePath={fileNav.selectedFile}
+                viewMode={viewMode}
+                projectName={config?.projectName || 'PRDKit'}
+                prototypesDir={config?.prototypesDir || ''}
+                wsConnected={ws.connected}
+                reloadVersion={reloadVersion}
+                viewerSkills={config?.viewerSkills || {
+                  pageCreateSkillCommand: DEFAULT_PAGE_CREATE_SKILL_COMMAND,
+                  inspectCopySkillCommand: DEFAULT_INSPECT_COPY_SKILL_COMMAND,
+                  markCreateSkillCommand: DEFAULT_MARK_CREATE_SKILL_COMMAND,
+                  markUpdateSkillCommand: DEFAULT_MARK_UPDATE_SKILL_COMMAND,
+                  copyTerminalGuide: DEFAULT_COPY_TERMINAL_GUIDE,
+                }}
+                marks={marks.effectiveMarks}
+                selectedMarkId={marks.selectedMarkId}
+                pendingMarkInfo={marks.pendingMarkInfo}
+                relinkingMarkId={marks.relinkingMarkId}
+                onMarkPrepare={marks.prepareMark}
+                onMarkRelink={marks.confirmRelink}
+                onMarkSelect={marks.selectMark}
+                onMarkCancel={marks.cancelMark}
+                onMarkResolutionChange={marks.setMissingMarkIds}
+                onToggleMarkPanel={markPanel.actions.toggle}
+                previewUrlOverride={checkpoint.activePreview?.prototypePath === fileNav.selectedFile ? checkpoint.activePreview.previewUrl : null}
+                previewReadonly={Boolean(checkpoint.activePreview && checkpoint.activePreview.prototypePath === fileNav.selectedFile)}
+              />
+            </Content>
+            {viewMode === 'mark' && (
+              <div ref={markPanelResize.panelRef} className="mark-panel-container" style={{ width: markPanel.state.width }}>
+                <div
+                  onMouseDown={markPanelResize.handleMouseDown}
+                  className={`app-resize-handle mark-panel-resize ${markPanelResize.isResizing ? 'resizing' : ''}`}
+                />
+                <MarkPanel
+                  marks={marks.effectiveMarks}
+                  selectedMarkId={marks.selectedMarkId}
+                  pendingMarkInfo={marks.pendingMarkInfo}
+                  relinkingMarkId={marks.relinkingMarkId}
+                  missingMarkIds={marks.missingMarkIds}
+                  viewerSkills={config?.viewerSkills || {
+                    pageCreateSkillCommand: DEFAULT_PAGE_CREATE_SKILL_COMMAND,
+                    inspectCopySkillCommand: DEFAULT_INSPECT_COPY_SKILL_COMMAND,
+                    markCreateSkillCommand: DEFAULT_MARK_CREATE_SKILL_COMMAND,
+                    markUpdateSkillCommand: DEFAULT_MARK_UPDATE_SKILL_COMMAND,
+                    copyTerminalGuide: DEFAULT_COPY_TERMINAL_GUIDE,
+                  }}
+                  onMarkSelect={marks.selectMark}
+                  onMarkCreate={marks.createMark}
+                  onMarkUpdate={marks.updateMark}
+                  onMarkDelete={marks.deleteMark}
+                  onMarkRelinkStart={marks.startRelink}
+                  onMarkRelinkCancel={marks.cancelRelink}
+                  onMarkCancel={marks.cancelMark}
+                  onRefresh={marks.loadMarks}
+                  collapsed={markPanel.state.collapsed}
+                  onCollapsedChange={(collapsed) => collapsed ? markPanel.actions.collapse() : markPanel.actions.expand()}
+                  projectName={config?.projectName || 'PRDKit'}
+                  filePath={fileNav.selectedFile}
+                  prototypesDir={config?.prototypesDir || ''}
+                />
+              </div>
+            )}
+          </Layout>
+          <PublishDrawer
+            open={publish.drawerOpen}
+            loading={publish.loading}
+            submitting={publish.submitting}
+            projectName={config?.projectName || 'PRDKit'}
+            currentFile={fileNav.selectedFile}
+            fileList={fileNav.fileList}
+            defaultOutputPath={publish.defaultPath}
+            onClose={publish.close}
+            onPickOutputDirectory={publish.pickDirectory}
+            onSubmit={publish.submit}
+          />
+          <HistoryDrawer
+            open={checkpoint.historyDrawerOpen}
+            prototypePath={fileNav.selectedFile}
+            refreshVersion={checkpoint.historyRefreshVersion}
+            focusCheckpointId={checkpoint.historyTargetCheckpointId}
+            onClose={checkpoint.closeHistory}
+            onPreview={checkpoint.preview}
+            onRestore={checkpoint.restore}
+          />
+          <PreferencesDrawer open={preferencesOpen} onClose={() => setPreferencesOpen(false)} />
+        </Layout>
+      </AppConfigProvider>
     </ConfigProvider>
   );
 }
 
 export default App;
-
-function extractPathBasename(targetPath: string): string {
-  const normalized = targetPath.replace(/[\\/]+$/, '');
-  const segments = normalized.split(/[\\/]/).filter(Boolean);
-  return segments[segments.length - 1] || normalized;
-}
-
-function joinPathSegments(directoryPath: string, entryName: string): string {
-  const separator = directoryPath.includes('\\') ? '\\' : '/';
-  const trimmedPath = directoryPath.replace(/[\\/]+$/, '');
-  return `${trimmedPath}${separator}${entryName}`;
-}
