@@ -57,6 +57,9 @@
   --color-border-light: #f0f0f0;      /* 浅色边框 */
 
   /* 背景色 */
+  --color-bg-primary: #ffffff;        /* 主要背景（白色） */
+  --color-bg-secondary: #fafafa;      /* 次要背景 */
+  --color-bg-tertiary: #f5f5f5;       /* 第三级背景 */
   --color-bg-container: #ffffff;      /* 容器背景 */
   --color-bg-elevated: #ffffff;       /* 浮层背景 */
   --color-bg-layout: #f5f5f5;         /* 布局背景 */

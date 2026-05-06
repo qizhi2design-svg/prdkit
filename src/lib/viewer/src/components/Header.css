@@ -1,7 +1,7 @@
 .header-container {
   height: 48px;
   background: #fff;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--color-border-light);
   display: flex;
   align-items: center;
   padding: 0 16px;
@@ -11,7 +11,7 @@
 
 .header-menu-button {
   font-size: 14px;
-  color: #595959;
+  color: var(--color-text-secondary);
   width: 36px;
   height: 36px;
   display: flex;
@@ -50,19 +50,19 @@
 }
 
 .header-file-count {
-  color: #999;
+  color: var(--color-text-tertiary);
   font-size: 12px;
   flex-shrink: 0;
 }
 
 .header-no-file {
-  color: #999;
+  color: var(--color-text-tertiary);
   font-size: 14px;
 }
 
 .header-inspect-button {
   font-size: 14px;
-  color: #8c8c8c;
+  color: var(--color-text-tertiary);
   width: 32px;
   height: 32px;
   display: flex;
@@ -74,7 +74,7 @@
 
 .header-inspect-button:hover {
   color: var(--color-primary);
-  background-color: #f5f5f5;
+  background-color: var(--color-bg-tertiary);
 }
 
 .header-mode-segmented {
@@ -92,7 +92,7 @@
 
 .header-history-button {
   border-color: #d6e4ff;
-  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  background: linear-gradient(180deg, var(--color-bg-primary) 0%, #f7fbff 100%);
   color: #1d4ed8;
   box-shadow: 0 8px 18px var(--color-primary-alpha-8);
 }
@@ -102,9 +102,9 @@
 }
 
 .header-save-button {
-  border-color: #d9d9d9;
-  background: #ffffff;
-  color: #262626;
+  border-color: var(--color-border-primary);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
 }
 
 .header-save-button:not(:disabled):hover,

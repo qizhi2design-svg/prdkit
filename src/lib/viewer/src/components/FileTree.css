@@ -6,7 +6,7 @@
 
 .file-tree-toolbar {
   padding: 8px 12px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--color-border-light);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -18,7 +18,7 @@
 .file-tree-search-icon {
   font-size: 14px;
   cursor: pointer;
-  color: #8c8c8c;
+  color: var(--color-text-tertiary);
   transition: all 0.2s;
   padding: 4px;
   border-radius: 4px;
@@ -29,7 +29,7 @@
 
 .file-tree-search-icon:hover {
   color: var(--color-primary);
-  background-color: #f5f5f5;
+  background-color: var(--color-bg-tertiary);
 }
 
 .file-tree-search-spacer {
@@ -43,7 +43,7 @@
 .file-tree-nav-icon {
   font-size: 14px;
   cursor: pointer;
-  color: #8c8c8c;
+  color: var(--color-text-tertiary);
   transition: all 0.2s;
   display: flex;
   align-items: center;
@@ -55,12 +55,12 @@
 
 .file-tree-nav-icon:hover {
   color: var(--color-primary);
-  background-color: #f5f5f5;
+  background-color: var(--color-bg-tertiary);
 }
 
 .file-tree-project-name {
   padding: 8px 12px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--color-border-light);
   user-select: none;
   -webkit-user-select: none;
   -moz-user-select: none;
@@ -100,12 +100,12 @@
 }
 
 .file-tree-project-action.ant-btn {
-  color: #8c8c8c;
+  color: var(--color-text-tertiary);
 }
 
 .file-tree-project-action.ant-btn:hover {
-  color: #262626;
-  background: #f5f5f5;
+  color: var(--color-text-primary);
+  background: var(--color-bg-tertiary);
 }
 
 .file-tree-project-action-ai.ant-btn {
@@ -128,14 +128,14 @@
   align-items: center;
   gap: 6px;
   padding: 12px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--color-border-light);
   background: #fff;
   font-size: 12px;
   white-space: nowrap;
 }
 
 .file-tree-brand-label {
-  color: #8c8c8c;
+  color: var(--color-text-tertiary);
   white-space: nowrap;
 }
 
@@ -216,11 +216,11 @@
 }
 
 .file-tree-edit-button {
-  color: #8c8c8c;
+  color: var(--color-text-tertiary);
 }
 
 .file-tree-edit-button:hover {
-  color: #262626;
+  color: var(--color-text-primary);
   background: rgba(0, 0, 0, 0.05) !important;
 }
 
@@ -270,7 +270,7 @@
 }
 
 .file-tree-content .ant-tree-node-content-wrapper:hover {
-  background-color: #f5f5f5;
+  background-color: var(--color-bg-tertiary);
 }
 
 .file-tree-content .ant-tree-node-selected .ant-tree-node-content-wrapper {
