@@ -22,6 +22,8 @@ export function useResizablePanel(options: ResizablePanelOptions): ResizablePane
 
   const [isResizing, setIsResizing] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const animationFrameIdRef = useRef<number | null>(null);
+  const latestMouseXRef = useRef(0);
 
   const handleWidthChange = useCallback(
     (newWidth: number) => {
@@ -42,30 +44,28 @@ export function useResizablePanel(options: ResizablePanelOptions): ResizablePane
   }, []);
 
   useEffect(() => {
-    let animationFrameId: number | null = null;
-    let latestMouseX = 0;
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return;
 
-      latestMouseX = e.clientX;
+      latestMouseXRef.current = e.clientX;
 
-      if (animationFrameId === null) {
-        animationFrameId = requestAnimationFrame(() => {
+      if (animationFrameIdRef.current === null) {
+        animationFrameIdRef.current = requestAnimationFrame(() => {
           let newWidth: number;
 
           if (direction === 'left') {
             // 从左边拖拽
-            newWidth = latestMouseX;
+            newWidth = latestMouseXRef.current;
           } else {
             // 从右边拖拽
-            newWidth = window.innerWidth - latestMouseX;
+            newWidth = window.innerWidth - latestMouseXRef.current;
           }
 
           if (newWidth >= minWidth && newWidth <= maxWidth) {
             handleWidthChange(newWidth);
           }
-          animationFrameId = null;
+          animationFrameIdRef.current = null;
         });
       }
     };
@@ -74,9 +74,9 @@ export function useResizablePanel(options: ResizablePanelOptions): ResizablePane
       setIsResizing(false);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
-      if (animationFrameId !== null) {
-        cancelAnimationFrame(animationFrameId);
-        animationFrameId = null;
+      if (animationFrameIdRef.current !== null) {
+        cancelAnimationFrame(animationFrameIdRef.current);
+        animationFrameIdRef.current = null;
       }
     };
 
@@ -88,8 +88,9 @@ export function useResizablePanel(options: ResizablePanelOptions): ResizablePane
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
-      if (animationFrameId !== null) {
-        cancelAnimationFrame(animationFrameId);
+      if (animationFrameIdRef.current !== null) {
+        cancelAnimationFrame(animationFrameIdRef.current);
+        animationFrameIdRef.current = null;
       }
     };
   }, [isResizing, direction, minWidth, maxWidth, handleWidthChange]);

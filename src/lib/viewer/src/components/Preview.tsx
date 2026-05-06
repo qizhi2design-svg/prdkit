@@ -62,6 +62,21 @@ export default function Preview({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const unmountedRef = useRef(false);
+
+  // 使用 ref 存储最新的 props 和状态，避免频繁重新注册事件监听器
+  const viewModeRef = useRef(viewMode);
+  const marksRef = useRef(marks);
+  const relinkingMarkIdRef = useRef(relinkingMarkId);
+  const onMarkPrepareRef = useRef(onMarkPrepare);
+  const onMarkRelinkRef = useRef(onMarkRelink);
+  const onMarkSelectRef = useRef(onMarkSelect);
+  const previewReadonlyRef = useRef(previewReadonly);
+  const projectNameRef = useRef(projectName);
+  const prototypesDirRef = useRef(prototypesDir);
+  const selectionModeRef = useRef<'single' | 'multiple'>('single');
+  const viewerSkillsRef = useRef(viewerSkills);
+
   const [hoveredElement, setHoveredElement] = useState<HTMLElement | null>(null);
   const [selectionMode, setSelectionMode] = useState<'single' | 'multiple'>('single');
   const [selectedElements, setSelectedElements] = useState<SelectedElement[]>([]);
@@ -72,6 +87,21 @@ export default function Preview({
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const [, setOverlayRefreshTick] = useState(0);
   const [iframeReloadToken, setIframeReloadToken] = useState(0);
+
+  // 更新 refs
+  useEffect(() => {
+    viewModeRef.current = viewMode;
+    marksRef.current = marks;
+    relinkingMarkIdRef.current = relinkingMarkId;
+    onMarkPrepareRef.current = onMarkPrepare;
+    onMarkRelinkRef.current = onMarkRelink;
+    onMarkSelectRef.current = onMarkSelect;
+    previewReadonlyRef.current = previewReadonly;
+    projectNameRef.current = projectName;
+    prototypesDirRef.current = prototypesDir;
+    selectionModeRef.current = selectionMode;
+    viewerSkillsRef.current = viewerSkills;
+  });
 
   const marksVisibleInCurrentMode = viewMode === 'mark' ? marksVisible : false;
   const markOverlaysVisible = viewMode === 'mark'
@@ -96,11 +126,20 @@ export default function Preview({
   };
 
   const requestOverlayRefresh = () => {
+    if (unmountedRef.current) return;
     setOverlayRefreshTick(prev => prev + 1);
   };
 
   useEffect(() => {
+    unmountedRef.current = false;
+    return () => {
+      unmountedRef.current = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (reloadVersion === 0) return;
+    if (unmountedRef.current) return;
     console.log('收到刷新通知，重新加载预览');
     setIframeReloadToken(Date.now());
   }, [reloadVersion]);
@@ -168,6 +207,7 @@ export default function Preview({
     };
 
     const startTransitionLoop = () => {
+      if (unmountedRef.current) return;
       if (transitionLoopId !== null) return;
 
       const tick = () => {
@@ -179,6 +219,7 @@ export default function Preview({
     };
 
     const setupIframeObservers = () => {
+      if (unmountedRef.current) return;
       cleanupIframeObservers();
 
       const iframeWindow = iframe.contentWindow;
@@ -285,6 +326,7 @@ export default function Preview({
     let currentCleanup: (() => void) | null = null;
 
     const setupInspectMode = () => {
+      if (unmountedRef.current) return;
       // 先清理旧的监听器
       if (currentCleanup) {
         currentCleanup();
@@ -296,6 +338,7 @@ export default function Preview({
 
     // 鼠标移动事件
     const handleMouseMove = (e: MouseEvent) => {
+      if (unmountedRef.current) return;
       const target = e.target as HTMLElement;
       if (target && target !== iframeDoc.body && target !== iframeDoc.documentElement) {
         setHoveredElement(target);
@@ -307,26 +350,40 @@ export default function Preview({
 
     // 点击事件
     const handleClick = async (e: MouseEvent) => {
+      if (unmountedRef.current) return;
       e.preventDefault();
       e.stopPropagation();
 
       const target = e.target as HTMLElement;
       if (!target) return;
 
+      // 从 ref 读取最新值
+      const currentViewMode = viewModeRef.current;
+      const currentMarks = marksRef.current;
+      const currentRelinkingMarkId = relinkingMarkIdRef.current;
+      const currentOnMarkPrepare = onMarkPrepareRef.current;
+      const currentOnMarkRelink = onMarkRelinkRef.current;
+      const currentOnMarkSelect = onMarkSelectRef.current;
+      const currentPreviewReadonly = previewReadonlyRef.current;
+      const currentProjectName = projectNameRef.current;
+      const currentPrototypesDir = prototypesDirRef.current;
+      const currentSelectionMode = selectionModeRef.current;
+      const currentViewerSkills = viewerSkillsRef.current;
+
       // 标记模式：检查是否已有标记，有则显示详情，无则准备创建
-      if (viewMode === 'mark') {
+      if (currentViewMode === 'mark') {
         // 生成唯一选择器
         const selector = generateUniqueSelector(target);
 
-        if (relinkingMarkId) {
-          const duplicatedMark = marks.find((mark) => mark.selector === selector && mark.id !== relinkingMarkId);
+        if (currentRelinkingMarkId) {
+          const duplicatedMark = currentMarks.find((mark) => mark.selector === selector && mark.id !== currentRelinkingMarkId);
           if (duplicatedMark) {
-            message.warning(`该元素已绑定到标记“${duplicatedMark.title}”`);
+            message.warning(`该元素已绑定到标记”${duplicatedMark.title}”`);
             return;
           }
 
           const rect = target.getBoundingClientRect();
-          onMarkRelink(relinkingMarkId, {
+          currentOnMarkRelink(currentRelinkingMarkId, {
             selector,
             domPath: getElementPath(target),
             position: {
@@ -344,15 +401,15 @@ export default function Preview({
         }
 
         // 检查是否已经有标记使用这个选择器
-        const existingMark = marks.find(mark => mark.selector === selector);
+        const existingMark = currentMarks.find(mark => mark.selector === selector);
 
         if (existingMark) {
           // 如果已有标记，切换到详情视图
-          onMarkSelect(existingMark.id);
+          currentOnMarkSelect(existingMark.id);
           return;
         }
 
-        if (previewReadonly) {
+        if (currentPreviewReadonly) {
           message.info('历史版本预览中不可新增标记，请先还原到该版本');
           return;
         }
@@ -362,7 +419,7 @@ export default function Preview({
         const domPath = getElementPath(target);
 
         // 调用 onMarkPrepare 传递待创建标记信息
-        onMarkPrepare({
+        currentOnMarkPrepare({
           selector: selector,
           domPath: domPath,
           position: {
@@ -380,19 +437,19 @@ export default function Preview({
       }
 
       // 编辑模式：复制 DOM 信息
-      const info = getElementInfo(target, projectName, prototypesDir, filePath);
+      const info = getElementInfo(target, currentProjectName, currentPrototypesDir, filePath);
 
-      if (selectionMode === 'single') {
+      if (currentSelectionMode === 'single') {
         // 单选模式：直接复制
         try {
           await copySkillClipboardText(
             {
-              skillCommand: viewerSkills.inspectCopySkillCommand,
+              skillCommand: currentViewerSkills.inspectCopySkillCommand,
               payload: info,
             },
             {
               successPrefix: '已复制 DOM skill 指令',
-              terminalGuide: viewerSkills.copyTerminalGuide,
+              terminalGuide: currentViewerSkills.copyTerminalGuide,
             }
           );
         } catch (error) {
@@ -444,7 +501,7 @@ export default function Preview({
         currentCleanup();
       }
     };
-  }, [viewMode, filePath, projectName, prototypesDir, selectionMode, marksVisibleInCurrentMode, onMarkPrepare, previewReadonly, marks, onMarkSelect, onMarkRelink, relinkingMarkId]);
+  }, [viewMode, filePath, marksVisibleInCurrentMode]);
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -864,10 +921,10 @@ export default function Preview({
         <div className="preview-inspect-banner mark-mode">
           <span className="preview-inspect-banner-text">
             {previewReadonly
-              ? (marksVisible ? '历史版本预览中，仅支持查看标记' : '历史版本预览中（标记已隐藏）')
+              ? (marksVisible ? '历史版本预览中，仅支持查看标记' : '历史版本预览中')
               : relinkingMarkId
                 ? '请点击页面中的新元素，重新绑定当前标记'
-                : (marksVisible ? '点击页面元素创建标记' : '预览模式（标记已隐藏）')}
+                : (marksVisible ? '点击页面元素创建标记' : '预览模式')}
             {marks.length > 0 && marksVisible && (
               <>
                 <Hotkey keys={['↑']} description="上一个" />

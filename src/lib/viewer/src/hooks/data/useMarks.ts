@@ -185,23 +185,31 @@ export function useMarks(options: UseMarksOptions): UseMarksReturn {
   // 确认重新链接标记
   const confirmRelink = useCallback(
     (markId: string, info: PendingMarkInfo) => {
-      const currentMark = marks.find((mark) => mark.id === markId);
-      if (!currentMark) return;
+      // 使用 ref 或直接从 marks 中查找（通过闭包）
+      // 为了避免过期闭包，我们在 updateMark 调用后立即更新状态
+      setMarks((currentMarks) => {
+        const currentMark = currentMarks.find((mark) => mark.id === markId);
+        if (!currentMark) return currentMarks;
 
-      updateMark(markId, {
-        title: currentMark.title,
-        description: currentMark.description,
-        selector: info.selector,
-        domPath: info.domPath,
-        position: info.position,
-        rect: info.rect,
+        // 调用 updateMark 更新服务器端数据
+        updateMark(markId, {
+          title: currentMark.title,
+          description: currentMark.description,
+          selector: info.selector,
+          domPath: info.domPath,
+          position: info.position,
+          rect: info.rect,
+        });
+
+        return currentMarks;
       });
+
       setRelinkingMarkId(null);
       setSelectedMarkId(markId);
       setPendingMarkInfo(null);
       message.success('已更新标记元素路径');
     },
-    [marks, updateMark]
+    [updateMark]
   );
 
   // 取消重新链接标记

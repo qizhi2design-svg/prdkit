@@ -164,14 +164,14 @@ function App() {
     marks.selectMark(null);
     marks.cancelMark();
     checkpoint.exitPreview();
-  }, [fileNav.selectedFile]);
+  }, [fileNav.selectedFile, marks.selectMark, marks.cancelMark, checkpoint.exitPreview]);
 
   // 创建/选择标记时自动展开面板
   useEffect(() => {
     if ((marks.pendingMarkInfo || marks.selectedMarkId) && markPanel.state.collapsed) {
       markPanel.actions.expand();
     }
-  }, [marks.pendingMarkInfo, marks.selectedMarkId, markPanel.state.collapsed]);
+  }, [marks.pendingMarkInfo, marks.selectedMarkId, markPanel.state.collapsed, markPanel.actions.expand]);
 
   // ========== 文件操作处理函数 ==========
   const handlePrototypeDelete = async (prototypePath: string) => {

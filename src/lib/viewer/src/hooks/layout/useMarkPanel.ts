@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import { useViewerStore } from '../../stores/useViewerStore';
 import type { MarkPanelReturn } from '../../types/hooks';
 
@@ -8,25 +8,25 @@ export function useMarkPanel(initialWidth: number): MarkPanelReturn {
   const width = useViewerStore((state) => state.markPanelWidth);
   const setWidth = useViewerStore((state) => state.setMarkPanelWidth);
 
-  const [savedWidth, setSavedWidth] = useState(initialWidth);
+  const savedWidthRef = useRef(initialWidth);
 
   // 处理折叠状态变化
   useEffect(() => {
     if (collapsed) {
       // 折叠时保存当前宽度，并设置为 40px
-      setSavedWidth(width);
+      savedWidthRef.current = width;
       setWidth(40);
     } else {
       // 展开时恢复之前的宽度
-      setWidth(savedWidth);
+      setWidth(savedWidthRef.current);
     }
-  }, [collapsed, savedWidth, setWidth]);
+  }, [collapsed, width, setWidth]);
 
   return {
     state: {
       collapsed,
       width,
-      savedWidth,
+      savedWidth: savedWidthRef.current,
     },
     actions: {
       toggle: () => setCollapsed(!collapsed),

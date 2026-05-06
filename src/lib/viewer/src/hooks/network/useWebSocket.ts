@@ -38,14 +38,24 @@ export function useWebSocket(options: WebSocketOptions): WebSocketReturn {
     };
 
     ws.onclose = () => {
+      // 先检查是否已卸载
+      if (unmountedRef.current) {
+        return;
+      }
+
       setConnected(false);
       wsRef.current = null;
 
-      if (!unmountedRef.current && reconnect && reconnectAttemptRef.current < maxReconnectAttempts) {
+      if (reconnect && reconnectAttemptRef.current < maxReconnectAttempts) {
         // 指数退避重连策略
         const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 30000);
         reconnectAttemptRef.current += 1;
-        reconnectTimerRef.current = setTimeout(connect, delay);
+        reconnectTimerRef.current = setTimeout(() => {
+          // 再次检查，防止延迟期间组件卸载
+          if (!unmountedRef.current) {
+            connect();
+          }
+        }, delay);
       }
     };
   }, [url, reconnect, maxReconnectAttempts]);
