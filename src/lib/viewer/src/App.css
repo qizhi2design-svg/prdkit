@@ -29,7 +29,7 @@
 }
 
 .app-resize-handle.resizing {
-  background-color: #1890ff;
+  background-color: var(--color-primary);
   transition: none;
 }
 

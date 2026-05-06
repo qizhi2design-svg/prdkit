@@ -40,7 +40,7 @@
 }
 
 .dom-path-breadcrumb-item:last-child {
-  color: #1890ff;
+  color: var(--color-primary);
   font-weight: 500;
 }
 

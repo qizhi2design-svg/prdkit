@@ -36,7 +36,7 @@
 
 .preview-inspect-banner-count {
   font-size: 12px;
-  color: #1890ff;
+  color: var(--color-primary);
   padding: 2px 8px;
   background: #e6f7ff;
   border-radius: 4px;
@@ -46,7 +46,7 @@
 .preview-ai-action-button.ant-btn {
   position: relative;
   border: none;
-  background: linear-gradient(135deg, #1677ff 0%, #22c3ee 52%, #7b61ff 100%);
+  background: var(--gradient-ai);
   box-shadow: 0 8px 18px rgba(34, 195, 238, 0.24);
   overflow: hidden;
 }
@@ -67,7 +67,7 @@
 
 .preview-ai-action-button.ant-btn:hover,
 .preview-ai-action-button.ant-btn:focus-visible {
-  background: linear-gradient(135deg, #0f6fff 0%, #1ec0ee 50%, #7755ff 100%);
+  background: var(--gradient-ai-hover);
   box-shadow: 0 10px 22px rgba(34, 195, 238, 0.28);
 }
 
@@ -107,7 +107,7 @@
   scrollbar-width: thin;
   scrollbar-color: rgba(148, 163, 184, 0.72) rgba(15, 23, 42, 0.05);
   background:
-    radial-gradient(circle at top, rgba(24, 144, 255, 0.04), transparent 40%),
+    radial-gradient(circle at top, var(--color-primary-alpha-4), transparent 40%),
     linear-gradient(180deg, #f7f9fc 0%, #edf2fb 100%);
   display: flex;
   flex-direction: column;
@@ -238,8 +238,8 @@
 
 .preview-element-highlight {
   position: absolute;
-  border: 2px solid #1890ff;
-  background-color: rgba(24, 144, 255, 0.1);
+  border: 2px solid var(--color-primary);
+  background-color: var(--color-primary-alpha-10);
   pointer-events: none;
   z-index: 9999;
   box-sizing: border-box;
@@ -255,7 +255,7 @@
   top: -22px;
   left: 0;
   padding: 2px 6px;
-  background: #1890ff;
+  background: var(--color-primary);
   color: white;
   font-size: 11px;
   font-family: monospace;
@@ -270,8 +270,8 @@
 /* 元素高亮覆盖层 */
 .preview-highlight-overlay {
   position: absolute;
-  border: 2px solid #1890ff;
-  background-color: rgba(24, 144, 255, 0.1);
+  border: 2px solid var(--color-primary);
+  background-color: var(--color-primary-alpha-10);
   pointer-events: none;
   z-index: 4;
   box-sizing: border-box;
@@ -282,7 +282,7 @@
   top: -22px;
   left: 0;
   padding: 2px 6px;
-  background: #1890ff;
+  background: var(--color-primary);
   color: white;
   font-size: 11px;
   font-family: monospace;
@@ -329,14 +329,14 @@
 }
 
 .preview-mark-highlight:hover {
-  border-color: #1890ff;
-  background-color: rgba(24, 144, 255, 0.1);
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-alpha-10);
 }
 
 .preview-mark-highlight.selected {
-  border-color: #1890ff;
+  border-color: var(--color-primary);
   border-width: 3px;
-  background-color: rgba(24, 144, 255, 0.15);
+  background-color: var(--color-primary-alpha-15);
 }
 
 /* 待创建标记的高亮框样式 */
@@ -373,11 +373,11 @@
 }
 
 .preview-mark-highlight:hover .preview-mark-number {
-  background: #1890ff;
+  background: var(--color-primary);
 }
 
 .preview-mark-highlight.selected .preview-mark-number {
-  background: #1890ff;
+  background: var(--color-primary);
 }
 
 /* 待创建标记的数字标签样式 */

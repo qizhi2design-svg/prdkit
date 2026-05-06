@@ -9,6 +9,18 @@
   --color-primary-light: #e6f4ff;
   --color-primary-lighter: #f7fbff;
 
+  /* 主色调透明度变体 */
+  --color-primary-alpha-4: rgba(22, 119, 255, 0.04);
+  --color-primary-alpha-5: rgba(22, 119, 255, 0.05);
+  --color-primary-alpha-8: rgba(22, 119, 255, 0.08);
+  --color-primary-alpha-10: rgba(22, 119, 255, 0.1);
+  --color-primary-alpha-12: rgba(22, 119, 255, 0.12);
+  --color-primary-alpha-15: rgba(22, 119, 255, 0.15);
+  --color-primary-alpha-18: rgba(22, 119, 255, 0.18);
+  --color-primary-alpha-20: rgba(22, 119, 255, 0.2);
+  --color-primary-alpha-28: rgba(22, 119, 255, 0.28);
+  --color-primary-alpha-42: rgba(22, 119, 255, 0.42);
+
   /* AI 功能专用渐变 */
   --gradient-ai: linear-gradient(135deg, #1677ff 0%, #22c3ee 52%, #7b61ff 100%);
   --gradient-ai-hover: linear-gradient(135deg, #0f6fff 0%, #1ec0ee 50%, #7755ff 100%);
@@ -37,6 +49,7 @@
   --color-text-secondary: #595959;    /* 次要文本 */
   --color-text-tertiary: #8c8c8c;     /* 辅助文本 */
   --color-text-quaternary: #bfbfbf;   /* 占位文本 */
+  --color-text-dark: #1f1f1f;         /* 深色文本（标题） */
 
   /* 边框色 */
   --color-border-primary: #d9d9d9;    /* 主要边框 */
@@ -51,9 +64,9 @@
   --color-bg-hover: #f5f5f5;          /* 悬停背景 */
 
   /* 特殊背景渐变 */
-  --gradient-bg-stage: radial-gradient(circle at top, rgba(24, 144, 255, 0.04), transparent 40%), linear-gradient(180deg, #f7f9fc 0%, #edf2fb 100%);
-  --gradient-bg-history: radial-gradient(circle at top left, rgba(22, 119, 255, 0.05), transparent 28%), linear-gradient(180deg, #fbfdff 0%, #f5f8fc 100%);
-  --gradient-bg-modal: radial-gradient(circle at top left, rgba(22, 119, 255, 0.12), transparent 28%), radial-gradient(circle at top right, rgba(123, 97, 255, 0.12), transparent 32%), linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+  --gradient-bg-stage: radial-gradient(circle at top, var(--color-primary-alpha-4), transparent 40%), linear-gradient(180deg, #f7f9fc 0%, #edf2fb 100%);
+  --gradient-bg-history: radial-gradient(circle at top left, var(--color-primary-alpha-5), transparent 28%), linear-gradient(180deg, #fbfdff 0%, #f5f8fc 100%);
+  --gradient-bg-modal: radial-gradient(circle at top left, var(--color-primary-alpha-12), transparent 28%), radial-gradient(circle at top right, rgba(123, 97, 255, 0.12), transparent 32%), linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
 
   /* 移动端设备外壳 */
   --gradient-device-shell: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);

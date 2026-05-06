@@ -1,7 +1,7 @@
 .history-drawer.compact .ant-drawer-body {
   padding: 0;
   background:
-    radial-gradient(circle at top left, rgba(22, 119, 255, 0.05), transparent 28%),
+    radial-gradient(circle at top left, var(--color-primary-alpha-5), transparent 28%),
     linear-gradient(180deg, #fbfdff 0%, #f5f8fc 100%);
 }
 
