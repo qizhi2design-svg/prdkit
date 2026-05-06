@@ -1,0 +1,137 @@
+/* PRDKit Viewer Common Styles */
+
+/* ========== AI 功能专用样式 ========== */
+.ai-gradient-button {
+  position: relative;
+  border: none;
+  background: var(--gradient-ai);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  color: #ffffff;
+  font-weight: var(--font-weight-semibold);
+}
+
+.ai-gradient-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-ai-shine);
+  transform: translateX(-130%);
+  transition: transform var(--transition-shine);
+}
+
+.ai-gradient-button:hover::before,
+.ai-gradient-button:focus-visible::before {
+  transform: translateX(130%);
+}
+
+.ai-gradient-button:hover,
+.ai-gradient-button:focus-visible {
+  background: var(--gradient-ai-hover);
+  box-shadow: 0 10px 22px rgba(34, 195, 238, 0.28);
+}
+
+.ai-gradient-button:active {
+  transform: translateY(1px);
+}
+
+.ai-gradient-button > span {
+  position: relative;
+  z-index: 1;
+}
+
+/* ========== 等宽字体文本 ========== */
+.monospace-text {
+  font-family: var(--font-family-code);
+  font-size: var(--font-size-xs);
+}
+
+/* ========== 滚动条样式 ========== */
+.custom-scrollbar {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.72) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.68);
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.86);
+  background-clip: content-box;
+}
+
+/* ========== 幽灵图标按钮 ========== */
+.ghost-icon-button {
+  width: var(--height-sm);
+  min-width: var(--height-sm);
+  height: var(--height-sm);
+  padding: 0;
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--radius-full);
+  color: var(--color-text-tertiary);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-base);
+}
+
+.ghost-icon-button:hover,
+.ghost-icon-button:focus-visible {
+  color: var(--color-text-primary);
+  border-color: var(--color-text-quaternary);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.ghost-icon-button-primary {
+  color: var(--color-primary);
+  border-color: rgba(22, 119, 255, 0.28);
+  background: rgba(240, 247, 255, 0.92);
+}
+
+.ghost-icon-button-primary:hover,
+.ghost-icon-button-primary:focus-visible {
+  color: var(--color-primary-active);
+  border-color: rgba(22, 119, 255, 0.42);
+  background: rgba(230, 244, 255, 1);
+}
+
+/* ========== 工具类 ========== */
+.text-primary { color: var(--color-text-primary); }
+.text-secondary { color: var(--color-text-secondary); }
+.text-tertiary { color: var(--color-text-tertiary); }
+.text-quaternary { color: var(--color-text-quaternary); }
+
+.bg-container { background: var(--color-bg-container); }
+.bg-layout { background: var(--color-bg-layout); }
+.bg-spotlight { background: var(--color-bg-spotlight); }
+.bg-hover { background: var(--color-bg-hover); }
+
+.border-primary { border-color: var(--color-border-primary); }
+.border-secondary { border-color: var(--color-border-secondary); }
+.border-light { border-color: var(--color-border-light); }
+
+.shadow-sm { box-shadow: var(--shadow-sm); }
+.shadow-base { box-shadow: var(--shadow-base); }
+.shadow-md { box-shadow: var(--shadow-md); }
+.shadow-lg { box-shadow: var(--shadow-lg); }
+.shadow-xl { box-shadow: var(--shadow-xl); }
+
+.radius-sm { border-radius: var(--radius-sm); }
+.radius-base { border-radius: var(--radius-base); }
+.radius-md { border-radius: var(--radius-md); }
+.radius-lg { border-radius: var(--radius-lg); }
+.radius-xl { border-radius: var(--radius-xl); }
+.radius-full { border-radius: var(--radius-full); }

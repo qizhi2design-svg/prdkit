@@ -98,9 +98,20 @@
   box-shadow: none;
 }
 
+.publish-dialog-toggle-button.ant-btn .ant-wave {
+  display: none !important;
+}
+
 .publish-dialog-toggle-button.ant-btn:hover,
 .publish-dialog-toggle-button.ant-btn:focus {
   color: #262626;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.publish-dialog-toggle-button.ant-btn:active {
+  border-color: transparent !important;
+  box-shadow: none !important;
 }
 
 .publish-dialog-toggle-button.ant-btn.ant-btn-background-ghost {

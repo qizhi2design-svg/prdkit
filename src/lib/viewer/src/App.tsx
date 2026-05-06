@@ -1,4 +1,4 @@
-import { Layout, message } from 'antd';
+import { Layout, message, ConfigProvider } from 'antd';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import FileTree from './components/FileTree';
 import Preview from './components/Preview';
@@ -9,6 +9,7 @@ import HistoryDrawer from './components/HistoryDrawer';
 import { DEFAULT_COPY_TERMINAL_GUIDE, DEFAULT_INSPECT_COPY_SKILL_COMMAND, DEFAULT_MARK_CREATE_SKILL_COMMAND, DEFAULT_MARK_UPDATE_SKILL_COMMAND, DEFAULT_PAGE_CREATE_SKILL_COMMAND } from './constants/clipboard';
 import { copySkillClipboardText } from './utils/clipboard';
 import type { ActiveCheckpointPreview, ViewMode, Mark, MarkUpdatePatch, PendingMarkInfo, PrototypeNode, CheckpointDetail, CheckpointStatus, ViewerConfigResponse, ViewerSkillConfig } from './types';
+import { antdTheme } from './theme/antd-theme';
 import './App.css';
 
 const { Sider, Content } = Layout;
@@ -980,7 +981,8 @@ function App() {
   const currentIndex = selectedFile ? fileList.indexOf(selectedFile) + 1 : 0;
 
   return (
-    <Layout className="app-layout">
+    <ConfigProvider theme={antdTheme}>
+      <Layout className="app-layout">
       <Header
         collapsed={collapsed}
         onToggle={() => setCollapsed(!collapsed)}
@@ -1117,6 +1119,7 @@ function App() {
         onRestore={handleCheckpointRestore}
       />
     </Layout>
+    </ConfigProvider>
   );
 }
 

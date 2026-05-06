@@ -1,0 +1,34 @@
+/* PRDKit Viewer Responsive Utilities */
+
+/* ========== 响应式断点 ========== */
+
+/* 移动端 (≤480px) */
+@media (max-width: 480px) {
+  :root {
+    --font-size-base: 12px;
+    --spacing-4: 12px;
+    --spacing-6: 20px;
+  }
+
+  .mobile-hidden {
+    display: none !important;
+  }
+
+  .mobile-full-width {
+    width: 100% !important;
+  }
+}
+
+/* 平板 (481px - 768px) */
+@media (min-width: 481px) and (max-width: 768px) {
+  .tablet-hidden {
+    display: none !important;
+  }
+}
+
+/* 桌面 (>768px) */
+@media (min-width: 769px) {
+  .desktop-hidden {
+    display: none !important;
+  }
+}
