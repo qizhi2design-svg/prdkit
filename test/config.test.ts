@@ -1,9 +1,35 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { DEFAULT_INSPECT_COPY_SKILL_COMMAND, DEFAULT_PAGE_CREATE_SKILL_COMMAND, DEFAULT_VIEWER_SKILLS } from "../src/lib/shared/index.js";
-import { loadConfig, resolveProjectRoot, saveConfig } from "../src/utils/config.js";
+import {
+  clearAuthRecord,
+  CLOUD_HOST_ENV_VAR,
+  getAuthRecord,
+  loadConfig,
+  resolveCloudHost,
+  resolveProjectRoot,
+  saveConfig,
+  setAuthRecord
+} from "../src/utils/config.js";
+
+const originalHome = process.env.HOME;
+const originalCloudHost = process.env[CLOUD_HOST_ENV_VAR];
+
+afterEach(async () => {
+  if (originalHome === undefined) {
+    delete process.env.HOME;
+  } else {
+    process.env.HOME = originalHome;
+  }
+
+  if (originalCloudHost === undefined) {
+    delete process.env[CLOUD_HOST_ENV_VAR];
+  } else {
+    process.env[CLOUD_HOST_ENV_VAR] = originalCloudHost;
+  }
+});
 
 describe("config", () => {
   it("saves and loads project config", async () => {
@@ -105,6 +131,38 @@ describe("config", () => {
       copyTerminalGuide: "复制后切到终端使用",
     });
 
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("resolves cloud host from environment variable", () => {
+    process.env[CLOUD_HOST_ENV_VAR] = "https://cloud.example.com///";
+    expect(resolveCloudHost()).toBe("https://cloud.example.com");
+  });
+
+  it("stores auth records by normalized host", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "prdkit-auth-store-"));
+    process.env.HOME = dir;
+
+    await setAuthRecord("https://cloud.example.com///", {
+      accessToken: "access-token",
+      refreshToken: "refresh-token",
+      expiresAt: "2099-01-01T00:00:00.000Z",
+      user: {
+        id: 1,
+        email: "demo@example.com",
+      },
+      scopes: ["publish"],
+    });
+
+    await expect(getAuthRecord("https://cloud.example.com")).resolves.toMatchObject({
+      accessToken: "access-token",
+      user: {
+        email: "demo@example.com",
+      },
+    });
+
+    await clearAuthRecord("https://cloud.example.com");
+    await expect(getAuthRecord("https://cloud.example.com")).resolves.toBeUndefined();
     await rm(dir, { recursive: true, force: true });
   });
 });

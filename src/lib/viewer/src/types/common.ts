@@ -23,4 +23,13 @@ export interface ViewerConfigResponse {
   projectName: string;
   prototypesDir: string;
   viewerSkills: ViewerSkillConfig;
+  cloud?: {
+    host: string;
+    projectId?: string;
+    projectName?: string;
+    projectSlug?: string;
+    authStatus: 'loggedOut' | 'expired' | 'active';
+    lastReleaseId?: string;
+    lastPublishedAt?: string;
+  };
 }

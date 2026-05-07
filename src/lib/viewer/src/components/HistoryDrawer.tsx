@@ -177,11 +177,18 @@ export default function HistoryDrawer({
               {checkpoints.map((item) => {
                 const isActive = selectedRecord?.id === item.id;
                 return (
-                  <button
+                  <div
                     key={item.id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     className={`history-version-item ${isActive ? 'active' : ''}`}
                     onClick={() => void handlePreview(item)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        void handlePreview(item);
+                      }
+                    }}
                   >
                     <div className="history-version-item-top">
                       <div className="history-version-title">
@@ -208,7 +215,7 @@ export default function HistoryDrawer({
                       <span className="history-version-dot" />
                       <span>{item.message || kindLabelMap[item.kind]}</span>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>

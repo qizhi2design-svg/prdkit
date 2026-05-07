@@ -1,4 +1,4 @@
-import { Layout, message, ConfigProvider } from 'antd';
+import { App as AntdApp, Layout, message, ConfigProvider } from 'antd';
 import { useState, useEffect } from 'react';
 import FileTree from './components/FileTree';
 import Preview from './components/Preview';
@@ -30,6 +30,13 @@ function App() {
   // ========== 全局配置 ==========
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [reloadVersion, setReloadVersion] = useState(0);
+  const [cloudConfig, setCloudConfig] = useState<{
+    host: string;
+    projectId?: string;
+    projectName?: string;
+    projectSlug?: string;
+    authStatus: 'loggedOut' | 'expired' | 'active';
+  } | null>(null);
 
   // ========== Zustand 全局状态 ==========
   const siderCollapsed = useViewerStore((state) => state.siderCollapsed);
@@ -104,26 +111,46 @@ function App() {
   // ========== 偏好设置抽屉 ==========
   const [preferencesOpen, setPreferencesOpen] = useState(false);
 
+  // ========== 配置加载函数 ==========
+  const loadConfig = async () => {
+    try {
+      const configRes = await fetch('/api/config', { cache: 'no-store' });
+      const configData: ViewerConfigResponse = await configRes.json();
+      const loadedProjectName = configData.projectName || 'PRDKit';
+
+      setConfig({
+        projectName: loadedProjectName,
+        prototypesDir: configData.prototypesDir || '',
+        viewerSkills: configData.viewerSkills || {
+          pageCreateSkillCommand: DEFAULT_PAGE_CREATE_SKILL_COMMAND,
+          inspectCopySkillCommand: DEFAULT_INSPECT_COPY_SKILL_COMMAND,
+          markCreateSkillCommand: DEFAULT_MARK_CREATE_SKILL_COMMAND,
+          markUpdateSkillCommand: DEFAULT_MARK_UPDATE_SKILL_COMMAND,
+          copyTerminalGuide: DEFAULT_COPY_TERMINAL_GUIDE,
+        },
+      });
+
+      // 加载云端配置
+      if (configData.cloud) {
+        setCloudConfig({
+          host: configData.cloud.host || '',
+          projectId: configData.cloud.projectId,
+          projectName: configData.cloud.projectName,
+          projectSlug: configData.cloud.projectSlug,
+          authStatus: configData.cloud.authStatus,
+        });
+      }
+    } catch (error) {
+      console.error('加载配置失败:', error);
+      throw error;
+    }
+  };
+
   // ========== 初始化加载配置和文件列表 ==========
   useEffect(() => {
     const loadData = async () => {
       try {
-        // 从 API 加载配置和原型数据
-        const configRes = await fetch('/api/config', { cache: 'no-store' });
-        const configData: ViewerConfigResponse = await configRes.json();
-        const loadedProjectName = configData.projectName || 'PRDKit';
-
-        setConfig({
-          projectName: loadedProjectName,
-          prototypesDir: configData.prototypesDir || '',
-          viewerSkills: configData.viewerSkills || {
-            pageCreateSkillCommand: DEFAULT_PAGE_CREATE_SKILL_COMMAND,
-            inspectCopySkillCommand: DEFAULT_INSPECT_COPY_SKILL_COMMAND,
-            markCreateSkillCommand: DEFAULT_MARK_CREATE_SKILL_COMMAND,
-            markUpdateSkillCommand: DEFAULT_MARK_UPDATE_SKILL_COMMAND,
-            copyTerminalGuide: DEFAULT_COPY_TERMINAL_GUIDE,
-          },
-        });
+        await loadConfig();
 
         const prototypesRes = await fetch('/api/prototypes', { cache: 'no-store' });
         const prototypesData: PrototypeNode = await prototypesRes.json();
@@ -383,10 +410,38 @@ function App() {
     }
   };
 
+  const handlePublishToCloud = async (payload: { projectId: string; message: string; entryFiles: string[] }) => {
+    try {
+      const response = await fetch('/api/publish-cloud', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: '发布失败' }));
+        throw new Error(error.error || error.message || '发布失败');
+      }
+
+      const data = await response.json().catch(() => null);
+      setCloudConfig((prev) => prev ? {
+        ...prev,
+        projectId: data?.project?.id || payload.projectId,
+        projectName: data?.project?.name || prev.projectName,
+        projectSlug: data?.project?.slug || prev.projectSlug,
+      } : prev);
+      message.success(data?.result?.releaseId ? `发布成功：${data.result.releaseId}` : '发布成功');
+    } catch (error) {
+      console.error('云端发布失败:', error);
+      throw error;
+    }
+  };
+
   return (
     <ConfigProvider theme={antdTheme}>
-      <AppConfigProvider value={config}>
-        <Layout className="app-layout">
+      <AntdApp>
+        <AppConfigProvider value={config}>
+          <Layout className="app-layout">
           <Header
             collapsed={siderCollapsed}
             onToggle={() => setSiderCollapsed(!siderCollapsed)}
@@ -516,9 +571,12 @@ function App() {
             currentFile={fileNav.selectedFile}
             fileList={fileNav.fileList}
             defaultOutputPath={publish.defaultPath}
+            cloudConfig={cloudConfig || undefined}
             onClose={publish.close}
             onPickOutputDirectory={publish.pickDirectory}
             onSubmit={publish.submit}
+            onPublishToCloud={handlePublishToCloud}
+            onRefreshConfig={loadConfig}
           />
           <HistoryDrawer
             open={checkpoint.historyDrawerOpen}
@@ -530,8 +588,9 @@ function App() {
             onRestore={checkpoint.restore}
           />
           <PreferencesDrawer open={preferencesOpen} onClose={() => setPreferencesOpen(false)} />
-        </Layout>
-      </AppConfigProvider>
+          </Layout>
+        </AppConfigProvider>
+      </AntdApp>
     </ConfigProvider>
   );
 }

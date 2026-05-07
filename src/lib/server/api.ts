@@ -1,4 +1,5 @@
 import express, { Router, Request, Response } from 'express';
+import crypto from 'node:crypto';
 import path from 'path';
 import fs from 'fs';
 import open from 'open';
@@ -11,8 +12,37 @@ import { createCheckpoint, findCheckpointRecord, listCheckpointRecords, readChec
 import { materializeCheckpointPreview } from '../checkpoints/prototype/preview.js';
 import { restoreCheckpoint } from '../checkpoints/prototype/restore.js';
 import { DEFAULT_INSPECT_COPY_SKILL_COMMAND, DEFAULT_PAGE_CREATE_SKILL_COMMAND, DEFAULT_VIEWER_SKILLS } from '../shared/index.js';
-import { loadConfig } from '#utils/config.js';
+import { CloudApiError, createCloudClient } from '../cloud/client.js';
+import { getAuthRecord, loadConfig, requireCloudHost, resolveCloudHost, saveConfig, updateProjectCloudConfig } from '#utils/config.js';
+import type { AuthHostRecord } from '#types/index.js';
 import type { PrdkitConfig } from '#types/index.js';
+
+type PendingViewerLogin = {
+  resolve: (record: AuthHostRecord) => void;
+  reject: (error: Error) => void;
+  timer: NodeJS.Timeout;
+};
+
+const pendingViewerLogins = new Map<string, PendingViewerLogin>();
+
+function renderAuthCallbackHtml(title: string, description: string): string {
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>${title}</title>
+    <style>
+      body { font-family: sans-serif; padding: 48px 24px; text-align: center; color: #111827; }
+      h1 { margin-bottom: 12px; }
+      p { color: #4b5563; }
+    </style>
+  </head>
+  <body>
+    <h1>${title}</h1>
+    <p>${description}</p>
+  </body>
+</html>`;
+}
 
 function normalizeViewerSkills(viewerSkills: {
   pageCreateSkillCommand?: string;
@@ -85,6 +115,10 @@ function readViewerSkills(projectRoot: string, config?: PrdkitConfig) {
 
 function isMissingPrototypeError(error: unknown): boolean {
   return error instanceof Error && error.message.includes('原型 "') && error.message.includes('" 不存在');
+}
+
+function toProjectSlug(name: string): string {
+  return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 }
 
 export function createApiRouter(prototypesDir: string): Router {
@@ -509,10 +543,201 @@ export function createApiRouter(prototypesDir: string): Router {
       config.prototypesDir = prototypesDir;
       config.viewerSkills = readViewerSkills(projectRoot, config as PrdkitConfig);
 
+      const host = resolveCloudHost();
+      if (host) {
+        const authRecord = await getAuthRecord(host);
+        const authStatus = !authRecord
+          ? 'loggedOut'
+          : new Date(authRecord.expiresAt).getTime() > Date.now()
+            ? 'active'
+            : 'expired';
+
+        config.cloud = {
+          host,
+          projectId: (config as PrdkitConfig).cloud?.projectId,
+          projectName: (config as PrdkitConfig).cloud?.projectName,
+          projectSlug: (config as PrdkitConfig).cloud?.projectSlug,
+          authStatus,
+          lastReleaseId: (config as PrdkitConfig).cloud?.lastReleaseId,
+          lastPublishedAt: (config as PrdkitConfig).cloud?.lastPublishedAt,
+        };
+      }
+
       res.json(config);
     } catch (error) {
       console.error('读取配置失败:', error);
       res.json({ projectName: 'PRDKit', prototypesDir, viewerSkills: DEFAULT_VIEWER_SKILLS });
+    }
+  });
+
+  const handleListCloudProjects = async (req: Request, res: Response) => {
+    try {
+      const host = requireCloudHost();
+      const client = await createCloudClient(host);
+      await client.ensureValidAuth();
+      const projects = await client.listProjects();
+
+      res.json({
+        success: true,
+        projects,
+      });
+    } catch (error) {
+      console.error('读取云端项目失败:', error);
+      res.status(500).json({
+        error: '读取云端项目失败',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  const handleCreateCloudProject = async (req: Request, res: Response) => {
+    try {
+      const { name } = req.body as { name?: string };
+      if (!name || typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json({ error: '缺少项目名称 name' });
+      }
+
+      const host = requireCloudHost();
+      const client = await createCloudClient(host);
+      await client.ensureValidAuth();
+      const trimmedName = name.trim();
+      let project;
+      let created = true;
+
+      try {
+        project = await client.createProject({ name: trimmedName });
+      } catch (error) {
+        if (!(error instanceof CloudApiError) || error.status !== 409) {
+          throw error;
+        }
+
+        const existingProject = await client.resolveProjectBySlug(toProjectSlug(trimmedName));
+        project = existingProject;
+        created = false;
+      }
+
+      res.json({
+        success: true,
+        created,
+        project,
+      });
+    } catch (error) {
+      console.error('创建云端项目失败:', error);
+      res.status(500).json({
+        error: '创建云端项目失败',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  router.get('/cloud/projects', handleListCloudProjects);
+  router.post('/cloud/projects', handleCreateCloudProject);
+  router.get('/projects', handleListCloudProjects);
+  router.post('/projects', handleCreateCloudProject);
+
+  router.get('/auth/callback', async (req: Request, res: Response) => {
+    try {
+      const state = typeof req.query.state === 'string' ? req.query.state.trim() : '';
+      const callbackToken = typeof req.query.callbackToken === 'string' ? req.query.callbackToken.trim() : '';
+      const error = typeof req.query.error === 'string' ? req.query.error.trim() : '';
+      const pending = state ? pendingViewerLogins.get(state) : undefined;
+
+      if (!state) {
+        return res.status(400).send(renderAuthCallbackHtml('登录失败', '缺少 state'));
+      }
+
+      if (error) {
+        pending?.reject(new Error(error));
+        if (pending) {
+          clearTimeout(pending.timer);
+          pendingViewerLogins.delete(state);
+        }
+        return res.status(400).send(renderAuthCallbackHtml('登录失败', error));
+      }
+
+      if (!callbackToken) {
+        pending?.reject(new Error('登录失败：缺少 callbackToken'));
+        if (pending) {
+          clearTimeout(pending.timer);
+          pendingViewerLogins.delete(state);
+        }
+        return res.status(400).send(renderAuthCallbackHtml('登录失败', '缺少 callbackToken'));
+      }
+
+      const host = requireCloudHost();
+      const client = await createCloudClient(host);
+      const authRecord = await client.exchangeBrowserLogin(callbackToken);
+
+      pending?.resolve(authRecord);
+      if (pending) {
+        clearTimeout(pending.timer);
+        pendingViewerLogins.delete(state);
+      }
+
+      res.status(200).send(renderAuthCallbackHtml('登录成功', '您可以关闭此窗口并返回发布面板。'));
+    } catch (error) {
+      const state = typeof req.query.state === 'string' ? req.query.state.trim() : '';
+      const pending = state ? pendingViewerLogins.get(state) : undefined;
+      pending?.reject(error instanceof Error ? error : new Error(String(error)));
+      if (pending) {
+        clearTimeout(pending.timer);
+        pendingViewerLogins.delete(state);
+      }
+      console.error('处理浏览器登录回调失败:', error);
+      res.status(500).send(renderAuthCallbackHtml('登录失败', error instanceof Error ? error.message : '登录失败'));
+    }
+  });
+
+  router.post('/auth/login', async (req: Request, res: Response) => {
+    try {
+      const host = requireCloudHost();
+      const client = await createCloudClient(host);
+      const viewerPort = req.get('host')?.split(':')[1] || '7790';
+      const state = crypto.randomBytes(16).toString('hex');
+      const callbackUrl = `http://127.0.0.1:${viewerPort}/api/auth/callback?state=${encodeURIComponent(state)}`;
+      const session = await client.startBrowserLogin('prdkit-viewer', process.env.HOSTNAME || 'viewer', callbackUrl);
+      const timeoutMs = Math.max(new Date(session.expiresAt).getTime() - Date.now(), 1_000);
+      const authPromise = new Promise<AuthHostRecord>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          pendingViewerLogins.delete(state);
+          reject(new Error('登录已超时，请重新点击登录'));
+        }, timeoutMs);
+
+        pendingViewerLogins.set(state, {
+          resolve: (record) => {
+            clearTimeout(timer);
+            resolve(record);
+          },
+          reject: (loginError) => {
+            clearTimeout(timer);
+            reject(loginError);
+          },
+          timer,
+        });
+      });
+
+      console.log(`\n请在浏览器中完成登录：${session.loginUrl}`);
+      console.log(`登录完成后将回调到：${callbackUrl}\n`);
+
+      try {
+        await open(session.loginUrl);
+      } catch {
+        console.warn('自动打开浏览器失败，请手动访问上面的地址完成登录');
+      }
+
+      const authRecord = await authPromise;
+
+      res.json({
+        success: true,
+        message: '登录成功',
+        user: authRecord.user,
+      });
+    } catch (error) {
+      console.error('启动登录流程失败:', error);
+      res.status(500).json({
+        error: '启动登录流程失败',
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 
@@ -801,6 +1026,60 @@ export function createApiRouter(prototypesDir: string): Router {
       console.error('发布产物失败:', error);
       res.status(500).json({
         error: '发布产物失败',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  // 云端发布
+  router.post('/publish-cloud', async (req: Request, res: Response) => {
+    try {
+      const { projectId, message, entryFiles } = req.body as {
+        projectId?: string;
+        message?: string;
+        entryFiles?: string[];
+      };
+      const { publishToCloud } = await import('../cloud/publisher.js');
+      const config = await loadConfig(projectRoot);
+
+      if (!config) {
+        return res.status(400).json({ error: '未找到项目配置' });
+      }
+
+      if (!projectId || typeof projectId !== 'string') {
+        return res.status(400).json({ error: '缺少 projectId' });
+      }
+
+      const result = await publishToCloud({
+        projectRoot,
+        config,
+        message,
+        entryFiles,
+        project: projectId,
+      });
+
+      const host = requireCloudHost();
+      const client = await createCloudClient(host);
+      const projects = await client.listProjects().catch(() => []);
+      const selectedProject = projects.find((item) => item.id === result.projectId);
+      const nextConfig = updateProjectCloudConfig(config, {
+        projectId: result.projectId,
+        projectSlug: selectedProject?.slug,
+        projectName: selectedProject?.name,
+        lastReleaseId: result.releaseId,
+        lastPublishedAt: new Date().toISOString(),
+      });
+      await saveConfig(nextConfig, projectRoot);
+
+      res.json({
+        success: true,
+        result,
+        project: selectedProject ?? null,
+      });
+    } catch (error) {
+      console.error('云端发布失败:', error);
+      res.status(500).json({
+        error: '云端发布失败',
         message: error instanceof Error ? error.message : String(error)
       });
     }

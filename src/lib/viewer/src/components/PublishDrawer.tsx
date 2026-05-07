@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Checkbox, Input, Modal, Tree, Typography, Radio, message } from 'antd';
+import { App as AntdApp, Button, Checkbox, Input, Modal, Typography, Popover, Spin, Select, Result, Tree } from 'antd';
+import type { DataNode } from 'antd/es/tree';
 import {
   FolderOpenOutlined,
   FileTextOutlined,
@@ -10,16 +11,26 @@ import {
   RightOutlined,
   CloudUploadOutlined,
   FolderAddOutlined,
+  MoreOutlined,
+  PlusOutlined,
+  LoginOutlined,
 } from '@ant-design/icons';
-import type { DataNode } from 'antd/es/tree';
 import './PublishDrawer.css';
 
 const { Text } = Typography;
 
 interface CloudConfig {
-  serverUrl: string;
+  host: string;
   projectId?: string;
-  isLoggedIn: boolean;
+  projectName?: string;
+  projectSlug?: string;
+  authStatus: 'loggedOut' | 'expired' | 'active';
+}
+
+interface CloudProjectSummary {
+  id: string;
+  name: string;
+  slug: string;
 }
 
 interface PublishDrawerProps {
@@ -34,20 +45,48 @@ interface PublishDrawerProps {
   onClose: () => void;
   onPickOutputDirectory: (currentOutputPath: string) => Promise<string | null>;
   onSubmit: (payload: { outputPath: string; entryFiles: string[]; openAfterPublish: boolean }) => Promise<void>;
-  onPublishToCloud?: (payload: { message: string; entryFiles: string[] }) => Promise<void>;
+  onPublishToCloud?: (payload: { projectId: string; message: string; entryFiles: string[] }) => Promise<void>;
+  onRefreshConfig?: () => Promise<void>;
 }
 
 interface TreeNode extends DataNode {
   key: string;
+  title: React.ReactNode;
+  icon?: React.ReactNode;
   children?: TreeNode[];
   isLeaf?: boolean;
+}
+
+async function parseApiResponse(response: Response) {
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    return response.json();
+  }
+
+  const text = await response.text();
+  return {
+    error: text || `请求失败 (${response.status})`,
+    message: text || `请求失败 (${response.status})`,
+  };
+}
+
+function normalizeCloudProjects(raw: unknown): CloudProjectSummary[] {
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+    .map((item) => ({
+      id: typeof item.id === 'string' ? item.id : '',
+      name: typeof item.name === 'string' ? item.name : '',
+      slug: typeof item.slug === 'string' ? item.slug : '',
+    }))
+    .filter((item) => item.id && item.name);
 }
 
 export default function PublishDrawer({
   open,
   loading,
   submitting,
-  projectName,
   currentFile,
   fileList,
   defaultOutputPath,
@@ -56,7 +95,9 @@ export default function PublishDrawer({
   onPickOutputDirectory,
   onSubmit,
   onPublishToCloud,
+  onRefreshConfig,
 }: PublishDrawerProps) {
+  const { message } = AntdApp.useApp();
   const [outputPath, setOutputPath] = useState(defaultOutputPath);
   const [selectedFiles, setSelectedFiles] = useState<string[]>(fileList);
   const [searchValue, setSearchValue] = useState('');
@@ -65,6 +106,15 @@ export default function PublishDrawer({
   const [pagePanelOpen, setPagePanelOpen] = useState(false);
   const [publishMode, setPublishMode] = useState<'local' | 'cloud'>('local');
   const [versionMessage, setVersionMessage] = useState('');
+  const [cloudProjects, setCloudProjects] = useState<CloudProjectSummary[]>([]);
+  const [cloudProjectLoading, setCloudProjectLoading] = useState(false);
+  const [cloudSubmitting, setCloudSubmitting] = useState(false);
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
+  const [projectSearchValue, setProjectSearchValue] = useState('');
+  const [newProjectName, setNewProjectName] = useState('');
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>(cloudConfig?.projectId);
+  const [loggingIn, setLoggingIn] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -75,23 +125,131 @@ export default function PublishDrawer({
     setPagePanelOpen(false);
     setPublishMode('local');
     setVersionMessage('');
-  }, [open, defaultOutputPath, fileList]);
+    setProjectSearchValue('');
+    setProjectPickerOpen(false);
+    setNewProjectName('');
+    setSelectedProjectId(cloudConfig?.projectId);
+  }, [open, defaultOutputPath, fileList, cloudConfig?.projectId]);
+
+  useEffect(() => {
+    if (!open || publishMode !== 'cloud' || cloudConfig?.authStatus !== 'active') {
+      return;
+    }
+    void loadCloudProjects();
+  }, [open, publishMode, cloudConfig?.authStatus]);
 
   const fileSet = useMemo(() => new Set(fileList), [fileList]);
   const selectedCount = selectedFiles.length;
-  const publishLabel = truncateProjectName(projectName);
+  const selectedProject = useMemo(
+    () => cloudProjects.find((project) => project.id === selectedProjectId)
+      || cloudProjects.find((project) => project.id === cloudConfig?.projectId),
+    [cloudProjects, selectedProjectId, cloudConfig?.projectId]
+  );
 
   const treeData = useMemo(() => {
     const root = createTreeFromPaths(fileList);
     return filterTree(root, searchValue);
   }, [fileList, searchValue]);
 
+  const filteredProjects = useMemo(() => {
+    const keyword = projectSearchValue.trim().toLowerCase();
+    return keyword
+      ? cloudProjects.filter((project) =>
+        [project.name, project.slug].some((value) => value.toLowerCase().includes(keyword))
+      )
+      : cloudProjects;
+  }, [cloudProjects, projectSearchValue]);
+
+  const loadCloudProjects = async () => {
+    setCloudProjectLoading(true);
+    try {
+      const response = await fetch('/api/projects', { cache: 'no-store' });
+      const data = await parseApiResponse(response);
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || '读取云端项目失败');
+      }
+
+      const projects = normalizeCloudProjects(data.projects);
+      setCloudProjects(projects);
+      setSelectedProjectId((current) => current || cloudConfig?.projectId || projects[0]?.id);
+    } catch (error) {
+      console.error('读取云端项目失败:', error);
+      message.error(error instanceof Error ? error.message : '读取云端项目失败');
+    } finally {
+      setCloudProjectLoading(false);
+    }
+  };
+
+  const handleCreateProject = async () => {
+    const name = newProjectName.trim();
+    if (!name) {
+      message.error('请输入项目名称');
+      return;
+    }
+
+    setCreatingProject(true);
+    try {
+      const response = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      const data = await parseApiResponse(response);
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || '创建项目失败');
+      }
+
+      const project = normalizeCloudProjects([data.project])[0];
+      if (!project) {
+        throw new Error('创建项目失败');
+      }
+      setCloudProjects((prev) => [project, ...prev.filter((item) => item.id !== project.id)]);
+      setSelectedProjectId(project.id);
+      setNewProjectName('');
+      setProjectPickerOpen(false);
+      message.success(data.created === false ? `项目已存在，已选中：${project.name}` : `已创建项目：${project.name}`);
+    } catch (error) {
+      console.error('创建项目失败:', error);
+      message.error(error instanceof Error ? error.message : '创建项目失败');
+    } finally {
+      setCreatingProject(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    setLoggingIn(true);
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+      });
+      const data = await parseApiResponse(response);
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || '登录失败');
+      }
+      if (onRefreshConfig) {
+        await onRefreshConfig();
+      }
+
+      await loadCloudProjects();
+      setPublishMode('cloud');
+      message.success(data.message || '登录成功');
+    } catch (error) {
+      console.error('登录失败:', error);
+      message.error(error instanceof Error ? error.message : '登录失败');
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
   const handleSubmit = async () => {
     const normalizedFiles = fileList.filter((file) => selectedFiles.includes(file));
 
     if (publishMode === 'cloud') {
-      if (!cloudConfig?.isLoggedIn) {
-        message.error('请先登录云端服务器');
+      if (cloudConfig?.authStatus !== 'active') {
+        message.error(cloudConfig?.authStatus === 'expired' ? '登录状态已过期，请重新登录' : '请先登录云端服务器');
         return;
       }
 
@@ -100,8 +258,15 @@ export default function PublishDrawer({
         return;
       }
 
+      if (!selectedProjectId) {
+        message.error('请先选择云端项目');
+        return;
+      }
+
+      setCloudSubmitting(true);
       try {
         await onPublishToCloud({
+          projectId: selectedProjectId,
           message: versionMessage,
           entryFiles: normalizedFiles,
         });
@@ -109,6 +274,8 @@ export default function PublishDrawer({
         onClose();
       } catch (error) {
         message.error(error instanceof Error ? error.message : '发布失败');
+      } finally {
+        setCloudSubmitting(false);
       }
     } else {
       await onSubmit({
@@ -150,9 +317,33 @@ export default function PublishDrawer({
       <div className={`publish-dialog-layout ${pagePanelOpen ? 'with-page-panel' : ''}`}>
         <div className="publish-dialog-main">
           <div className="publish-dialog-section publish-dialog-mode-row">
-            <div className="publish-dialog-summary-text">
-              发布"{publishLabel}"到{publishMode === 'cloud' ? '云端' : '本地目录'}
-            </div>
+            <Select
+              value={publishMode}
+              onChange={(value) => setPublishMode(value)}
+              className="publish-dialog-mode-select"
+              size="large"
+              bordered={false}
+              disabled={!cloudConfig && publishMode === 'local'}
+              options={[
+                {
+                  value: 'cloud',
+                  label: (
+                    <span>
+                      <CloudUploadOutlined /> 发布到云端
+                    </span>
+                  ),
+                  disabled: !cloudConfig,
+                },
+                {
+                  value: 'local',
+                  label: (
+                    <span>
+                      <FolderAddOutlined /> 发布到本地
+                    </span>
+                  ),
+                },
+              ]}
+            />
             <Button
               type="default"
               ghost
@@ -164,43 +355,114 @@ export default function PublishDrawer({
             </Button>
           </div>
 
-          <div className="publish-dialog-section">
-            <Text strong className="publish-dialog-label">发布模式</Text>
-            <Radio.Group
-              value={publishMode}
-              onChange={(e) => setPublishMode(e.target.value)}
-              style={{ width: '100%', marginTop: 8 }}
-            >
-              <Radio.Button value="local" style={{ width: '50%', textAlign: 'center' }}>
-                <FolderAddOutlined /> 本地
-              </Radio.Button>
-              <Radio.Button
-                value="cloud"
-                style={{ width: '50%', textAlign: 'center' }}
-                disabled={!cloudConfig}
-              >
-                <CloudUploadOutlined /> 云端
-              </Radio.Button>
-            </Radio.Group>
-            {publishMode === 'cloud' && !cloudConfig?.isLoggedIn && (
-              <Text type="secondary" style={{ fontSize: 12, marginTop: 4, display: 'block' }}>
-                请先运行 prdkit cloud login 登录
-              </Text>
-            )}
-          </div>
-
           <div className="publish-dialog-content">
             {publishMode === 'cloud' ? (
-              <div className="publish-dialog-section">
-                <Text strong className="publish-dialog-label">版本说明</Text>
-                <Input.TextArea
-                  value={versionMessage}
-                  onChange={(e) => setVersionMessage(e.target.value)}
-                  placeholder="描述本次更新的内容（可选）"
-                  rows={3}
-                  style={{ marginTop: 8 }}
-                />
-              </div>
+              <>
+                {cloudConfig?.authStatus !== 'active' ? (
+                  <Result
+                    status="warning"
+                    title={cloudConfig?.authStatus === 'expired' ? '登录已过期' : '尚未登录'}
+                    subTitle={
+                      cloudConfig?.authStatus === 'expired'
+                        ? '您的登录状态已过期，请重新登录以继续使用云端发布功能'
+                        : '请先登录云端服务器以使用发布功能'
+                    }
+                    extra={
+                      <Button
+                        type="primary"
+                        icon={<LoginOutlined />}
+                        loading={loggingIn}
+                        onClick={() => void handleLogin()}
+                      >
+                        立即登录
+                      </Button>
+                    }
+                  />
+                ) : (
+                  <>
+                    <div className="publish-dialog-section">
+                      <Text strong className="publish-dialog-label">项目名称</Text>
+                      <div className="publish-dialog-cloud-target">
+                        <div className="publish-dialog-cloud-target-main">
+                          <div className="publish-dialog-cloud-target-name">
+                            {selectedProject?.name || cloudConfig?.projectName || '选择云端项目'}
+                          </div>
+                          <div className="publish-dialog-cloud-target-meta">
+                            {selectedProject?.slug || cloudConfig?.projectSlug || '通过右侧按钮选择或创建项目'}
+                          </div>
+                        </div>
+                        <Popover
+                          trigger="click"
+                          placement="bottomRight"
+                          open={projectPickerOpen}
+                          onOpenChange={setProjectPickerOpen}
+                          content={(
+                            <div className="publish-dialog-project-popover">
+                              <Input
+                                value={projectSearchValue}
+                                onChange={(event) => setProjectSearchValue(event.target.value)}
+                                prefix={<SearchOutlined />}
+                                placeholder="搜索项目..."
+                                allowClear
+                              />
+                              <div className="publish-dialog-project-list-shell">
+                                {cloudProjectLoading ? (
+                                  <div className="publish-dialog-project-loading"><Spin size="small" /></div>
+                                ) : (
+                                  <div className="publish-dialog-project-list">
+                                    {filteredProjects.map((project) => (
+                                      <div
+                                        key={project.id}
+                                        className={`publish-dialog-project-item ${selectedProjectId === project.id ? 'selected' : ''}`}
+                                        onClick={() => {
+                                          setSelectedProjectId(project.id);
+                                          setProjectPickerOpen(false);
+                                        }}
+                                      >
+                                        <FolderOpenOutlined className="publish-dialog-project-icon" />
+                                        <div className="publish-dialog-project-name">{project.name}</div>
+                                      </div>
+                                    ))}
+                                    {filteredProjects.length === 0 && (
+                                      <div className="publish-dialog-project-empty">未找到匹配的项目</div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="publish-dialog-project-create">
+                                <Input
+                                  value={newProjectName}
+                                  onChange={(event) => setNewProjectName(event.target.value)}
+                                  placeholder="输入新项目名称"
+                                  onPressEnter={() => {
+                                    void handleCreateProject();
+                                  }}
+                                />
+                                <Button icon={<PlusOutlined />} loading={creatingProject} onClick={() => void handleCreateProject()}>
+                                  新建
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        >
+                          <Button className="publish-dialog-cloud-picker-button" icon={<MoreOutlined />} />
+                        </Popover>
+                      </div>
+                    </div>
+
+                    <div className="publish-dialog-section">
+                      <Text strong className="publish-dialog-label">更新说明</Text>
+                      <Input.TextArea
+                        value={versionMessage}
+                        onChange={(e) => setVersionMessage(e.target.value)}
+                        placeholder="描述本次更新的内容（可选）"
+                        rows={5}
+                        className="publish-dialog-version-textarea"
+                      />
+                    </div>
+                  </>
+                )}
+              </>
             ) : (
               <div className="publish-dialog-section">
                 <Text strong className="publish-dialog-label">输出路径</Text>
@@ -244,12 +506,12 @@ export default function PublishDrawer({
               type="primary"
               size="large"
               block
-              loading={submitting}
+              loading={publishMode === 'cloud' ? cloudSubmitting : submitting}
               disabled={
                 loading ||
                 selectedCount === 0 ||
                 (publishMode === 'local' && !outputPath.trim()) ||
-                (publishMode === 'cloud' && !cloudConfig?.isLoggedIn)
+                (publishMode === 'cloud' && (cloudConfig?.authStatus !== 'active' || !selectedProjectId))
               }
               onClick={handleSubmit}
               className="publish-dialog-submit"
@@ -310,11 +572,6 @@ export default function PublishDrawer({
       </div>
     </Modal>
   );
-}
-
-function truncateProjectName(value: string): string {
-  if (value.length <= 18) return value;
-  return `${value.slice(0, 18)}...`;
 }
 
 function createTreeFromPaths(paths: string[]): TreeNode[] {

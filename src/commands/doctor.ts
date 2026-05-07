@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, writeFileSync, readdirSync, readFileSync, rename
 import { join, relative, basename, extname } from "node:path";
 import { confirm, input } from "@inquirer/prompts";
 import { COPY } from "#constants/command-text.js";
-import { loadConfig, saveConfig } from "#utils/config.js";
+import { loadConfig, resolveCloudHost, saveConfig } from "#utils/config.js";
 import { createDefaultConfig } from "#constants/defaults.js";
 import { ensureTemplateRepo } from "#utils/templates.js";
 import { logger } from "#utils/logger.js";
@@ -148,6 +148,13 @@ async function fixProjectStructure(
       }
 
       config = createDefaultConfig(projectName, author);
+      const cloudHost = resolveCloudHost(projectRoot);
+      if (cloudHost) {
+        config.cloud = {
+          ...(config.cloud ?? {}),
+          host: cloudHost,
+        };
+      }
 
       const configPath = join(projectRoot, ".prdkit", "config.json");
       writeFileSync(configPath, JSON.stringify(config, null, 2));
@@ -195,6 +202,14 @@ async function checkConfigNormalization(projectRoot: string): Promise<ConfigNorm
 
   if (!normalizedConfig) {
     return { needsUpdate: false };
+  }
+
+  const cloudHost = resolveCloudHost(projectRoot);
+  if (cloudHost && normalizedConfig.cloud?.host !== cloudHost) {
+    normalizedConfig.cloud = {
+      ...(normalizedConfig.cloud ?? {}),
+      host: cloudHost,
+    };
   }
 
   const needsUpdate = JSON.stringify(rawConfig) !== JSON.stringify(normalizedConfig);

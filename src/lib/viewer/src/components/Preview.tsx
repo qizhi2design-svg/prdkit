@@ -832,8 +832,8 @@ export default function Preview({
     const iframeRect = iframe.getBoundingClientRect();
     const canvasRect = canvas.getBoundingClientRect();
     const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-    const iframeViewportWidth = iframeDoc?.documentElement.clientWidth || iframe.clientWidth || viewportSize.width;
-    const iframeViewportHeight = iframeDoc?.documentElement.clientHeight || iframe.clientHeight || viewportSize.height;
+    const iframeViewportWidth = iframeDoc?.documentElement?.clientWidth || iframe.clientWidth || viewportSize.width;
+    const iframeViewportHeight = iframeDoc?.documentElement?.clientHeight || iframe.clientHeight || viewportSize.height;
     const scaleX = iframeViewportWidth > 0 ? iframeRect.width / iframeViewportWidth : 1;
     const scaleY = iframeViewportHeight > 0 ? iframeRect.height / iframeViewportHeight : 1;
 

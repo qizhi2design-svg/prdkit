@@ -140,6 +140,17 @@ export const COPY = {
 说明：
   输出 workspace/prototypes 下的所有原型入口页面路径。
 `,
+  prototypePublishDescription: "发布原型到本地目录或云端",
+  prototypePublishHelpAfter: `
+示例：
+  prdkit prototype publish
+  prdkit prototype publish --output ./dist/publish/demo
+  prdkit prototype publish --cloud --project demo-workspace
+
+说明：
+  默认导出标准只读数据协议目录，包含 manifest.json、marks.json 和 prototypes/。
+  使用 --cloud 时发布到云端项目；项目可通过 --project 指定，或先在本地 viewer 中选择。
+`,
   checkpointDescription: "checkpoint 存储、对比与恢复",
   checkpointCreateDescription: "为指定原型创建 checkpoint",
   checkpointCreateHelpAfter: `
@@ -283,15 +294,16 @@ export const COPY = {
   检查当前项目是否有正在运行的预览服务器。
   显示服务的端口、模式、启动时间等信息。
 `,
-  publishDescription: "导出 publish 协议产物目录",
+  publishDescription: "已废弃，请改用 prototype publish",
   publishHelpAfter: `
 示例：
-  prdkit publish
-  prdkit publish --output ./dist/publish/demo
+  prdkit prototype publish
+  prdkit prototype publish --output ./dist/publish/demo
+  prdkit prototype publish --cloud --project demo-workspace
 
 说明：
-  导出标准只读数据协议目录，包含 manifest.json、marks.json 和 prototypes/。
-  该产物供后续 viewer-publish 项目或公网静态服务消费，不包含只读 viewer 页面。
+  顶级 publish 命令已移除。
+  请改用 prdkit prototype publish 管理本地发布和云端发布。
 `,
   updateDescription: "检查并更新 prdkit 到最新版本",
   updateHelpAfter: `
@@ -309,7 +321,7 @@ export const COPY = {
 
 说明：
   显示项目名称、作者以及各类文档的统计信息。
-  包括 PRD 文档数量（按状态分类）、原型数量、讨论数量、Bug 报告数量和 Checkpoint 数量。
+  同时包含云端服务器地址、登录状态、默认项目和最近发布信息。
 `,
   markDescription: "标记相关命令",
   markListDescription: "列出指定原型下的所有标记",

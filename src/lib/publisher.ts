@@ -196,7 +196,7 @@ async function writePublishFiles(
 function buildReadme(projectRoot: string): string {
   return `# PRDKit Publish Artifact
 
-这是由 \`prdkit publish\` 生成的标准发布产物目录。
+这是由 \`prdkit prototype publish\` 生成的标准发布产物目录。
 
 ## 内容说明
 

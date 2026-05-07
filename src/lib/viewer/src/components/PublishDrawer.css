@@ -58,8 +58,8 @@
   border-top: 1px solid var(--color-border-light);
 }
 
-.publish-dialog-section + .publish-dialog-section {
-  margin-top: 22px;
+.publish-dialog-section+.publish-dialog-section {
+  margin-top: 16px;
 }
 
 .publish-dialog-mode-row {
@@ -124,6 +124,144 @@
   margin-bottom: 10px;
   font-size: 14px;
   color: var(--color-text-primary) !important;
+}
+
+.publish-dialog-cloud-target {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding-bottom: 14px;
+}
+
+.publish-dialog-cloud-target-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.publish-dialog-cloud-target-name {
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 400;
+  color: var(--color-text-dark);
+  word-break: break-word;
+}
+
+.publish-dialog-cloud-target-meta {
+  display: none;
+}
+
+.publish-dialog-cloud-picker-button.ant-btn {
+  border-radius: 10px;
+  border: none;
+  box-shadow: none;
+}
+
+.publish-dialog-cloud-picker-button.ant-btn .ant-wave {
+  display: none !important;
+}
+
+.publish-dialog-cloud-picker-button.ant-btn:hover,
+.publish-dialog-cloud-picker-button.ant-btn:focus {
+  border: none;
+  box-shadow: none;
+}
+
+.publish-dialog-project-popover {
+  width: 340px;
+}
+
+.publish-dialog-project-list-shell {
+  margin-top: 12px;
+  min-height: 240px;
+  max-height: 420px;
+  overflow: auto;
+  border: 1px solid var(--color-border-light);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.publish-dialog-project-list {
+  padding: 8px;
+}
+
+.publish-dialog-project-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-bottom: 4px;
+}
+
+.publish-dialog-project-item:hover {
+  background: #f0f7ff;
+}
+
+.publish-dialog-project-item.selected {
+  background: #e6f4ff;
+  border: 1px solid #1890ff;
+}
+
+.publish-dialog-project-icon {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.publish-dialog-project-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-text-dark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.publish-dialog-project-empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--color-text-tertiary);
+  font-size: 14px;
+}
+
+.publish-dialog-project-tree-shell {
+  margin-top: 12px;
+  min-height: 240px;
+  max-height: 420px;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--color-border-light);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.publish-dialog-project-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+}
+
+.publish-dialog-project-create {
+  display: flex;
+  margin-top: 12px;
+}
+
+.publish-dialog-project-create .ant-input {
+  height: 40px;
+  border-radius: 8px 0 0 8px;
+  border-right: none;
+  /* border: 1px solid var(--color-border-light); */
+  font-size: 14px;
+}
+
+.publish-dialog-project-create .ant-btn {
+  height: 40px;
+  border-radius: 0px 8px 8px 0px;
+  font-size: 14px;
 }
 
 .publish-dialog-path-row {
@@ -261,4 +399,30 @@
   color: var(--color-text-tertiary);
   text-align: center;
   padding: 36px 0;
+}
+
+/* Select 下拉框样式 */
+.publish-dialog-mode-select {
+  width: auto;
+  min-width: 140px;
+}
+
+/* 登录提示区域 */
+.publish-dialog-auth-hint {
+  padding-top: 0;
+}
+
+.publish-dialog-auth-hint-text {
+  font-size: 12px;
+  display: block;
+}
+
+/* 项目名称输入框 */
+.publish-dialog-version-textarea {
+  margin-top: 4px;
+}
+
+/* 输出路径输入框 */
+.publish-dialog-path-input-wrapper {
+  margin-top: 8px;
 }

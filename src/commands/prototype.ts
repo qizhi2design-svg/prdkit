@@ -9,6 +9,7 @@ import { flattenPrototypes, scanPrototypes } from "#lib/server/scanner.js";
 import { logger } from "#utils/logger.js";
 import { ConfigError, FileSystemError, PrototypeError, ValidationError } from "#utils/errors.js";
 import { runCreateTemplate, type CreateTemplateOptions } from "#core/create-command.js";
+import { registerPrototypePublish } from "#commands/prototype-publish.js";
 import {
   diffCheckpoints,
   diffCurrentAgainstLatest
@@ -184,6 +185,8 @@ export function registerPrototype(program: Command): void {
       console.log(formatPrototypeList(prototypeList));
       console.log(chalk.dim(`\n共找到 ${prototypeList.length} 个原型`));
     });
+
+  registerPrototypePublish(prototype);
 
   // Checkpoint 子命令
   const checkpoint = prototype.command("checkpoint").description(COPY.checkpointDescription);

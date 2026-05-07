@@ -297,7 +297,7 @@ prdkit doctor --fix
 
 ### `prdkit info`
 
-显示项目统计信息。
+显示项目统计信息和云端登录状态。
 
 ```bash
 prdkit info
@@ -305,17 +305,41 @@ prdkit info
 
 ---
 
-### `prdkit publish <prototype>`
+### `prdkit auth login`
 
-导出原型为发布物。
+打开浏览器登录云端服务，登录地址默认来自环境变量 `PRDKIT_CLOUD_HOST`。
+
+```bash
+prdkit auth login
+```
+
+---
+
+### `prdkit auth logout`
+
+清除当前云端登录状态。
+
+```bash
+prdkit auth logout
+```
+
+---
+
+### `prdkit prototype publish`
+
+发布原型到本地目录或云端项目。
 
 **选项:**
 - `--output <dir>` - 输出目录
-- `--format <format>` - 导出格式 (zip, html)
+- `--cloud` - 发布到云端
+- `--project <idOrSlug>` - 指定云端项目
+- `--message <text>` - 云端发布说明
 
 **示例:**
 ```bash
-prdkit publish "登录页面" --format zip
+prdkit prototype publish
+prdkit prototype publish --output ./dist/publish/demo
+prdkit prototype publish --cloud --project demo-workspace
 ```
 
 ## ⚙️ 配置

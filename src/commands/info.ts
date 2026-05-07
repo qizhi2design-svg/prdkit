@@ -4,7 +4,9 @@ import path from "node:path";
 import chalk from "chalk";
 import matter from "gray-matter";
 import { COPY } from "#constants/command-text.js";
-import { loadConfig, resolveProjectRoot } from "#utils/config.js";
+import { createCloudClient } from "#lib/cloud/client.js";
+import type { CloudAuthStatus } from "#types/index.js";
+import { getAuthRecord, loadConfig, resolveCloudHost, resolveProjectRoot } from "#utils/config.js";
 import { flattenPrototypes, scanPrototypes } from "#lib/server/scanner.js";
 import { ConfigError } from "#utils/errors.js";
 
@@ -26,6 +28,15 @@ interface ProjectStats {
   prototypes: number;
   discussions: number;
   bugs: number;
+  cloud: {
+    host?: string;
+    authStatus: CloudAuthStatus | "unavailable";
+    userEmail?: string;
+    projectId?: string;
+    projectName?: string;
+    lastReleaseId?: string;
+    lastPublishedAt?: string;
+  };
 }
 
 function countFiles(dir: string): number {
@@ -93,7 +104,50 @@ export async function getProjectStats(projectRoot: string): Promise<ProjectStats
     prds,
     prototypes,
     discussions,
-    bugs
+    bugs,
+    cloud: await resolveCloudInfo(config),
+  };
+}
+
+async function resolveCloudInfo(statsConfig: NonNullable<Awaited<ReturnType<typeof loadConfig>>>): Promise<ProjectStats["cloud"]> {
+  const host = resolveCloudHost();
+  const base = {
+    host,
+    projectId: statsConfig.cloud?.projectId,
+    projectName: statsConfig.cloud?.projectName,
+    lastReleaseId: statsConfig.cloud?.lastReleaseId,
+    lastPublishedAt: statsConfig.cloud?.lastPublishedAt,
+  };
+
+  if (!host) {
+    return {
+      ...base,
+      authStatus: "unavailable",
+    };
+  }
+
+  const authRecord = await getAuthRecord(host);
+  if (!authRecord) {
+    return {
+      ...base,
+      authStatus: "loggedOut",
+    };
+  }
+
+  if (new Date(authRecord.expiresAt).getTime() <= Date.now()) {
+    return {
+      ...base,
+      authStatus: "expired",
+      userEmail: authRecord.user.email,
+    };
+  }
+
+  const client = await createCloudClient(host);
+  const user = await client.getCurrentUser().catch(() => authRecord.user);
+  return {
+    ...base,
+    authStatus: "active",
+    userEmail: user.email,
   };
 }
 
@@ -133,6 +187,15 @@ function displayStats(stats: ProjectStats): void {
   console.log(`${chalk.yellow('原型:')} ${stats.prototypes}`);
   console.log(`${chalk.yellow('讨论:')} ${stats.discussions}`);
   console.log(`${chalk.yellow('Bug 报告:')} ${stats.bugs}`);
+  console.log();
+
+  console.log(chalk.cyan.bold('云端状态'));
+  console.log(chalk.gray('─'.repeat(50)));
+  console.log(`${chalk.yellow('服务器地址:')} ${stats.cloud.host || "未配置"}`);
+  console.log(`${chalk.yellow('登录状态:')} ${stats.cloud.authStatus}`);
+  console.log(`${chalk.yellow('登录用户:')} ${stats.cloud.userEmail || "暂无"}`);
+  console.log(`${chalk.yellow('默认项目:')} ${stats.cloud.projectName || stats.cloud.projectId || "未选择"}`);
+  console.log(`${chalk.yellow('最近发布:')} ${stats.cloud.lastReleaseId || "暂无"}`);
   console.log();
 }
 
