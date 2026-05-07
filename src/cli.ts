@@ -12,9 +12,7 @@ import { registerPrd } from "#commands/prd.js";
 import { registerPrototype } from "#commands/prototype.js";
 import { registerServe } from "#commands/serve.js";
 import { registerUpdate } from "#commands/update.js";
-import { registerPublish } from "#commands/publish.js";
 import { registerInfo } from "#commands/info.js";
-import { registerCloud } from "#commands/cloud.js";
 import { registerAuth } from "#commands/auth.js";
 import { handleError } from "#utils/error-handler.js";
 import { UserCancelledError } from "#utils/errors.js";
@@ -52,9 +50,7 @@ registerInfo(program);
 registerDoctor(program);
 registerServe(program);
 registerUpdate(program);
-registerPublish(program);
 registerAuth(program);
-registerCloud(program);
 
 program.parseAsync(process.argv).catch((error: unknown) => {
   // 用户取消操作（Ctrl+C）
