@@ -10,17 +10,17 @@ export function useMarkPanel(initialWidth: number): MarkPanelReturn {
 
   const savedWidthRef = useRef(initialWidth);
 
-  // 处理折叠状态变化
   useEffect(() => {
-    if (collapsed) {
-      // 折叠时保存当前宽度，并设置为 40px
+    if (!collapsed && width > 40) {
       savedWidthRef.current = width;
-      setWidth(40);
-    } else {
-      // 展开时恢复之前的宽度
-      setWidth(savedWidthRef.current);
     }
-  }, [collapsed, width, setWidth]);
+  }, [collapsed, width]);
+
+  const restoreWidthIfNeeded = () => {
+    if (width <= 40) {
+      setWidth(savedWidthRef.current > 40 ? savedWidthRef.current : initialWidth);
+    }
+  };
 
   return {
     state: {
@@ -29,8 +29,16 @@ export function useMarkPanel(initialWidth: number): MarkPanelReturn {
       savedWidth: savedWidthRef.current,
     },
     actions: {
-      toggle: () => setCollapsed(!collapsed),
-      expand: () => setCollapsed(false),
+      toggle: () => {
+        if (collapsed) {
+          restoreWidthIfNeeded();
+        }
+        setCollapsed(!collapsed);
+      },
+      expand: () => {
+        restoreWidthIfNeeded();
+        setCollapsed(false);
+      },
       collapse: () => setCollapsed(true),
       setWidth,
     },

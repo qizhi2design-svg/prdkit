@@ -1,3 +1,4 @@
+import { DoubleRightOutlined } from '@ant-design/icons';
 import { App as AntdApp, Layout, message, ConfigProvider } from 'antd';
 import { useState, useEffect } from 'react';
 import FileTree from './components/FileTree';
@@ -495,7 +496,9 @@ function App() {
               className="app-content"
               style={{
                 pointerEvents: sider.isResizing || markPanelResize.isResizing ? 'none' : 'auto',
-                marginRight: viewMode === 'mark' ? markPanel.state.width : 0,
+                marginRight: viewMode === 'mark'
+                  ? (markPanel.state.collapsed ? 40 : markPanel.state.width)
+                  : 0,
                 transition: markPanelResize.isResizing ? 'none' : 'margin-right 0.2s',
               }}
             >
@@ -528,38 +531,56 @@ function App() {
               />
             </Content>
             {viewMode === 'mark' && (
-              <div ref={markPanelResize.panelRef} className="mark-panel-container" style={{ width: markPanel.state.width }}>
-                <div
-                  onMouseDown={markPanelResize.handleMouseDown}
-                  className={`app-resize-handle mark-panel-resize ${markPanelResize.isResizing ? 'resizing' : ''}`}
-                />
-                <MarkPanel
-                  marks={marks.effectiveMarks}
-                  selectedMarkId={marks.selectedMarkId}
-                  pendingMarkInfo={marks.pendingMarkInfo}
-                  relinkingMarkId={marks.relinkingMarkId}
-                  missingMarkIds={marks.missingMarkIds}
-                  viewerSkills={config?.viewerSkills || {
-                    pageCreateSkillCommand: DEFAULT_PAGE_CREATE_SKILL_COMMAND,
-                    inspectCopySkillCommand: DEFAULT_INSPECT_COPY_SKILL_COMMAND,
-                    markCreateSkillCommand: DEFAULT_MARK_CREATE_SKILL_COMMAND,
-                    markUpdateSkillCommand: DEFAULT_MARK_UPDATE_SKILL_COMMAND,
-                    copyTerminalGuide: DEFAULT_COPY_TERMINAL_GUIDE,
-                  }}
-                  onMarkSelect={marks.selectMark}
-                  onMarkCreate={marks.createMark}
-                  onMarkUpdate={marks.updateMark}
-                  onMarkDelete={marks.deleteMark}
-                  onMarkRelinkStart={marks.startRelink}
-                  onMarkRelinkCancel={marks.cancelRelink}
-                  onMarkCancel={marks.cancelMark}
-                  onRefresh={marks.loadMarks}
-                  collapsed={markPanel.state.collapsed}
-                  onCollapsedChange={(collapsed) => collapsed ? markPanel.actions.collapse() : markPanel.actions.expand()}
-                  projectName={config?.projectName || 'PRDKit'}
-                  filePath={fileNav.selectedFile}
-                  prototypesDir={config?.prototypesDir || ''}
-                />
+              <div
+                ref={markPanelResize.panelRef}
+                className={`mark-panel-container ${markPanel.state.collapsed ? 'collapsed' : ''}`}
+                style={{ width: markPanel.state.collapsed ? 40 : markPanel.state.width }}
+              >
+                {markPanel.state.collapsed ? (
+                  <button
+                    type="button"
+                    className="mark-panel-collapsed-trigger"
+                    aria-label="展开标记面板"
+                    onClick={markPanel.actions.expand}
+                  >
+                    <DoubleRightOutlined />
+                    <span>标记</span>
+                  </button>
+                ) : (
+                  <>
+                    <div
+                      onMouseDown={markPanelResize.handleMouseDown}
+                      className={`app-resize-handle mark-panel-resize ${markPanelResize.isResizing ? 'resizing' : ''}`}
+                    />
+                    <MarkPanel
+                      marks={marks.effectiveMarks}
+                      selectedMarkId={marks.selectedMarkId}
+                      pendingMarkInfo={marks.pendingMarkInfo}
+                      relinkingMarkId={marks.relinkingMarkId}
+                      missingMarkIds={marks.missingMarkIds}
+                      viewerSkills={config?.viewerSkills || {
+                        pageCreateSkillCommand: DEFAULT_PAGE_CREATE_SKILL_COMMAND,
+                        inspectCopySkillCommand: DEFAULT_INSPECT_COPY_SKILL_COMMAND,
+                        markCreateSkillCommand: DEFAULT_MARK_CREATE_SKILL_COMMAND,
+                        markUpdateSkillCommand: DEFAULT_MARK_UPDATE_SKILL_COMMAND,
+                        copyTerminalGuide: DEFAULT_COPY_TERMINAL_GUIDE,
+                      }}
+                      onMarkSelect={marks.selectMark}
+                      onMarkCreate={marks.createMark}
+                      onMarkUpdate={marks.updateMark}
+                      onMarkDelete={marks.deleteMark}
+                      onMarkRelinkStart={marks.startRelink}
+                      onMarkRelinkCancel={marks.cancelRelink}
+                      onMarkCancel={marks.cancelMark}
+                      onRefresh={marks.loadMarks}
+                      collapsed={false}
+                      onCollapsedChange={(collapsed) => collapsed ? markPanel.actions.collapse() : markPanel.actions.expand()}
+                      projectName={config?.projectName || 'PRDKit'}
+                      filePath={fileNav.selectedFile}
+                      prototypesDir={config?.prototypesDir || ''}
+                    />
+                  </>
+                )}
               </div>
             )}
           </Layout>

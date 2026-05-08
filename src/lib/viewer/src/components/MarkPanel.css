@@ -27,6 +27,10 @@
   transition: all 0.2s;
   padding: 20px 0;
   position: relative;
+  border: 0;
+  outline: none;
+  appearance: none;
+  font: inherit;
 }
 
 .mark-panel-collapsed-trigger::before {
