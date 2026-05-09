@@ -557,6 +557,13 @@ DOM 路径: ${domPath}`;
               <div style={{ flex: 1, minWidth: 0 }}>
                 <DomPathBreadcrumb domPath={selectedMark.domPath || selectedMark.selector} />
               </div>
+              <Button
+                type="text"
+                size="small"
+                icon={<NodeIndexOutlined />}
+                onClick={() => onMarkRelinkStart(selectedMark.id)}
+                title="修改绑定"
+              />
             </div>
           ) : null}
           {missingMarkIdSet.has(selectedMark.id) ? (

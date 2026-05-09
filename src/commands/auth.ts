@@ -113,11 +113,17 @@ export function registerAuth(program: Command): void {
         });
       });
 
-      logger.info(`请在浏览器中完成登录：${session.loginUrl}`);
+      // 使用 cloud.json 中配置的 host 构建登录地址，避免后端返回 0.0.0.0
+      const cloudUrl = new URL(host)
+      const loginUrl = new URL(session.loginUrl)
+      loginUrl.protocol = cloudUrl.protocol
+      loginUrl.host = cloudUrl.host
+
+      logger.info(`请在浏览器中完成登录：${loginUrl.toString()}`);
       logger.info(`登录完成后将自动回调到：${callbackUrl}`);
 
       try {
-        await open(session.loginUrl);
+        await open(loginUrl.toString());
       } catch {
         logger.warn("自动打开浏览器失败，请手动访问上面的地址完成登录");
       }
