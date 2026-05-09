@@ -1,13 +1,30 @@
 import { Command } from 'commander';
 import { spawn } from 'node:child_process';
 import path from 'path';
-import { loadConfig } from '#utils/config.js';
+import { ensureCloudConfig, loadConfig } from '#utils/config.js';
 import { startServer } from '#lib/server/index.js';
 import { logger } from '#utils/logger.js';
 import { ConfigError, ValidationError, ServerError } from '#utils/errors.js';
 import { COPY } from '#constants/command-text.js';
 import { findAvailablePort, findAvailablePortBlock, isPortAvailable } from '#utils/port.js';
-import { writeServerInfo, removeServerInfo, getServerStatus } from '#utils/pid.js';
+import { writeServerInfo, removeServerInfo, getServerStatus, isProcessRunning } from '#utils/pid.js';
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function waitForProcessExit(pid: number, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!isProcessRunning(pid)) {
+      return true;
+    }
+    await delay(150);
+  }
+  return !isProcessRunning(pid);
+}
 
 export function registerServe(program: Command) {
   const serve = program
@@ -30,6 +47,9 @@ export function registerServe(program: Command) {
       }
 
       const projectRoot = process.cwd();
+      await ensureCloudConfig(projectRoot, {
+        promptMessage: '输入默认云端服务器地址',
+      });
 
       // 检查是否已有服务在运行
       const status = await getServerStatus(projectRoot);
@@ -191,5 +211,52 @@ export function registerServe(program: Command) {
       console.log(`  模式:     ${info.mode === 'dev' ? '开发模式' : '生产模式'}`);
       console.log(`  运行时长: ${uptimeStr}`);
       console.log(`  访问地址: http://localhost:${info.port}`);
+    });
+
+  serve
+    .command('stop')
+    .description(COPY.serveStopDescription)
+    .addHelpText('after', COPY.serveStopHelpAfter)
+    .action(async () => {
+      const projectRoot = process.cwd();
+      const status = await getServerStatus(projectRoot);
+
+      if (!status.info) {
+        logger.info('当前项目没有运行中的服务');
+        return;
+      }
+
+      const { info } = status;
+      if (!status.running) {
+        logger.info('当前项目没有运行中的服务');
+        await removeServerInfo(projectRoot);
+        return;
+      }
+
+      logger.info(`正在停止服务 (PID: ${info.pid}, 端口: ${info.port})...`);
+
+      try {
+        process.kill(info.pid, 'SIGTERM');
+      } catch (error) {
+        if (!isProcessRunning(info.pid)) {
+          await removeServerInfo(projectRoot);
+          logger.success('服务已停止');
+          return;
+        }
+        throw error;
+      }
+
+      const exitedGracefully = await waitForProcessExit(info.pid, 3000);
+      if (!exitedGracefully) {
+        logger.warn('服务未在 3 秒内退出，正在强制结束进程...');
+        process.kill(info.pid, 'SIGKILL');
+        const exitedForcefully = await waitForProcessExit(info.pid, 2000);
+        if (!exitedForcefully) {
+          throw ServerError.startFailed(`停止服务失败，进程 ${info.pid} 仍在运行`);
+        }
+      }
+
+      await removeServerInfo(projectRoot);
+      logger.success('服务已停止');
     });
 }

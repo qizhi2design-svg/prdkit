@@ -294,6 +294,15 @@ export const COPY = {
   检查当前项目是否有正在运行的预览服务器。
   显示服务的端口、模式、启动时间等信息。
 `,
+  serveStopDescription: "停止当前项目的预览服务",
+  serveStopHelpAfter: `
+示例：
+  prdkit serve stop
+
+说明：
+  停止当前项目正在运行的预览服务器。
+  会优先尝试优雅退出，超时后再强制结束进程。
+`,
   publishDescription: "已废弃，请改用 prototype publish",
   publishHelpAfter: `
 示例：

@@ -2,7 +2,6 @@ import type {
   AuthHostRecord,
   AuthenticatedUser,
   CloudProjectSummary,
-  PrdkitConfig,
   ReleaseCommitPayload,
   ReleaseCommitResult,
   ReleasePreparePrototype,
@@ -332,8 +331,4 @@ export async function createCloudClient(host: string): Promise<CloudClient> {
     persistAuth: async (record) => setAuthRecord(normalizedHost, record),
     clearAuth: async () => clearAuthRecord(normalizedHost),
   });
-}
-
-export function resolveProjectId(config: Pick<PrdkitConfig, "cloud">, overrideProject?: string): string | undefined {
-  return overrideProject || config.cloud?.projectId;
 }

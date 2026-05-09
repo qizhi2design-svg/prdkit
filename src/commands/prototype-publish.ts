@@ -5,7 +5,7 @@ import { COPY } from "#constants/command-text.js";
 import { buildDefaultPublishOutputDir, publishArtifacts } from "#lib/publisher.js";
 import { publishToCloud } from "#lib/cloud/publisher.js";
 import { ConfigError } from "#utils/errors.js";
-import { loadConfig, resolveProjectRoot, saveConfig, updateProjectCloudConfig } from "#utils/config.js";
+import { ensureCloudConfig, loadCloudConfig, loadConfig, resolveProjectRoot, saveCloudConfig } from "#utils/config.js";
 import { logger } from "#utils/logger.js";
 
 export interface PrototypePublishOptions {
@@ -30,9 +30,13 @@ export async function runPrototypePublish(options: PrototypePublishOptions): Pro
   }
 
   if (options.cloud) {
+    const cloudConfig = await ensureCloudConfig(projectRoot, {
+      promptMessage: "输入默认云端服务器地址",
+    });
     const result = await publishToCloud({
       projectRoot,
       config,
+      cloudConfig,
       message: options.message,
       dryRun: options.dryRun,
       json: options.json,
@@ -55,12 +59,13 @@ export async function runPrototypePublish(options: PrototypePublishOptions): Pro
     logger.info(`未变化页面: ${result.unchangedCount} 个`);
     logger.info(`查看地址: ${result.releaseUrl}`);
 
-    const nextConfig = updateProjectCloudConfig(config, {
+    const nextConfig = {
+      ...(await loadCloudConfig(projectRoot) ?? cloudConfig),
       projectId: result.projectId,
       lastReleaseId: result.releaseId,
       lastPublishedAt: new Date().toISOString(),
-    });
-    await saveConfig(nextConfig, projectRoot);
+    };
+    await saveCloudConfig(nextConfig, projectRoot);
 
     if (options.open !== false) {
       await open(result.releaseUrl).catch(() => undefined);

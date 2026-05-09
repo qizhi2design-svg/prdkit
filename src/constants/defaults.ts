@@ -12,8 +12,7 @@ export function createDefaultConfig(
   description?: string,
   productPositioning?: string,
   teamSize?: string,
-  projectStage?: string,
-  cloudHost?: string
+  projectStage?: string
 ): PrdkitConfig {
   return {
     version: 1,
@@ -32,6 +31,5 @@ export function createDefaultConfig(
       "prototype-admin": "workspace/prototypes"
     },
     viewerSkills: DEFAULT_VIEWER_SKILLS,
-    cloud: cloudHost ? { host: cloudHost } : undefined,
   };
 }

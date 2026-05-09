@@ -3,7 +3,7 @@ import os from "node:os";
 import open from "open";
 import { Command } from "commander";
 import { createCloudClient } from "#lib/cloud/client.js";
-import { requireCloudHost } from "#utils/config.js";
+import { ensureCloudConfig, requireCloudHost } from "#utils/config.js";
 import { logger } from "#utils/logger.js";
 import { findAvailablePort } from "#utils/port.js";
 
@@ -35,7 +35,10 @@ export function registerAuth(program: Command): void {
     .command("login")
     .description("使用浏览器登录云端服务器")
     .action(async () => {
-      const host = requireCloudHost();
+      await ensureCloudConfig(process.cwd(), {
+        promptMessage: "输入默认云端服务器地址",
+      });
+      const host = await requireCloudHost();
       const client = await createCloudClient(host);
       const port = await findAvailablePort(57530, 57630);
       const callbackUrl = `http://127.0.0.1:${port}${CALLBACK_PATH}`;
@@ -133,7 +136,10 @@ export function registerAuth(program: Command): void {
     .command("logout")
     .description("退出当前云端登录")
     .action(async () => {
-      const host = requireCloudHost();
+      await ensureCloudConfig(process.cwd(), {
+        promptMessage: "输入默认云端服务器地址",
+      });
+      const host = await requireCloudHost();
       const client = await createCloudClient(host);
       await client.logout();
       logger.success("已退出登录");

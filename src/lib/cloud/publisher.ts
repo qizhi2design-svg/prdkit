@@ -1,5 +1,6 @@
 import path from "node:path";
 import type {
+  PrdkitCloudConfig,
   PrdkitConfig,
   ReleaseCommitPayload,
   ReleaseCommitResult,
@@ -14,6 +15,7 @@ import { createCloudClient } from "./client.js";
 interface PublishToCloudOptions {
   projectRoot: string;
   config: PrdkitConfig;
+  cloudConfig: PrdkitCloudConfig;
   message?: string;
   entryFiles?: string[];
   dryRun?: boolean;
@@ -41,11 +43,11 @@ type SnapshotBundle = {
 };
 
 export async function publishToCloud(options: PublishToCloudOptions): Promise<PublishToCloudResult> {
-  const { projectRoot, config, message, entryFiles, dryRun, project } = options;
-  const host = requireCloudHost();
+  const { projectRoot, config, cloudConfig, message, entryFiles, dryRun, project } = options;
+  const host = await requireCloudHost();
   const client = await createCloudClient(host);
   await client.ensureValidAuth();
-  const projectId = await resolvePublishProjectId(client, config, project);
+  const projectId = await resolvePublishProjectId(client, cloudConfig, project);
 
   const prototypesDir = path.join(projectRoot, "workspace", "prototypes");
   const entries = resolveEntries(prototypesDir, entryFiles);
@@ -133,18 +135,18 @@ export async function publishToCloud(options: PublishToCloudOptions): Promise<Pu
 
 async function resolvePublishProjectId(
   client: Awaited<ReturnType<typeof createCloudClient>>,
-  config: PrdkitConfig,
+  cloudConfig: PrdkitCloudConfig,
   project?: string
 ): Promise<string> {
   if (!project?.trim()) {
-    if (!config.cloud?.projectId) {
+    if (!cloudConfig.projectId) {
       throw new Error("未选择云端项目，请使用 `prdkit prototype publish --cloud --project <idOrSlug>` 或通过本地 viewer 选择项目");
     }
-    return config.cloud.projectId;
+    return cloudConfig.projectId;
   }
 
   const identifier = project.trim();
-  if (config.cloud?.projectId === identifier) {
+  if (cloudConfig.projectId === identifier) {
     return identifier;
   }
 

@@ -6,13 +6,20 @@ export type ViewerSkillConfig = {
   copyTerminalGuide: string;
 };
 
-export type ProjectCloudConfig = {
-  host?: string;
+export type PrdkitCloudConfig = {
+  version: 1;
+  host: string;
   projectId?: string;
   projectSlug?: string;
   projectName?: string;
   lastReleaseId?: string;
   lastPublishedAt?: string;
+};
+
+export type PrdkitGlobalConfig = {
+  cloud?: {
+    defaultHost?: string;
+  };
 };
 
 export type AuthenticatedUser = {
@@ -45,7 +52,7 @@ export type CloudProjectSummary = {
   prototypeCount?: number;
 };
 
-export type ReleaseItemStatus = "changed" | "unchanged" | "failed";
+export type ReleaseItemStatus = "changed" | "unchanged" | "failed" | "removed";
 
 export type ReleasePreparePrototype = {
   path: string;
@@ -143,7 +150,6 @@ export type PrdkitConfig = {
   templateRepo: string;
   defaultCreateDirs?: Record<string, string>;
   viewerSkills?: ViewerSkillConfig;
-  cloud?: ProjectCloudConfig;
 };
 
 export type TemplateItem = {

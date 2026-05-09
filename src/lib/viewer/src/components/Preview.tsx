@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Empty, message, Segmented, Button } from 'antd';
 import './Preview.css';
-import { getElementInfo, getElementPath, formatMultipleElementsInfo, generateUniqueSelector, type ElementInfo } from '../utils/domUtils';
+import { getElementInfo, getElementPath, formatMultipleElementsInfo, generateUniqueSelector, findElementBySelector, type ElementInfo } from '../utils/domUtils';
 import { getModifierKey } from '../utils/platform';
 import { copySkillClipboardText } from '../utils/clipboard';
 import Hotkey from './Hotkey';
@@ -513,11 +513,7 @@ export default function Preview({
 
       const nextMissingMarkIds = marks
         .filter((mark) => {
-          try {
-            return !iframeDoc.querySelector(mark.selector);
-          } catch {
-            return true;
-          }
+          return !findElementBySelector(iframeDoc, mark.selector);
         })
         .map((mark) => mark.id);
 
@@ -1040,7 +1036,7 @@ export default function Preview({
               const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
               if (!iframeDoc) return null;
 
-              const element = iframeDoc.querySelector(pendingMarkInfo.selector);
+              const element = findElementBySelector(iframeDoc, pendingMarkInfo.selector);
               if (!element) return null;
 
               const overlayRect = getOverlayRect(element);
@@ -1080,7 +1076,7 @@ export default function Preview({
               const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
               if (!iframeDoc) return null;
 
-              const element = iframeDoc.querySelector(mark.selector);
+              const element = findElementBySelector(iframeDoc, mark.selector);
               if (!element) return null;
 
               const overlayRect = getOverlayRect(element);

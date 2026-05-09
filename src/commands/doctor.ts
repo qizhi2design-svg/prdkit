@@ -3,12 +3,12 @@ import { existsSync, mkdirSync, writeFileSync, readdirSync, readFileSync, rename
 import { join, relative, basename, extname } from "node:path";
 import { confirm, input } from "@inquirer/prompts";
 import { COPY } from "#constants/command-text.js";
-import { loadConfig, resolveCloudHost, saveConfig } from "#utils/config.js";
+import { DEFAULT_CLOUD_HOST, ensureCloudConfig, loadCloudConfig, loadConfig, readGlobalConfigSync, resolveCloudHost, saveCloudConfig, saveConfig } from "#utils/config.js";
 import { createDefaultConfig } from "#constants/defaults.js";
 import { ensureTemplateRepo } from "#utils/templates.js";
 import { logger } from "#utils/logger.js";
 import { ConfigError, FileSystemError } from "#utils/errors.js";
-import type { PrdkitConfig } from "#types/index.js";
+import type { PrdkitCloudConfig, PrdkitConfig } from "#types/index.js";
 
 type DoctorOptions = {
   fix?: boolean;
@@ -34,12 +34,18 @@ type ConfigNormalizationResult = {
   normalizedConfig?: PrdkitConfig;
 };
 
+type CloudConfigNormalizationResult = {
+  needsUpdate: boolean;
+  reason?: string;
+};
+
 async function checkProjectStructure(projectRoot: string): Promise<CheckResult[]> {
   const checks: CheckResult[] = [];
 
   // 检查 .prdkit 目录和配置文件
   const prdkitDir = join(projectRoot, ".prdkit");
   const configFile = join(prdkitDir, "config.json");
+  const cloudFile = join(prdkitDir, "cloud.json");
   const templatesDir = join(prdkitDir, "templates");
 
   checks.push({
@@ -52,6 +58,13 @@ async function checkProjectStructure(projectRoot: string): Promise<CheckResult[]
   checks.push({
     path: configFile,
     exists: existsSync(configFile),
+    type: "file",
+    required: true,
+  });
+
+  checks.push({
+    path: cloudFile,
+    exists: existsSync(cloudFile),
     type: "file",
     required: true,
   });
@@ -102,6 +115,7 @@ async function fixProjectStructure(
   logger.info(`开始修复 ${missingItems.length} 个缺失项...`);
 
   const configFileMissing = missingItems.some(item => item.path.endsWith("config.json"));
+  const cloudFileMissing = missingItems.some(item => item.path.endsWith("cloud.json"));
   const templatesDirMissing = missingItems.some(item => item.path.endsWith("templates"));
 
   // 先创建所有目录（除了 templates 目录，它需要从 git 克隆）
@@ -148,13 +162,6 @@ async function fixProjectStructure(
       }
 
       config = createDefaultConfig(projectName, author);
-      const cloudHost = resolveCloudHost(projectRoot);
-      if (cloudHost) {
-        config.cloud = {
-          ...(config.cloud ?? {}),
-          host: cloudHost,
-        };
-      }
 
       const configPath = join(projectRoot, ".prdkit", "config.json");
       writeFileSync(configPath, JSON.stringify(config, null, 2));
@@ -166,6 +173,15 @@ async function fixProjectStructure(
         error instanceof Error ? error : undefined
       );
     }
+  }
+
+  if (cloudFileMissing) {
+    await ensureCloudConfig(projectRoot, {
+      nonInteractive: autoFix,
+      promptMessage: "输入默认云端服务器地址",
+    });
+    const relativeCloudPath = relative(process.cwd(), join(projectRoot, ".prdkit", "cloud.json"));
+    logger.success(`创建云端配置: ${relativeCloudPath}`);
   }
 
   // 如果模板目录缺失，拉取模板仓库
@@ -204,14 +220,6 @@ async function checkConfigNormalization(projectRoot: string): Promise<ConfigNorm
     return { needsUpdate: false };
   }
 
-  const cloudHost = resolveCloudHost(projectRoot);
-  if (cloudHost && normalizedConfig.cloud?.host !== cloudHost) {
-    normalizedConfig.cloud = {
-      ...(normalizedConfig.cloud ?? {}),
-      host: cloudHost,
-    };
-  }
-
   const needsUpdate = JSON.stringify(rawConfig) !== JSON.stringify(normalizedConfig);
   return {
     needsUpdate,
@@ -219,10 +227,105 @@ async function checkConfigNormalization(projectRoot: string): Promise<ConfigNorm
   };
 }
 
+async function checkCloudConfigNormalization(projectRoot: string): Promise<CloudConfigNormalizationResult> {
+  const cloudFile = join(projectRoot, ".prdkit", "cloud.json");
+  if (!existsSync(cloudFile)) {
+    return { needsUpdate: false };
+  }
+
+  let rawConfig: unknown;
+  try {
+    rawConfig = JSON.parse(readFileSync(cloudFile, "utf8"));
+  } catch {
+    return {
+      needsUpdate: true,
+      reason: "cloud.json 不是合法的 JSON",
+    };
+  }
+
+  try {
+    const normalizedConfig = await loadCloudConfig(projectRoot);
+    if (!normalizedConfig) {
+      return {
+        needsUpdate: true,
+        reason: "cloud.json 缺少有效配置",
+      };
+    }
+
+    const needsUpdate = JSON.stringify(rawConfig) !== JSON.stringify(normalizedConfig);
+    return {
+      needsUpdate,
+      reason: needsUpdate ? "cloud.json 缺少标准字段或 host 未规范化" : undefined,
+    };
+  } catch (error) {
+    return {
+      needsUpdate: true,
+      reason: error instanceof Error ? error.message : "cloud.json 格式无效",
+    };
+  }
+}
+
 async function normalizeConfigFile(projectRoot: string, normalizedConfig: PrdkitConfig): Promise<void> {
   await saveConfig(normalizedConfig, projectRoot);
   const relativeConfigPath = relative(process.cwd(), join(projectRoot, ".prdkit", "config.json"));
   logger.success(`更新配置文件: ${relativeConfigPath}`);
+}
+
+function pickStringField(raw: Record<string, unknown>, key: keyof Omit<PrdkitCloudConfig, "version" | "host">): string | undefined {
+  const value = raw[key];
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+async function normalizeCloudConfigFile(projectRoot: string, autoFix: boolean): Promise<void> {
+  const cloudFile = join(projectRoot, ".prdkit", "cloud.json");
+  let rawConfig: Record<string, unknown> = {};
+
+  if (existsSync(cloudFile)) {
+    try {
+      const parsed = JSON.parse(readFileSync(cloudFile, "utf8"));
+      if (parsed && typeof parsed === "object") {
+        rawConfig = parsed as Record<string, unknown>;
+      }
+    } catch {
+      rawConfig = {};
+    }
+  }
+
+  const globalDefaultHost = readGlobalConfigSync().cloud?.defaultHost || DEFAULT_CLOUD_HOST;
+  const promptDefault = await resolveCloudHost(projectRoot, typeof rawConfig.host === "string" && rawConfig.host.trim()
+    ? rawConfig.host
+    : globalDefaultHost);
+
+  let host = promptDefault;
+  if (!autoFix) {
+    host = await resolveCloudHost(projectRoot, (await input({
+      message: "输入默认云端服务器地址",
+      default: promptDefault,
+      required: true,
+      validate: async (value) => {
+        try {
+          await resolveCloudHost(projectRoot, value);
+          return true;
+        } catch (error) {
+          return error instanceof Error ? error.message : "请输入有效的 http/https 地址";
+        }
+      },
+    })).trim());
+  }
+
+  const nextConfig: PrdkitCloudConfig = {
+    version: 1,
+    host,
+    ...(pickStringField(rawConfig, "projectId") ? { projectId: pickStringField(rawConfig, "projectId") } : {}),
+    ...(pickStringField(rawConfig, "projectSlug") ? { projectSlug: pickStringField(rawConfig, "projectSlug") } : {}),
+    ...(pickStringField(rawConfig, "projectName") ? { projectName: pickStringField(rawConfig, "projectName") } : {}),
+    ...(pickStringField(rawConfig, "lastReleaseId") ? { lastReleaseId: pickStringField(rawConfig, "lastReleaseId") } : {}),
+    ...(pickStringField(rawConfig, "lastPublishedAt") ? { lastPublishedAt: pickStringField(rawConfig, "lastPublishedAt") } : {}),
+  };
+
+  await saveCloudConfig(nextConfig, projectRoot);
+  const relativeCloudPath = relative(process.cwd(), cloudFile);
+  logger.success(`更新云端配置: ${relativeCloudPath}`);
 }
 
 /**
@@ -475,12 +578,20 @@ export function registerDoctor(program: Command): void {
 
       logger.info("正在检查配置文件...");
       const configNormalization = await checkConfigNormalization(projectRoot);
+      const cloudConfigNormalization = await checkCloudConfigNormalization(projectRoot);
 
       console.log("\n配置文件检查结果:");
       if (configNormalization.needsUpdate) {
         console.log("✗ 配置文件缺少标准字段，将补齐默认配置项\n");
       } else {
         console.log("✓ 配置文件格式完整\n");
+      }
+
+      console.log("云端配置检查结果:");
+      if (cloudConfigNormalization.needsUpdate) {
+        console.log(`✗ ${cloudConfigNormalization.reason || "cloud.json 需要规范化"}\n`);
+      } else {
+        console.log("✓ 云端配置格式完整\n");
       }
 
       // 检查 prototype marks 文件
@@ -505,13 +616,16 @@ export function registerDoctor(program: Command): void {
       }
 
       // 修复问题
-      if (missingItems.length > 0 || markIssues.length > 0 || configNormalization.needsUpdate) {
+      if (missingItems.length > 0 || markIssues.length > 0 || configNormalization.needsUpdate || cloudConfigNormalization.needsUpdate) {
         if (options.fix) {
           if (hasStructureIssues) {
             await fixProjectStructure(projectRoot, results, true);
           }
           if (configNormalization.needsUpdate && configNormalization.normalizedConfig) {
             await normalizeConfigFile(projectRoot, configNormalization.normalizedConfig);
+          }
+          if (cloudConfigNormalization.needsUpdate) {
+            await normalizeCloudConfigFile(projectRoot, true);
           }
           if (markIssues.length > 0) {
             await fixPrototypeMarks(markIssues, true);
@@ -528,6 +642,9 @@ export function registerDoctor(program: Command): void {
             }
             if (configNormalization.needsUpdate && configNormalization.normalizedConfig) {
               await normalizeConfigFile(projectRoot, configNormalization.normalizedConfig);
+            }
+            if (cloudConfigNormalization.needsUpdate) {
+              await normalizeCloudConfigFile(projectRoot, false);
             }
             if (markIssues.length > 0) {
               await fixPrototypeMarks(markIssues, false);

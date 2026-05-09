@@ -7,13 +7,151 @@ export interface ElementInfo {
   info: string;
 }
 
+function escapeCssIdentifier(value: string): string {
+  if (typeof globalThis.CSS !== 'undefined' && typeof globalThis.CSS.escape === 'function') {
+    return globalThis.CSS.escape(value);
+  }
+
+  return value.replace(/[^a-zA-Z0-9_-]/g, (char) => `\\${char}`);
+}
+
+function getClassTokens(className: string): string[] {
+  return className.split(/\s+/).filter(Boolean);
+}
+
+function getEscapedClassSelector(className: string): string {
+  return getClassTokens(className)
+    .map((token) => `.${escapeCssIdentifier(token)}`)
+    .join('');
+}
+
+function getRawClassSelector(className: string): string {
+  const tokens = getClassTokens(className);
+  return tokens.length > 0 ? `.${tokens.join('.')}` : '';
+}
+
+interface LegacySelectorSegment {
+  tagName: string | null;
+  id: string | null;
+  classBlob: string | null;
+  nthChild: number | null;
+}
+
+function parseLegacySelectorSegment(segment: string): LegacySelectorSegment | null {
+  const trimmed = segment.trim();
+  if (!trimmed) return null;
+
+  const nthChildMatch = trimmed.match(/:nth-child\((\d+)\)$/);
+  const nthChild = nthChildMatch ? Number.parseInt(nthChildMatch[1], 10) : null;
+  const segmentBody = nthChildMatch ? trimmed.slice(0, nthChildMatch.index) : trimmed;
+
+  if (segmentBody.startsWith('#')) {
+    return {
+      tagName: null,
+      id: segmentBody.slice(1),
+      classBlob: null,
+      nthChild,
+    };
+  }
+
+  const firstDotIndex = segmentBody.indexOf('.');
+  const tagName = (firstDotIndex === -1 ? segmentBody : segmentBody.slice(0, firstDotIndex)).trim().toLowerCase();
+  const classBlob = firstDotIndex === -1 ? null : segmentBody.slice(firstDotIndex + 1);
+
+  return {
+    tagName: tagName || null,
+    id: null,
+    classBlob: classBlob || null,
+    nthChild,
+  };
+}
+
+function matchesLegacySelectorSegment(element: Element, segment: LegacySelectorSegment): boolean {
+  if (segment.id && element.id !== segment.id) {
+    return false;
+  }
+
+  if (segment.tagName && element.tagName.toLowerCase() !== segment.tagName) {
+    return false;
+  }
+
+  if (segment.classBlob) {
+    const className = typeof (element as HTMLElement).className === 'string'
+      ? (element as HTMLElement).className
+      : (element.getAttribute('class') ?? '');
+    const normalizedClassBlob = getClassTokens(className).join('.');
+    if (normalizedClassBlob !== segment.classBlob) {
+      return false;
+    }
+  }
+
+  if (segment.nthChild !== null) {
+    const parent = element.parentElement;
+    if (!parent) {
+      return false;
+    }
+
+    const index = Array.from(parent.children).indexOf(element) + 1;
+    if (index !== segment.nthChild) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function getDescendants(root: Document | Element): Element[] {
+  if ('querySelectorAll' in root) {
+    return Array.from(root.querySelectorAll('*'));
+  }
+
+  return [];
+}
+
+function findElementByLegacySelector(root: Document | Element, selector: string): Element | null {
+  const segments = selector
+    .split(' > ')
+    .map(parseLegacySelectorSegment)
+    .filter((segment): segment is LegacySelectorSegment => segment !== null);
+
+  if (segments.length === 0) {
+    return null;
+  }
+
+  let currentMatches = getDescendants(root).filter((element) => matchesLegacySelectorSegment(element, segments[0]));
+  if (currentMatches.length === 0) {
+    return null;
+  }
+
+  for (let index = 1; index < segments.length; index += 1) {
+    const segment = segments[index];
+    currentMatches = currentMatches.flatMap((parent) =>
+      Array.from(parent.children).filter((child) => matchesLegacySelectorSegment(child, segment))
+    );
+
+    if (currentMatches.length === 0) {
+      return null;
+    }
+  }
+
+  return currentMatches[0] ?? null;
+}
+
+export function findElementBySelector(root: Document | Element, selector: string): Element | null {
+  try {
+    return root.querySelector(selector);
+  } catch {
+    return findElementByLegacySelector(root, selector);
+  }
+}
+
 /**
  * 生成唯一的 CSS 选择器
  */
 export function generateUniqueSelector(element: HTMLElement): string {
   // 如果有 id，直接使用 id
   if (element.id) {
-    return `#${element.id}`;
+    return `#${escapeCssIdentifier(element.id)}`;
   }
 
   // 构建选择器路径
@@ -25,17 +163,14 @@ export function generateUniqueSelector(element: HTMLElement): string {
 
     // 添加 id
     if (current.id) {
-      selector = `#${current.id}`;
+      selector = `#${escapeCssIdentifier(current.id)}`;
       path.unshift(selector);
       break; // id 是唯一的，可以停止
     }
 
     // 添加 class
     if (current.className && typeof current.className === 'string') {
-      const classes = current.className.split(' ').filter(Boolean);
-      if (classes.length > 0) {
-        selector += `.${classes.join('.')}`;
-      }
+      selector += getEscapedClassSelector(current.className);
     }
 
     // 添加 nth-child 以确保唯一性
@@ -62,8 +197,10 @@ export function getElementInfo(
   filePath: string | null
 ): string {
   const tagName = element.tagName.toLowerCase();
-  const id = element.id ? `#${element.id}` : '';
-  const classes = element.className ? `.${element.className.split(' ').join('.')}` : '';
+  const id = element.id ? `#${escapeCssIdentifier(element.id)}` : '';
+  const classes = typeof element.className === 'string'
+    ? getEscapedClassSelector(element.className)
+    : '';
   const selector = `${tagName}${id}${classes}`;
 
   // 获取属性
@@ -125,7 +262,7 @@ export function getElementPath(element: HTMLElement): string {
     const tagName = current.tagName.toLowerCase();
     const id = current.id ? `#${current.id}` : '';
     const classes = current.className && typeof current.className === 'string'
-      ? `.${current.className.split(' ').filter(Boolean).join('.')}`
+      ? getRawClassSelector(current.className)
       : '';
 
     path.unshift(`${tagName}${id}${classes}`);

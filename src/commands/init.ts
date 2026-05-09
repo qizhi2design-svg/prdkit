@@ -2,7 +2,7 @@ import { input } from "@inquirer/prompts";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { COPY } from "#constants/command-text.js";
-import { saveConfig } from "#utils/config.js";
+import { ensureCloudConfig, saveConfig } from "#utils/config.js";
 import { createDefaultConfig, DEFAULT_SCAFFOLD_REPO, DEFAULT_TEMPLATE_REPO } from "#constants/defaults.js";
 import { ensureSafeInitTarget } from "#utils/files.js";
 import { copyScaffoldInto, personalizeReadme } from "#utils/scaffold.js";
@@ -20,6 +20,7 @@ type InitOptions = {
   projectStage?: string;
   scaffoldRepo?: string;
   templateRepo?: string;
+  cloudHost?: string;
   branch?: string;
   nonInteractive?: boolean;
 };
@@ -49,6 +50,7 @@ export function registerInit(program: import("commander").Command): void {
     .option("-s, --project-stage <stage>", "项目阶段")
     .option("-r, --scaffold-repo <git-url>", "scaffold 仓库地址", DEFAULT_SCAFFOLD_REPO)
     .option("-T, --template-repo <git-url>", "template 仓库地址", DEFAULT_TEMPLATE_REPO)
+    .option("--cloud-host <url>", "云端服务器地址")
     .option("-b, --branch <branch>", "scaffold 仓库分支", "main")
     .option("--non-interactive", "禁用交互式输入")
     .addHelpText("after", `\n${COPY.initHelpAfter}`)
@@ -78,6 +80,11 @@ export function registerInit(program: import("commander").Command): void {
           options.projectStage
         );
         await saveConfig(config, targetPath);
+        await ensureCloudConfig(targetPath, {
+          hostOverride: options.cloudHost,
+          nonInteractive: options.nonInteractive,
+          promptMessage: "输入默认云端服务器地址",
+        });
 
         // 拉取模板仓库
         spinner.text = "拉取模板仓库";

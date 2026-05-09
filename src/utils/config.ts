@@ -1,4 +1,5 @@
-import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
+import { input } from "@inquirer/prompts";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -6,12 +7,15 @@ import { z } from "zod";
 import type {
   AuthHostRecord,
   AuthStore,
+  PrdkitCloudConfig,
   PrdkitConfig,
-  ProjectCloudConfig
+  PrdkitGlobalConfig,
 } from "#types/index.js";
 import { DEFAULT_PAGE_CREATE_SKILL_COMMAND, DEFAULT_INSPECT_COPY_SKILL_COMMAND, DEFAULT_VIEWER_SKILLS } from "#lib/shared/index.js";
 import { needsMigration, migrateCheckpointStorage } from "#lib/checkpoints/migration.js";
 import { logger } from "./logger.js";
+
+const DEFAULT_CLOUD_HOST = "http://localhost:3000";
 
 const viewerSkillsSchema = z.object({
   pageCreateSkillCommand: z.string().min(1).default(DEFAULT_VIEWER_SKILLS.pageCreateSkillCommand),
@@ -33,13 +37,21 @@ const configSchema = z.object({
   templateRepo: z.string().min(1),
   defaultCreateDirs: z.record(z.string(), z.string()).optional(),
   viewerSkills: viewerSkillsSchema.optional().default(DEFAULT_VIEWER_SKILLS),
+});
+
+const cloudConfigSchema = z.object({
+  version: z.literal(1).default(1),
+  host: z.string().min(1),
+  projectId: z.string().min(1).optional(),
+  projectSlug: z.string().min(1).optional(),
+  projectName: z.string().min(1).optional(),
+  lastReleaseId: z.string().min(1).optional(),
+  lastPublishedAt: z.string().min(1).optional(),
+});
+
+const globalConfigSchema = z.object({
   cloud: z.object({
-    host: z.string().min(1).optional(),
-    projectId: z.string().min(1).optional(),
-    projectSlug: z.string().min(1).optional(),
-    projectName: z.string().min(1).optional(),
-    lastReleaseId: z.string().min(1).optional(),
-    lastPublishedAt: z.string().min(1).optional(),
+    defaultHost: z.string().min(1).optional(),
   }).optional(),
 });
 
@@ -60,13 +72,16 @@ const authStoreSchema = z.object({
   hosts: z.record(z.string(), authHostRecordSchema).default({}),
 });
 
+type EnsureCloudConfigOptions = {
+  hostOverride?: string;
+  nonInteractive?: boolean;
+  prompt?: boolean;
+  promptMessage?: string;
+};
+
 function normalizeViewerSkills(config: PrdkitConfig, hasExplicitPageCreateSkillCommand: boolean): PrdkitConfig {
   const viewerSkills = config.viewerSkills ?? DEFAULT_VIEWER_SKILLS;
 
-  // 兼容旧配置：历史上 inspectCopySkillCommand 同时承担了“新建页面”和“编辑页面”的复制命令。
-  // 当旧项目仍保存为 /prdkit-page-create 且没有显式 pageCreateSkillCommand 时，自动迁移为：
-  // - 新建页面使用 create
-  // - 编辑模式使用 update
   if (
     viewerSkills.inspectCopySkillCommand === DEFAULT_PAGE_CREATE_SKILL_COMMAND &&
     !hasExplicitPageCreateSkillCommand
@@ -87,12 +102,75 @@ function normalizeViewerSkills(config: PrdkitConfig, hasExplicitPageCreateSkillC
   };
 }
 
+function normalizeUrlHost(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new Error("云端服务器地址不能为空");
+  }
+
+  const candidate = /^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(trimmed)
+    ? trimmed
+    : `http://${trimmed}`;
+
+  const parsed = new URL(candidate);
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new Error("云端服务器地址仅支持 http 或 https");
+  }
+  return normalizeHost(parsed.toString());
+}
+
+function isNonInteractiveEnv(): boolean {
+  return process.env.CI === "true" || process.env.CI === "1";
+}
+
+function normalizeLegacyCloudConfig(raw: unknown): Partial<PrdkitCloudConfig> | undefined {
+  if (!raw || typeof raw !== "object") {
+    return undefined;
+  }
+
+  const cloud = raw as Record<string, unknown>;
+  const hostValue = typeof cloud.host === "string" ? cloud.host.trim() : "";
+  const host = hostValue ? normalizeUrlHost(hostValue) : undefined;
+
+  return {
+    ...(host ? { host } : {}),
+    ...(typeof cloud.projectId === "string" && cloud.projectId.trim() ? { projectId: cloud.projectId.trim() } : {}),
+    ...(typeof cloud.projectSlug === "string" && cloud.projectSlug.trim() ? { projectSlug: cloud.projectSlug.trim() } : {}),
+    ...(typeof cloud.projectName === "string" && cloud.projectName.trim() ? { projectName: cloud.projectName.trim() } : {}),
+    ...(typeof cloud.lastReleaseId === "string" && cloud.lastReleaseId.trim() ? { lastReleaseId: cloud.lastReleaseId.trim() } : {}),
+    ...(typeof cloud.lastPublishedAt === "string" && cloud.lastPublishedAt.trim() ? { lastPublishedAt: cloud.lastPublishedAt.trim() } : {}),
+  };
+}
+
+async function readJsonFile<T>(file: string): Promise<T | undefined> {
+  if (!existsSync(file)) {
+    return undefined;
+  }
+  const raw = await readFile(file, "utf8");
+  return JSON.parse(raw) as T;
+}
+
+function readJsonFileSync<T>(file: string): T | undefined {
+  if (!existsSync(file)) {
+    return undefined;
+  }
+  return JSON.parse(readFileSync(file, "utf8")) as T;
+}
+
+function projectCloudConfigPath(projectRoot: string): string {
+  return path.join(prdkitDir(projectRoot), "cloud.json");
+}
+
 export function prdkitDir(cwd = process.cwd()): string {
   return path.join(cwd, ".prdkit");
 }
 
 export function configPath(cwd = process.cwd()): string {
   return path.join(prdkitDir(cwd), "config.json");
+}
+
+export function cloudConfigPath(cwd = process.cwd()): string {
+  return path.join(prdkitDir(cwd), "cloud.json");
 }
 
 function resolveProjectRootSync(cwd = process.cwd()): string | undefined {
@@ -115,6 +193,24 @@ export function authStorePath(): string {
   return path.join(authStoreDir(), "auth.json");
 }
 
+export function globalConfigPath(): string {
+  return path.join(authStoreDir(), "config.json");
+}
+
+export async function loadGlobalConfig(): Promise<PrdkitGlobalConfig> {
+  const raw = await readJsonFile<PrdkitGlobalConfig>(globalConfigPath());
+  if (!raw) {
+    return {};
+  }
+  return globalConfigSchema.parse(raw);
+}
+
+export async function saveGlobalConfig(config: PrdkitGlobalConfig): Promise<void> {
+  const file = globalConfigPath();
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+}
+
 export async function loadConfig(cwd = process.cwd()): Promise<PrdkitConfig | undefined> {
   const projectRoot = await resolveProjectRoot(cwd);
   if (!projectRoot) return undefined;
@@ -132,6 +228,157 @@ export async function saveConfig(config: PrdkitConfig, cwd = process.cwd()): Pro
   const file = configPath(cwd);
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+}
+
+async function readLegacyProjectCloudConfig(projectRoot: string): Promise<Partial<PrdkitCloudConfig> | undefined> {
+  const file = configPath(projectRoot);
+  const raw = await readJsonFile<{ cloud?: unknown }>(file);
+  return normalizeLegacyCloudConfig(raw?.cloud);
+}
+
+async function removeLegacyCloudFromProjectConfig(projectRoot: string): Promise<void> {
+  const config = await loadConfig(projectRoot);
+  if (config) {
+    await saveConfig(config, projectRoot);
+  }
+}
+
+async function migrateLegacyProjectCloudConfig(projectRoot: string): Promise<void> {
+  const file = projectCloudConfigPath(projectRoot);
+  if (existsSync(file)) {
+    return;
+  }
+
+  const legacyCloud = await readLegacyProjectCloudConfig(projectRoot);
+  if (!legacyCloud?.host) {
+    return;
+  }
+
+  const nextConfig = cloudConfigSchema.parse({
+    version: 1,
+    ...legacyCloud,
+  });
+  await saveCloudConfig(nextConfig, projectRoot);
+  await removeLegacyCloudFromProjectConfig(projectRoot);
+}
+
+export async function loadCloudConfig(cwd = process.cwd()): Promise<PrdkitCloudConfig | undefined> {
+  const projectRoot = await resolveProjectRoot(cwd);
+  if (!projectRoot) return undefined;
+  await migrateLegacyProjectCloudConfig(projectRoot);
+  const file = projectCloudConfigPath(projectRoot);
+  const raw = await readJsonFile<Partial<PrdkitCloudConfig>>(file);
+  if (!raw) {
+    return undefined;
+  }
+
+  const parsed = cloudConfigSchema.parse({
+    ...raw,
+    host: raw.host ? normalizeUrlHost(raw.host) : raw.host,
+  });
+  return parsed;
+}
+
+export async function saveCloudConfig(config: PrdkitCloudConfig, cwd = process.cwd()): Promise<void> {
+  const file = projectCloudConfigPath(cwd);
+  await mkdir(path.dirname(file), { recursive: true });
+  const normalized = cloudConfigSchema.parse({
+    ...config,
+    host: normalizeUrlHost(config.host),
+  });
+  await writeFile(file, `${JSON.stringify(normalized, null, 2)}\n`, "utf8");
+}
+
+export async function updateCloudConfig(
+  cwd: string,
+  patch: Partial<Omit<PrdkitCloudConfig, "version" | "host">> & { host?: string }
+): Promise<PrdkitCloudConfig> {
+  const current = await loadCloudConfig(cwd);
+  if (!current) {
+    throw new Error("未找到项目云端配置，请先初始化 cloud.json");
+  }
+
+  const nextConfig = cloudConfigSchema.parse({
+    ...current,
+    ...patch,
+    host: patch.host ? normalizeUrlHost(patch.host) : current.host,
+  });
+  await saveCloudConfig(nextConfig, cwd);
+  return nextConfig;
+}
+
+async function resolveConfiguredDefaultCloudHost(): Promise<string> {
+  const globalConfig = await loadGlobalConfig();
+  const configured = globalConfig.cloud?.defaultHost?.trim();
+  if (!configured) {
+    return DEFAULT_CLOUD_HOST;
+  }
+  return normalizeUrlHost(configured);
+}
+
+async function resolvePromptDefaultHost(cwd = process.cwd(), hostOverride?: string): Promise<string> {
+  if (hostOverride?.trim()) {
+    return normalizeUrlHost(hostOverride);
+  }
+
+  const currentCloud = await loadCloudConfig(cwd);
+  if (currentCloud?.host) {
+    return normalizeUrlHost(currentCloud.host);
+  }
+
+  return resolveConfiguredDefaultCloudHost();
+}
+
+export async function ensureCloudConfig(cwd = process.cwd(), options: EnsureCloudConfigOptions = {}): Promise<PrdkitCloudConfig> {
+  const projectRoot = await resolveProjectRoot(cwd) ?? path.resolve(cwd);
+  await migrateLegacyProjectCloudConfig(projectRoot);
+
+  const file = projectCloudConfigPath(projectRoot);
+  const existing = await loadCloudConfig(projectRoot);
+  const defaultHost = await resolvePromptDefaultHost(projectRoot, options.hostOverride);
+  const shouldPrompt = options.prompt !== false && !options.nonInteractive && !isNonInteractiveEnv();
+
+  if (!existing) {
+    let host = defaultHost;
+    if (shouldPrompt) {
+      host = normalizeUrlHost((await input({
+        message: options.promptMessage ?? "输入云端服务器地址",
+        default: defaultHost,
+        required: true,
+        validate: (value) => {
+          try {
+            normalizeUrlHost(value);
+            return true;
+          } catch (error) {
+            return error instanceof Error ? error.message : "请输入有效的 http/https 地址";
+          }
+        },
+      })).trim());
+    }
+
+    const nextConfig = cloudConfigSchema.parse({
+      version: 1,
+      host,
+    });
+    await saveCloudConfig(nextConfig, projectRoot);
+    return nextConfig;
+  }
+
+  const nextHost = options.hostOverride?.trim()
+    ? normalizeUrlHost(options.hostOverride)
+    : normalizeUrlHost(existing.host);
+
+  const nextConfig = cloudConfigSchema.parse({
+    ...existing,
+    host: nextHost,
+  });
+
+  if (!existsSync(file) || JSON.stringify(existing) !== JSON.stringify(nextConfig)) {
+    await saveCloudConfig(nextConfig, projectRoot);
+  }
+
+  await removeLegacyCloudFromProjectConfig(projectRoot);
+  return nextConfig;
 }
 
 export async function loadAuthStore(): Promise<AuthStore> {
@@ -177,62 +424,35 @@ export function normalizeHost(host: string): string {
   return host.trim().replace(/\/+$/, "");
 }
 
-function loadProjectCloudHostFromConfig(cwd = process.cwd()): string | undefined {
-  const projectRoot = resolveProjectRootSync(cwd);
-  if (!projectRoot) return undefined;
-
-  const file = configPath(projectRoot);
-  if (!existsSync(file)) return undefined;
-
-  try {
-    const raw = readFileSync(file, "utf8");
-    const parsed = JSON.parse(raw) as { cloud?: { host?: string } };
-    const host = parsed.cloud?.host?.trim();
-    return host ? normalizeHost(host) : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-export function resolveCloudHost(cwd = process.cwd()): string | undefined {
-  return loadProjectCloudHostFromConfig(cwd);
-}
-
-export function requireCloudHost(cwd = process.cwd()): string {
-  const host = resolveCloudHost(cwd);
-  if (!host) {
-    throw new Error("未配置云端服务器地址，请先在当前项目的 .prdkit/config.json 中设置 cloud.host");
-  }
-  return host;
-}
-
-export function updateProjectCloudConfig(
-  config: PrdkitConfig,
-  patch: Partial<ProjectCloudConfig> | undefined
-): PrdkitConfig {
-  if (!patch) {
-    return config;
+export async function resolveCloudHost(cwd = process.cwd(), overrideHost?: string): Promise<string> {
+  if (overrideHost?.trim()) {
+    return normalizeUrlHost(overrideHost);
   }
 
-  return {
-    ...config,
-    cloud: {
-      ...(config.cloud ?? {}),
-      ...patch,
-    },
-  };
+  const projectRoot = await resolveProjectRoot(cwd);
+  if (projectRoot) {
+    const cloudConfig = await loadCloudConfig(projectRoot);
+    if (cloudConfig?.host) {
+      return normalizeUrlHost(cloudConfig.host);
+    }
+  }
+
+  return resolveConfiguredDefaultCloudHost();
+}
+
+export async function requireCloudHost(cwd = process.cwd(), overrideHost?: string): Promise<string> {
+  return resolveCloudHost(cwd, overrideHost);
 }
 
 export async function resolveProjectRoot(cwd = process.cwd()): Promise<string | undefined> {
   let current = path.resolve(cwd);
   while (true) {
     if (existsSync(configPath(current))) {
-      // 自动检测并执行 checkpoint 迁移
       if (needsMigration(current)) {
         try {
           migrateCheckpointStorage(current);
           logger.info("Checkpoint 存储结构已自动升级");
-        } catch (error) {
+        } catch {
           logger.warn("Checkpoint 存储迁移失败，将继续使用旧格式");
         }
       }
@@ -243,3 +463,17 @@ export async function resolveProjectRoot(cwd = process.cwd()): Promise<string | 
     current = parent;
   }
 }
+
+export function resolveProjectRootLegacySync(cwd = process.cwd()): string | undefined {
+  return resolveProjectRootSync(cwd);
+}
+
+export function readGlobalConfigSync(): PrdkitGlobalConfig {
+  const raw = readJsonFileSync<PrdkitGlobalConfig>(globalConfigPath());
+  if (!raw) {
+    return {};
+  }
+  return globalConfigSchema.parse(raw);
+}
+
+export { DEFAULT_CLOUD_HOST };

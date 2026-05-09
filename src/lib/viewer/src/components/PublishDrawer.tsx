@@ -172,7 +172,13 @@ export default function PublishDrawer({
 
       const projects = normalizeCloudProjects(data.projects);
       setCloudProjects(projects);
-      setSelectedProjectId((current) => current || cloudConfig?.projectId || projects[0]?.id);
+      setSelectedProjectId((current) => {
+        const preferredId = current || cloudConfig?.projectId;
+        if (preferredId && projects.some((project) => project.id === preferredId)) {
+          return preferredId;
+        }
+        return projects[0]?.id;
+      });
     } catch (error) {
       console.error('读取云端项目失败:', error);
       message.error(error instanceof Error ? error.message : '读取云端项目失败');
@@ -260,6 +266,12 @@ export default function PublishDrawer({
 
       if (!selectedProjectId) {
         message.error('请先选择云端项目');
+        return;
+      }
+
+      if (!cloudProjects.some((project) => project.id === selectedProjectId)) {
+        message.error('当前云端项目不可用，请重新选择');
+        await loadCloudProjects();
         return;
       }
 

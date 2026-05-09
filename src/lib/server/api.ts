@@ -13,7 +13,7 @@ import { materializeCheckpointPreview } from '../checkpoints/prototype/preview.j
 import { restoreCheckpoint } from '../checkpoints/prototype/restore.js';
 import { DEFAULT_INSPECT_COPY_SKILL_COMMAND, DEFAULT_PAGE_CREATE_SKILL_COMMAND, DEFAULT_VIEWER_SKILLS } from '../shared/index.js';
 import { CloudApiError, createCloudClient } from '../cloud/client.js';
-import { getAuthRecord, loadConfig, requireCloudHost, resolveCloudHost, saveConfig, updateProjectCloudConfig } from '#utils/config.js';
+import { getAuthRecord, loadCloudConfig, loadConfig, requireCloudHost, resolveCloudHost, updateCloudConfig } from '#utils/config.js';
 import type { AuthHostRecord } from '#types/index.js';
 import type { PrdkitConfig } from '#types/index.js';
 
@@ -118,7 +118,15 @@ function isMissingPrototypeError(error: unknown): boolean {
 }
 
 function toProjectSlug(name: string): string {
-  return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  const normalized = name
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  return normalized || `project-${Date.now().toString(36)}`;
 }
 
 export function createApiRouter(prototypesDir: string): Router {
@@ -543,23 +551,35 @@ export function createApiRouter(prototypesDir: string): Router {
       config.prototypesDir = prototypesDir;
       config.viewerSkills = readViewerSkills(projectRoot, config as PrdkitConfig);
 
-      const host = resolveCloudHost();
-      if (host) {
+      const cloudConfig = await loadCloudConfig(projectRoot);
+      const host = await resolveCloudHost(projectRoot);
+      if (cloudConfig) {
         const authRecord = await getAuthRecord(host);
-        const authStatus = !authRecord
-          ? 'loggedOut'
-          : new Date(authRecord.expiresAt).getTime() > Date.now()
-            ? 'active'
-            : 'expired';
+        let authStatus: 'loggedOut' | 'expired' | 'active' = 'loggedOut';
+
+        if (authRecord) {
+          if (new Date(authRecord.expiresAt).getTime() > Date.now()) {
+            authStatus = 'active';
+          } else {
+            try {
+              const client = await createCloudClient(host);
+              await client.ensureValidAuth();
+              authStatus = 'active';
+            } catch (refreshError) {
+              console.warn('刷新云端登录状态失败，已标记为 expired:', refreshError);
+              authStatus = 'expired';
+            }
+          }
+        }
 
         config.cloud = {
           host,
-          projectId: (config as PrdkitConfig).cloud?.projectId,
-          projectName: (config as PrdkitConfig).cloud?.projectName,
-          projectSlug: (config as PrdkitConfig).cloud?.projectSlug,
+          projectId: cloudConfig.projectId,
+          projectName: cloudConfig.projectName,
+          projectSlug: cloudConfig.projectSlug,
           authStatus,
-          lastReleaseId: (config as PrdkitConfig).cloud?.lastReleaseId,
-          lastPublishedAt: (config as PrdkitConfig).cloud?.lastPublishedAt,
+          lastReleaseId: cloudConfig.lastReleaseId,
+          lastPublishedAt: cloudConfig.lastPublishedAt,
         };
       }
 
@@ -572,7 +592,7 @@ export function createApiRouter(prototypesDir: string): Router {
 
   const handleListCloudProjects = async (req: Request, res: Response) => {
     try {
-      const host = requireCloudHost();
+      const host = await requireCloudHost(projectRoot);
       const client = await createCloudClient(host);
       await client.ensureValidAuth();
       const projects = await client.listProjects();
@@ -597,7 +617,7 @@ export function createApiRouter(prototypesDir: string): Router {
         return res.status(400).json({ error: '缺少项目名称 name' });
       }
 
-      const host = requireCloudHost();
+      const host = await requireCloudHost(projectRoot);
       const client = await createCloudClient(host);
       await client.ensureValidAuth();
       const trimmedName = name.trim();
@@ -611,7 +631,12 @@ export function createApiRouter(prototypesDir: string): Router {
           throw error;
         }
 
-        const existingProject = await client.resolveProjectBySlug(toProjectSlug(trimmedName));
+        const fallbackSlug = toProjectSlug(trimmedName);
+        const projects = await client.listProjects();
+        const existingProject = projects.find((item) => item.name === trimmedName || item.slug === fallbackSlug);
+        if (!existingProject) {
+          throw error;
+        }
         project = existingProject;
         created = false;
       }
@@ -664,7 +689,7 @@ export function createApiRouter(prototypesDir: string): Router {
         return res.status(400).send(renderAuthCallbackHtml('登录失败', '缺少 callbackToken'));
       }
 
-      const host = requireCloudHost();
+      const host = await requireCloudHost(projectRoot);
       const client = await createCloudClient(host);
       const authRecord = await client.exchangeBrowserLogin(callbackToken);
 
@@ -690,7 +715,7 @@ export function createApiRouter(prototypesDir: string): Router {
 
   router.post('/auth/login', async (req: Request, res: Response) => {
     try {
-      const host = requireCloudHost();
+      const host = await requireCloudHost(projectRoot);
       const client = await createCloudClient(host);
       const viewerPort = req.get('host')?.split(':')[1] || '7790';
       const state = crypto.randomBytes(16).toString('hex');
@@ -1041,9 +1066,13 @@ export function createApiRouter(prototypesDir: string): Router {
       };
       const { publishToCloud } = await import('../cloud/publisher.js');
       const config = await loadConfig(projectRoot);
+      const cloudConfig = await loadCloudConfig(projectRoot);
 
       if (!config) {
         return res.status(400).json({ error: '未找到项目配置' });
+      }
+      if (!cloudConfig) {
+        return res.status(400).json({ error: '未找到云端配置' });
       }
 
       if (!projectId || typeof projectId !== 'string') {
@@ -1053,23 +1082,23 @@ export function createApiRouter(prototypesDir: string): Router {
       const result = await publishToCloud({
         projectRoot,
         config,
+        cloudConfig,
         message,
         entryFiles,
         project: projectId,
       });
 
-      const host = requireCloudHost();
+      const host = await requireCloudHost(projectRoot);
       const client = await createCloudClient(host);
       const projects = await client.listProjects().catch(() => []);
       const selectedProject = projects.find((item) => item.id === result.projectId);
-      const nextConfig = updateProjectCloudConfig(config, {
+      const nextConfig = await updateCloudConfig(projectRoot, {
         projectId: result.projectId,
         projectSlug: selectedProject?.slug,
         projectName: selectedProject?.name,
         lastReleaseId: result.releaseId,
         lastPublishedAt: new Date().toISOString(),
       });
-      await saveConfig(nextConfig, projectRoot);
 
       res.json({
         success: true,

@@ -6,7 +6,7 @@ import matter from "gray-matter";
 import { COPY } from "#constants/command-text.js";
 import { createCloudClient } from "#lib/cloud/client.js";
 import type { CloudAuthStatus } from "#types/index.js";
-import { getAuthRecord, loadConfig, resolveCloudHost, resolveProjectRoot } from "#utils/config.js";
+import { ensureCloudConfig, getAuthRecord, loadCloudConfig, loadConfig, resolveCloudHost, resolveProjectRoot } from "#utils/config.js";
 import { flattenPrototypes, scanPrototypes } from "#lib/server/scanner.js";
 import { ConfigError } from "#utils/errors.js";
 
@@ -105,26 +105,20 @@ export async function getProjectStats(projectRoot: string): Promise<ProjectStats
     prototypes,
     discussions,
     bugs,
-    cloud: await resolveCloudInfo(config),
+    cloud: await resolveCloudInfo(),
   };
 }
 
-async function resolveCloudInfo(statsConfig: NonNullable<Awaited<ReturnType<typeof loadConfig>>>): Promise<ProjectStats["cloud"]> {
-  const host = resolveCloudHost();
+async function resolveCloudInfo(): Promise<ProjectStats["cloud"]> {
+  const cloudConfig = await loadCloudConfig();
+  const host = await resolveCloudHost();
   const base = {
     host,
-    projectId: statsConfig.cloud?.projectId,
-    projectName: statsConfig.cloud?.projectName,
-    lastReleaseId: statsConfig.cloud?.lastReleaseId,
-    lastPublishedAt: statsConfig.cloud?.lastPublishedAt,
+    projectId: cloudConfig?.projectId,
+    projectName: cloudConfig?.projectName,
+    lastReleaseId: cloudConfig?.lastReleaseId,
+    lastPublishedAt: cloudConfig?.lastPublishedAt,
   };
-
-  if (!host) {
-    return {
-      ...base,
-      authStatus: "unavailable",
-    };
-  }
 
   const authRecord = await getAuthRecord(host);
   if (!authRecord) {
@@ -134,15 +128,19 @@ async function resolveCloudInfo(statsConfig: NonNullable<Awaited<ReturnType<type
     };
   }
 
+  const client = await createCloudClient(host);
   if (new Date(authRecord.expiresAt).getTime() <= Date.now()) {
-    return {
-      ...base,
-      authStatus: "expired",
-      userEmail: authRecord.user.email,
-    };
+    try {
+      await client.ensureValidAuth();
+    } catch {
+      return {
+        ...base,
+        authStatus: "expired",
+        userEmail: authRecord.user.email,
+      };
+    }
   }
 
-  const client = await createCloudClient(host);
   const user = await client.getCurrentUser().catch(() => authRecord.user);
   return {
     ...base,
@@ -189,13 +187,24 @@ function displayStats(stats: ProjectStats): void {
   console.log(`${chalk.yellow('Bug 报告:')} ${stats.bugs}`);
   console.log();
 
+  const authStatusText = {
+    active: '已登录',
+    loggedOut: '未登录',
+    expired: '已过期',
+    unavailable: '不可用',
+  }[stats.cloud.authStatus] || stats.cloud.authStatus;
+
+  const lastPublishText = stats.cloud.lastPublishedAt
+    ? new Date(stats.cloud.lastPublishedAt).toLocaleString('zh-CN')
+    : '暂无';
+
   console.log(chalk.cyan.bold('云端状态'));
   console.log(chalk.gray('─'.repeat(50)));
   console.log(`${chalk.yellow('服务器地址:')} ${stats.cloud.host || "未配置"}`);
-  console.log(`${chalk.yellow('登录状态:')} ${stats.cloud.authStatus}`);
+  console.log(`${chalk.yellow('登录状态:')} ${authStatusText}`);
   console.log(`${chalk.yellow('登录用户:')} ${stats.cloud.userEmail || "暂无"}`);
   console.log(`${chalk.yellow('默认项目:')} ${stats.cloud.projectName || stats.cloud.projectId || "未选择"}`);
-  console.log(`${chalk.yellow('最近发布:')} ${stats.cloud.lastReleaseId || "暂无"}`);
+  console.log(`${chalk.yellow('最近发布:')} ${lastPublishText}`);
   console.log();
 }
 
@@ -210,6 +219,9 @@ export function registerInfo(program: Command): void {
         throw ConfigError.projectNotInitialized();
       }
 
+      await ensureCloudConfig(projectRoot, {
+        promptMessage: "输入默认云端服务器地址",
+      });
       const stats = await getProjectStats(projectRoot);
 
       if (options.json) {
