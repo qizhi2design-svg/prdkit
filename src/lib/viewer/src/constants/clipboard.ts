@@ -5,4 +5,4 @@ export {
   DEFAULT_MARK_CREATE_SKILL_COMMAND,
   DEFAULT_MARK_UPDATE_SKILL_COMMAND,
   DEFAULT_VIEWER_SKILLS,
-} from '../../../shared/index.js';
+} from '../../../constants/index.js';

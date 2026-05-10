@@ -11,7 +11,7 @@ import type {
   PrdkitConfig,
   PrdkitGlobalConfig,
 } from "#types/index.js";
-import { DEFAULT_PAGE_CREATE_SKILL_COMMAND, DEFAULT_INSPECT_COPY_SKILL_COMMAND, DEFAULT_VIEWER_SKILLS } from "#lib/shared/index.js";
+import { DEFAULT_PAGE_CREATE_SKILL_COMMAND, DEFAULT_INSPECT_COPY_SKILL_COMMAND, DEFAULT_VIEWER_SKILLS } from "#lib/constants/index.js";
 import { needsMigration, migrateCheckpointStorage } from "#lib/checkpoints/migration.js";
 import { logger } from "./logger.js";
 

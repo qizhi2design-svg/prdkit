@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { buildDefaultPublishDirName, publishArtifacts } from "../src/lib/publisher.js";
+import { buildDefaultPublishDirName, publishArtifacts } from "../src/lib/server/publish.js";
 
 function writeJson(filePath: string, value: unknown) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });

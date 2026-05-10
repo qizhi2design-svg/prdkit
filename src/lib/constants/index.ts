@@ -4,6 +4,6 @@ export {
   DEFAULT_MARK_CREATE_SKILL_COMMAND,
   DEFAULT_MARK_UPDATE_SKILL_COMMAND,
   DEFAULT_VIEWER_SKILLS,
-} from './constants/skills.js';
+} from './skills.js';
 
-export { DEFAULT_COPY_TERMINAL_GUIDE } from './constants/messages.js';
+export { DEFAULT_COPY_TERMINAL_GUIDE } from './messages.js';

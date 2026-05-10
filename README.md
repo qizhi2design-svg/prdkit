@@ -14,7 +14,7 @@
   <a href="https://claude.ai"><img src="https://img.shields.io/badge/Claude-CLI-5A67D8.svg" alt="Claude CLI"></a>
 </p>
 
-一个专为产品经理设计的 CLI 工具套件,通过 **技能驱动**、**需求闭环**、**开源可用** 三大核心理念,帮助产品团队在 AI 时代实现高效的产品文档管理和原型协作。
+一个专为产品经理设计的 CLI 工具套件，通过 **技能驱动**、**需求闭环**、**开源可用** 三大核心理念，帮助产品团队在 AI 时代实现高效的产品文档管理和原型协作。
 
 [快速开始](#快速开始) · [功能特性](#功能特性) · [命令文档](#命令文档)
 
@@ -26,19 +26,19 @@
 
 ### 🎯 核心能力
 
-- **⚡ 技能驱动** - 通过命令行 Skill 交互,快速完成文档创建和原型管理
-- **🔄 需求闭环** - 从 PRD 编写到原型标注,形成完整的需求管理闭环
-- **🌐 开源可用** - 完全开源,支持自定义模板和工作流
+- **⚡ 技能驱动** — 通过 CLI 与 AI Skill 协同，快速完成文档创建、原型管理和需求评审
+- **🔄 需求闭环** — 从 PRD 编写、原型设计到标注与版本管理，形成完整的需求管理闭环
+- **🌐 开源可用** — 完全开源，支持自定义模板和工作流
 
 ### 🚀 五大功能模块
 
 | 功能 | 描述 |
 |------|------|
-| **Skills 智能生态** | 快速单元文档模型,通过预设模板加速文档创建 |
-| **动态看板** | 实时掌握需求变化,可视化管理项目进度 |
-| **智能标记** | 快速理解重点信息,支持原型标注和版本对比 |
-| **版本管理** | 版本有序回溯,Checkpoint 系统保障原型演进 |
-| **发布上线** | 一键到发布物,支持原型导出和归档 |
+| **PRD 文档管理** | 基于模板快速创建 PRD，支持方案预研、版本检查点和差异对比 |
+| **原型管理** | 创建 Web/Mobile/Admin 三类原型，支持标注、版本快照与恢复 |
+| **智能标注** | 在原型元素上创建标记，支持选择器定位和描述补充 |
+| **版本检查点** | 对 PRD 和原型创建版本快照，支持差异对比、恢复和历史预览 |
+| **发布上线** | 发布原型到本地目录或云端项目，支持版本管理和归档 |
 
 ## 📦 安装
 
@@ -46,6 +46,12 @@
 
 ```bash
 npm install -g @huangqz/prdkit-cli
+```
+
+或通过 pnpm：
+
+```bash
+pnpm add -g @huangqz/prdkit-cli
 ```
 
 ### 本地安装
@@ -79,7 +85,7 @@ prdkit init my-product
 prdkit init --name "我的产品" --author "张三" --non-interactive
 ```
 
-初始化后会创建标准化的项目结构:
+初始化后会创建标准化的项目结构：
 
 ```
 my-product/
@@ -105,13 +111,13 @@ my-product/
 
 ```bash
 # 创建 PRD 文档
-prdkit create "用户认证功能"
+prdkit prd create "用户认证功能"
 
-# 指定文档类型
-prdkit create "用户认证功能" --type prd
+# 从方案预研文档生成正式 PRD
+prdkit prd create --from-plan ./draft/方案预研.md
 
 # 指定输出目录
-prdkit create "用户认证功能" --output workspace/prds
+prdkit prd create "用户认证功能" --dir workspace/prds
 ```
 
 ### 3. 创建原型
@@ -121,10 +127,10 @@ prdkit create "用户认证功能" --output workspace/prds
 prdkit prototype create "登录页面"
 
 # 使用指定模板
-prdkit prototype create "登录页面" --template web
-
-# 创建移动端原型
 prdkit prototype create "个人中心" --template mobile
+
+# 创建后台原型
+prdkit prototype create "运营后台" --template admin
 ```
 
 ### 4. 启动预览服务器
@@ -134,45 +140,109 @@ prdkit prototype create "个人中心" --template mobile
 prdkit serve
 
 # 指定端口
-prdkit serve -p 8080
+prdkit serve start -p 8080
 
 # 开发模式(支持热更新)
-prdkit serve --dev
+prdkit serve start --dev
 ```
 
 ## 📖 命令文档
 
-### `prdkit init [directory]`
+### `prdkit init [target-dir]`
 
 初始化产品项目脚手架。
 
-**选项:**
-- `--name <name>` - 项目名称
-- `--author <author>` - 作者名称
-- `--non-interactive` - 非交互模式
-- `--scaffold-repo <url>` - 自定义 scaffold 仓库
-- `--template-repo <url>` - 自定义模板仓库
+**选项：**
+- `-n, --name <name>` — 项目名称
+- `-a, --author <author>` — 作者名称
+- `-d, --description <description>` — 项目描述
+- `-p, --product-positioning <positioning>` — 产品定位
+- `-t, --team-size <size>` — 团队规模
+- `-s, --project-stage <stage>` — 项目阶段
+- `--non-interactive` — 非交互模式
+- `-r, --scaffold-repo <url>` — 自定义 scaffold 仓库
+- `-T, --template-repo <url>` — 自定义模板仓库
+- `-b, --branch <branch>` — scaffold 仓库分支（默认 main）
+- `--cloud-host <url>` — 云服务器地址
 
-**示例:**
+**示例：**
 ```bash
 prdkit init my-product --name "我的产品" --author "张三"
+prdkit init --name "电商平台" --team-size medium --project-stage early
 ```
 
 ---
 
-### `prdkit create <title>`
+### `prdkit prd`
 
-从模板创建文档。
+PRD 文档管理命令组。
 
-**选项:**
-- `--type <type>` - 文档类型 (prd, prototype)
-- `--output <dir>` - 输出目录
-- `--template <name>` - 使用指定模板
+#### `prdkit prd create [title]`
 
-**示例:**
+创建 PRD 文档。
+
+**选项：**
+- `-o, --output <file-or-dir>` — 输出文件路径或目录
+- `-d, --dir <dir>` — 输出目录
+- `-n, --name <project-name>` — 项目名称
+- `-a, --author <author>` — 作者
+- `-D, --date <yyyy-mm-dd>` — 文档日期
+- `-f, --from-plan <file>` — 从方案预研文档生成正式 PRD
+- `--non-interactive` — 禁用交互输入
+
+**示例：**
 ```bash
-prdkit create "用户认证功能" --type prd
-prdkit create "登录页面" --type prototype
+prdkit prd create "用户认证功能"
+prdkit prd create "结算改版" --dir ./workspace/prds
+prdkit prd create --from-plan ./draft/支付流程优化-prd-plan.md
+```
+
+#### `prdkit prd list`
+
+列出当前项目中的所有 PRD。
+
+**选项：**
+- `-j, --json` — JSON 格式输出
+
+```bash
+prdkit prd list
+prdkit prd list --json
+```
+
+#### `prdkit prd check [target]`
+
+定位 PRD 并给出 AI 评审 Skill 的使用入口。
+
+**参数：**
+- `[target]` — PRD 标题、文件名或路径（默认选择最近修改的 PRD）
+
+**选项：**
+- `-j, --json` — JSON 格式输出
+
+**示例：**
+```bash
+prdkit prd check
+prdkit prd check "支付流程优化"
+```
+
+#### `prdkit prd checkpoint`
+
+管理 PRD 文档的版本检查点。
+
+| 子命令 | 描述 |
+|--------|------|
+| `create [target]` | 创建 PRD 检查点（支持 `-m, --message`） |
+| `list [target]` | 列出 PRD 检查点时间线 |
+| `show <checkpoint-id>` | 查看单个检查点详情 |
+| `diff <from-id> <to-id>` | 对比两个检查点的文本差异 |
+| `status [target]` | 查看当前 PRD 与最近检查点的差异状态 |
+| `restore <checkpoint-id>` | 恢复到指定检查点（支持 `-f, --force`） |
+
+**示例：**
+```bash
+prdkit prd checkpoint create "支付流程优化" -m "补充验收标准"
+prdkit prd checkpoint list
+prdkit prd checkpoint diff checkpoint-a checkpoint-b
 ```
 
 ---
@@ -181,170 +251,221 @@ prdkit create "登录页面" --type prototype
 
 原型管理命令组。
 
-#### `prdkit prototype create <title>`
+#### `prdkit prototype create [title]`
 
-创建新原型。
+创建原型文档。
 
-**选项:**
-- `--template <name>` - 原型模板 (web, mobile, admin)
-- `--output <dir>` - 输出目录
+**选项：**
+- `-t, --template <type>` — 原型模板类型：`web` | `mobile` | `admin`
+- `-o, --output <file-or-dir>` — 输出文件路径或目录
+- `-d, --dir <dir>` — 输出目录
+- `-n, --name <project-name>` — 项目名称
+- `-a, --author <author>` — 作者
+- `-D, --date <yyyy-mm-dd>` — 文档日期
+- `--non-interactive` — 禁用交互输入
 
-**示例:**
+**示例：**
 ```bash
-prdkit prototype create "登录页面" --template web
+prdkit prototype create "首页原型"
+prdkit prototype create "移动首页" --template mobile
+prdkit prototype create "运营后台" --template admin
 ```
 
 #### `prdkit prototype list`
 
-列出所有原型。
+列出当前项目中的所有原型。
+
+**选项：**
+- `-j, --json` — JSON 格式输出
 
 ```bash
 prdkit prototype list
 ```
 
----
+#### `prdkit prototype publish`
 
-### `prdkit mark`
+发布原型到本地目录或云端。
+
+**选项：**
+- `-o, --output <dir>` — 输出目录（默认自动生成到 `dist/publish`）
+- `-c, --cloud` — 发布到云端
+- `-p, --project <idOrSlug>` — 指定云端项目 ID 或 Slug
+- `-m, --message <text>` — 版本描述（云端发布）
+- `--dry-run` — 云端预检，不实际发布
+- `--no-open` — 发布后不自动打开结果页
+- `-j, --json` — JSON 格式输出
+
+**示例：**
+```bash
+prdkit prototype publish
+prdkit prototype publish --output ./dist/publish/demo
+prdkit prototype publish --cloud --project demo-workspace -m "v1.2 首页改版"
+```
+
+#### `prdkit prototype mark`
 
 原型标注管理。
 
-#### `prdkit mark create <prototype> <title>`
+| 子命令 | 描述 |
+|--------|------|
+| `create` | 创建标注（需 `--prototype`、`--title`，可选 `--desc`、`--selector`） |
+| `list` | 列出原型的所有标注 |
+| `get <mark-id>` | 查看指定标注详情 |
+| `edit <mark-id>` | 编辑标注标题或描述 |
+| `delete <mark-id>` | 删除标注 |
 
-为原型创建标注。
+**选项（通用）：**
+- `-p, --prototype <path>` — 原型路径（必需）
 
-**示例:**
+**示例：**
 ```bash
-prdkit mark create "登录页面" "按钮样式需要调整"
+prdkit prototype mark list --prototype dashboard
+prdkit prototype mark create --prototype login --title "密码框提示不清晰" --desc "建议补充错误态文案"
+prdkit prototype mark get mark-1777349007244 --prototype dashboard --json
+prdkit prototype mark delete mark-1777349007244 --prototype dashboard
 ```
 
-#### `prdkit mark list <prototype>`
+#### `prdkit prototype checkpoint`
 
-列出原型的所有标注。
+原型版本检查点管理。
 
+| 子命令 | 描述 |
+|--------|------|
+| `create <prototype-path>` | 创建检查点（支持 `-m, --message`） |
+| `list [prototype-path]` | 列出检查点时间线 |
+| `show <checkpoint-id>` | 查看单个检查点详情 |
+| `diff <from-id> <to-id>` | 对比两个检查点的结构化差异 |
+| `status [prototype-path]` | 查看工作区与最近检查点的差异状态 |
+| `restore <checkpoint-id>` | 恢复到指定检查点（支持 `-f, --force`） |
+| `preview <checkpoint-id>` | 生成检查点的可浏览预览目录（支持 `--open`） |
+| `prune [prototype-path]` | 清理超出保留上限的自动检查点 |
+| `session start` | 启动手动检查点 session（支持 `-n, --name`） |
+| `session status` | 查看当前 session 状态 |
+| `session end` | 结束当前 session |
+
+**示例：**
 ```bash
-prdkit mark list "登录页面"
-```
-
----
-
-### `prdkit checkpoint`
-
-版本管理命令组。
-
-#### `prdkit checkpoint create <prototype> <message>`
-
-为原型创建版本快照。
-
-**示例:**
-```bash
-prdkit checkpoint create "登录页面" "完成初版设计"
-```
-
-#### `prdkit checkpoint list <prototype>`
-
-列出原型的所有版本。
-
-```bash
-prdkit checkpoint list "登录页面"
-```
-
-#### `prdkit checkpoint restore <prototype> <checkpoint-id>`
-
-恢复到指定版本。
-
-```bash
-prdkit checkpoint restore "登录页面" checkpoint-001
+prdkit prototype checkpoint create dashboard -m "首页导航改版"
+prdkit prototype checkpoint list dashboard --json
+prdkit prototype checkpoint diff checkpoint-a checkpoint-b
+prdkit prototype checkpoint preview checkpoint-a --open
+prdkit prototype checkpoint prune
 ```
 
 ---
 
 ### `prdkit serve`
 
+原型预览服务器管理。
+
+| 子命令 | 描述 |
+|--------|------|
+| `start` （默认） | 启动预览服务器 |
+| `status` | 查看服务运行状态 |
+| `stop` | 停止预览服务 |
+
+#### `prdkit serve start`
+
 启动本地预览服务器。
 
-**选项:**
-- `-p, --port <port>` - 服务器端口 (默认: 自动查找 7788-7888 范围内的可用端口)
-- `--no-open` - 不自动打开浏览器
-- `--dev` - 开发模式(支持热更新)
+**选项：**
+- `-p, --port <port>` — 端口号（默认自动查找 7788-7888 范围内可用端口）
+- `--no-open` — 不自动打开浏览器
+- `--dev` — 开发模式（启用 Vite 热更新）
 
-**示例:**
+**示例：**
 ```bash
-# 使用默认端口
 prdkit serve
-
-# 指定端口
-prdkit serve -p 8080
-
-# 开发模式
-prdkit serve --dev
+prdkit serve start -p 8080 --dev
 ```
+
+#### `prdkit serve status`
+
+```bash
+prdkit serve status
+```
+
+显示 PID、端口、模式、运行时长等信息。
+
+#### `prdkit serve stop`
+
+```bash
+prdkit serve stop
+```
+
+优先优雅退出，超时 3 秒后强制结束进程。
 
 ---
 
 ### `prdkit doctor`
 
-诊断并修复项目结构问题。
+检查并修复项目问题。
 
-**选项:**
-- `--fix` - 自动修复发现的问题
+**选项：**
+- `-f, --fix` — 自动修复发现的问题
 
-**示例:**
+**示例：**
 ```bash
+prdkit doctor
 prdkit doctor --fix
 ```
+
+检查项目：目录结构完整性、配置标准化、标注文件命名规范与 frontmatter 一致性。
 
 ---
 
 ### `prdkit info`
 
-显示项目统计信息和云端登录状态。
+查看项目信息和内容统计。
+
+**选项：**
+- `-j, --json` — JSON 格式输出
 
 ```bash
 prdkit info
 ```
 
+显示：项目名称、作者、描述、产品定位、团队规模、PRD 统计（总数 + 按状态）、原型数、讨论数、Bug 数、云端登录状态。
+
 ---
 
-### `prdkit auth login`
+### `prdkit auth`
 
-打开浏览器登录云端服务，登录地址默认来自环境变量 `PRDKIT_CLOUD_HOST`。
+云端认证管理。
+
+#### `prdkit auth login`
 
 ```bash
 prdkit auth login
 ```
 
----
+通过浏览器登录云端服务，登录地址默认来自环境变量 `PRDKIT_CLOUD_HOST`。
 
-### `prdkit auth logout`
-
-清除当前云端登录状态。
+#### `prdkit auth logout`
 
 ```bash
 prdkit auth logout
 ```
 
+清除当前云端登录状态。
+
 ---
 
-### `prdkit prototype publish`
+### `prdkit update`
 
-发布原型到本地目录或云端项目。
+检查并更新 prdkit 到最新版本。
 
-**选项:**
-- `--output <dir>` - 输出目录
-- `--cloud` - 发布到云端
-- `--project <idOrSlug>` - 指定云端项目
-- `--message <text>` - 云端发布说明
-
-**示例:**
 ```bash
-prdkit prototype publish
-prdkit prototype publish --output ./dist/publish/demo
-prdkit prototype publish --cloud --project demo-workspace
+prdkit update
 ```
+
+检查 npm 上的最新版本，如果有更新则自动安装。
+
+---
 
 ## ⚙️ 配置
 
-项目配置文件位于 `.prdkit/config.json`:
+项目配置文件位于 `.prdkit/config.json`：
 
 ```json
 {
@@ -373,18 +494,18 @@ prdkit prototype publish --cloud --project demo-workspace
 
 ## 🎨 模板系统
 
-PRDKit 支持自定义模板,模板文件支持变量替换:
+PRDKit 支持自定义模板，模板文件支持变量替换：
 
 ### 可用变量
 
-- `{{title}}` - 文档标题
-- `{{projectName}}` - 项目名称
-- `{{author}}` - 作者
-- `{{date}}` - 文档日期
+- `{{title}}` — 文档标题
+- `{{projectName}}` — 项目名称
+- `{{author}}` — 作者
+- `{{date}}` — 文档日期
 
 ### 模板结构
 
-模板仓库的 `templates.json` 定义可用模板:
+模板仓库的 `templates.json` 定义可用模板：
 
 ```json
 {
@@ -402,7 +523,7 @@ PRDKit 支持自定义模板,模板文件支持变量替换:
 
 ## 🤝 贡献指南
 
-我们欢迎所有形式的贡献!
+我们欢迎所有形式的贡献！
 
 ### 贡献方式
 
@@ -421,24 +542,24 @@ PRDKit 支持自定义模板,模板文件支持变量替换:
 
 ### 报告问题
 
-如果发现 bug 或有功能建议,请[创建 Issue](https://github.com/your-org/prdkit/issues)。
+如果发现 bug 或有功能建议，请[创建 Issue](https://github.com/qizhi2design-svg/prdkit/issues)。
 
 ## 📄 许可证
 
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
+本项目采用 MIT 许可证 — 详见 [LICENSE](LICENSE) 文件。
 
 ## 🙏 致谢
 
 - 感谢所有贡献者的付出
 - 灵感来源于现代产品管理实践
-- 使用了优秀的开源项目: Commander.js, Inquirer, Vite, React
+- 使用了优秀的开源项目：Commander.js, Inquirer, Vite, React
 - 特别感谢 [@pmYangKun](https://github.com/pmYangKun) 的 [check-prd-skill](https://github.com/pmYangKun/check-prd-skill) 和 [create-prd-skill](https://github.com/pmYangKun/create-prd-skill) 项目提供的灵感和参考
 
 ---
 
 <div align="center">
 
-**PRDKit** - AI 时代产品工作新方式
+**PRDKit** — AI 时代产品工作新方式
 
 Made with ❤️ by [purity3](https://github.com/purity3)
 

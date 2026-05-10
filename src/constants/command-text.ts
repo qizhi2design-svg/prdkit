@@ -18,17 +18,6 @@ export const COPY = {
   在指定目录创建完整的项目结构，包含文档管理所需的目录和配置。
 `,
   createDescription: "创建文档（兼容命令）",
-  createHelpAfter: `
-示例：
-  prdkit create "支付流程优化" --template prd
-  prdkit create "首页原型" --template prototype --dir ./workspace/prototypes
-  prdkit create "工作台" --template prototype-admin --dir ./workspace/prototypes
-  prdkit create --template prd --non-interactive --name "My Product" --author "Alice" "结算改版"
-
-说明：
-  这是兼容保留命令。
-  推荐改用 prdkit prd create 或 prdkit prototype create。
-`,
   prdDescription: "PRD 文档相关命令",
   prdCreateDescription: "创建 PRD 文档",
   prdCheckDescription: "定位 PRD 并给出 review skill 使用入口",
@@ -303,17 +292,6 @@ export const COPY = {
   停止当前项目正在运行的预览服务器。
   会优先尝试优雅退出，超时后再强制结束进程。
 `,
-  publishDescription: "已废弃，请改用 prototype publish",
-  publishHelpAfter: `
-示例：
-  prdkit prototype publish
-  prdkit prototype publish --output ./dist/publish/demo
-  prdkit prototype publish --cloud --project demo-workspace
-
-说明：
-  顶级 publish 命令已移除。
-  请改用 prdkit prototype publish 管理本地发布和云端发布。
-`,
   updateDescription: "检查并更新 prdkit 到最新版本",
   updateHelpAfter: `
 示例：
@@ -323,15 +301,6 @@ export const COPY = {
   检查 npm 上的最新版本，如果有更新则自动安装。
 `,
   infoDescription: "查看项目信息和内容统计",
-  infoHelpAfter: `
-示例：
-  prdkit info
-  prdkit info --json
-
-说明：
-  显示项目名称、作者以及各类文档的统计信息。
-  同时包含云端服务器地址、登录状态、默认项目和最近发布信息。
-`,
   markDescription: "标记相关命令",
   markListDescription: "列出指定原型下的所有标记",
   markListHelpAfter: `
@@ -379,16 +348,5 @@ export const COPY = {
 说明：
   删除指定原型下对应 ID 的 mark 文件。
 `,
-  listMarksDescription: "列出原型下的所有标记或原型列表（兼容命令）",
-  listMarksHelpAfter: `
-示例：
-  prdkit list my-prototype      # 列出指定原型的标记
-  prdkit list --prototypes      # 列出所有原型
-
-说明：
-  这是兼容保留命令。
-  推荐改用 prdkit mark list 或 prdkit prototype list。
-`,
-  jsonOutputOption: "以 JSON 格式输出",
-  notInProjectError: "当前目录不在 prdkit 项目中"
+  jsonOutputOption: "以 JSON 格式输出"
 } as const;

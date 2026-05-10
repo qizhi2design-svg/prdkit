@@ -3,7 +3,7 @@ import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import path from 'path';
 import chalk from 'chalk';
-import { createApiRouter } from './api.js';
+import { createApiRouter } from './api/index.js';
 import { createWatcher, broadcastReload } from './watcher.js';
 import { checkpointStoreRoot } from '../checkpoints/prototype/store.js';
 
