@@ -5,7 +5,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import { DEFAULT_INSPECT_COPY_SKILL_COMMAND, DEFAULT_PAGE_CREATE_SKILL_COMMAND, DEFAULT_VIEWER_SKILLS } from "../src/lib/constants/index.js";
 import {
   clearAuthRecord,
-  CLOUD_HOST_ENV_VAR,
   getAuthRecord,
   loadConfig,
   resolveCloudHost,
@@ -15,19 +14,12 @@ import {
 } from "../src/utils/config.js";
 
 const originalHome = process.env.HOME;
-const originalCloudHost = process.env[CLOUD_HOST_ENV_VAR];
 
 afterEach(async () => {
   if (originalHome === undefined) {
     delete process.env.HOME;
   } else {
     process.env.HOME = originalHome;
-  }
-
-  if (originalCloudHost === undefined) {
-    delete process.env[CLOUD_HOST_ENV_VAR];
-  } else {
-    process.env[CLOUD_HOST_ENV_VAR] = originalCloudHost;
   }
 });
 
@@ -134,9 +126,8 @@ describe("config", () => {
     await rm(dir, { recursive: true, force: true });
   });
 
-  it("resolves cloud host from environment variable", () => {
-    process.env[CLOUD_HOST_ENV_VAR] = "https://cloud.example.com///";
-    expect(resolveCloudHost()).toBe("https://cloud.example.com");
+  it("resolves cloud host from override parameter", async () => {
+    expect(await resolveCloudHost(undefined, "https://cloud.example.com///")).toBe("https://cloud.example.com");
   });
 
   it("stores auth records by normalized host", async () => {

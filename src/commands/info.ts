@@ -105,13 +105,13 @@ export async function getProjectStats(projectRoot: string): Promise<ProjectStats
     prototypes,
     discussions,
     bugs,
-    cloud: await resolveCloudInfo(),
+    cloud: await resolveCloudInfo(projectRoot),
   };
 }
 
-async function resolveCloudInfo(): Promise<ProjectStats["cloud"]> {
-  const cloudConfig = await loadCloudConfig();
-  const host = await resolveCloudHost();
+async function resolveCloudInfo(cwd = process.cwd()): Promise<ProjectStats["cloud"]> {
+  const cloudConfig = await loadCloudConfig(cwd);
+  const host = await resolveCloudHost(cwd);
   const base = {
     host,
     projectId: cloudConfig?.projectId,

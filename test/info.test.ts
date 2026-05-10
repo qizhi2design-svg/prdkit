@@ -2,12 +2,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CLOUD_HOST_ENV_VAR, saveConfig, setAuthRecord } from "../src/utils/config.js";
+import { saveCloudConfig, saveConfig, setAuthRecord } from "../src/utils/config.js";
 import { getProjectStats } from "../src/commands/info.js";
 
 const tempDirs: string[] = [];
 const originalHome = process.env.HOME;
-const originalCloudHost = process.env[CLOUD_HOST_ENV_VAR];
 
 afterEach(() => {
   for (const dir of tempDirs.splice(0)) {
@@ -17,11 +16,6 @@ afterEach(() => {
     delete process.env.HOME;
   } else {
     process.env.HOME = originalHome;
-  }
-  if (originalCloudHost === undefined) {
-    delete process.env[CLOUD_HOST_ENV_VAR];
-  } else {
-    process.env[CLOUD_HOST_ENV_VAR] = originalCloudHost;
   }
   vi.unstubAllGlobals();
 });
@@ -50,17 +44,17 @@ describe("getProjectStats", () => {
       scaffoldRepo: "a",
       templateRepo: "b"
     }, projectRoot);
+    process.env.HOME = projectRoot;
     const stats = await getProjectStats(projectRoot);
     expect(stats.prototypes).toBe(2);
     expect("checkpoints" in stats).toBe(false);
-    expect(stats.cloud.authStatus).toBe("unavailable");
+    expect(stats.cloud.authStatus).toBe("loggedOut");
   });
 
   it("includes cloud login status and current user", async () => {
     const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "prdkit-info-cloud-"));
     tempDirs.push(projectRoot);
     process.env.HOME = projectRoot;
-    process.env[CLOUD_HOST_ENV_VAR] = "https://cloud.example.com";
 
     fs.mkdirSync(path.join(projectRoot, "workspace", "prototypes", "demo"), { recursive: true });
     fs.writeFileSync(path.join(projectRoot, "workspace", "prototypes", "demo", "index.html"), "<html></html>", "utf8");
@@ -76,6 +70,8 @@ describe("getProjectStats", () => {
         projectName: "云端项目",
       },
     }, projectRoot);
+
+    await saveCloudConfig({ version: 1, host: "https://cloud.example.com", projectId: "p-1", projectName: "云端项目" }, projectRoot);
 
     await setAuthRecord("https://cloud.example.com", {
       accessToken: "access-token",
