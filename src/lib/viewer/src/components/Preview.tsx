@@ -78,10 +78,16 @@ export default function Preview({
   const prototypesDirRef = useRef(prototypesDir);
   const selectionModeRef = useRef<'single' | 'multiple'>('single');
   const viewerSkillsRef = useRef(viewerSkills);
+  const selectedMarkIdRef = useRef(selectedMarkId);
+  const pendingMarkInfoRef = useRef(pendingMarkInfo);
+  const onMarkCancelRef = useRef(onMarkCancel);
+  const onToggleMarkPanelRef = useRef(onToggleMarkPanel);
+  const filePathRef = useRef(filePath);
 
   const [hoveredElement, setHoveredElement] = useState<HTMLElement | null>(null);
   const [selectionMode, setSelectionMode] = useState<'single' | 'multiple'>('single');
   const [selectedElements, setSelectedElements] = useState<SelectedElement[]>([]);
+  const selectedElementsRef = useRef(selectedElements);
   const [marksVisible, setMarksVisible] = useState(true); // 标记是否可见
   const [previewViewport] = useState<PreviewViewport>('desktop');
   const [zoomPercent] = useState(100);
@@ -107,11 +113,17 @@ export default function Preview({
     onMarkPrepareRef.current = onMarkPrepare;
     onMarkRelinkRef.current = onMarkRelink;
     onMarkSelectRef.current = onMarkSelect;
+    onMarkCancelRef.current = onMarkCancel;
+    onToggleMarkPanelRef.current = onToggleMarkPanel;
     previewReadonlyRef.current = previewReadonly;
     projectNameRef.current = projectName;
     prototypesDirRef.current = prototypesDir;
     selectionModeRef.current = selectionMode;
     viewerSkillsRef.current = viewerSkills;
+    selectedMarkIdRef.current = selectedMarkId;
+    pendingMarkInfoRef.current = pendingMarkInfo;
+    selectedElementsRef.current = selectedElements;
+    filePathRef.current = filePath;
   });
 
   const marksVisibleInCurrentMode = viewMode === 'mark' ? marksVisible : false;
@@ -542,7 +554,7 @@ export default function Preview({
     setHoveredElement(null);
   }, [filePath]);
 
-  // 编辑模式键盘快捷键监听
+  // 编辑模式键盘快捷键监听（通过 ref 读取数据，仅 viewMode 变化时重建）
   useEffect(() => {
     if (viewMode !== 'inspect') return;
 
@@ -568,26 +580,25 @@ export default function Preview({
 
         // Ctrl/Cmd+C: 复制选中的元素
         if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
-          // 只在多选模式且有选中元素时触发
-          if (selectionMode === 'multiple' && selectedElements.length > 0) {
+          if (selectionModeRef.current === 'multiple' && selectedElementsRef.current.length > 0) {
             e.preventDefault();
 
             const combinedInfo = formatMultipleElementsInfo(
-              selectedElements,
-              projectName,
-              prototypesDir,
-              filePath
+              selectedElementsRef.current,
+              projectNameRef.current,
+              prototypesDirRef.current,
+              filePathRef.current
             );
 
             try {
               await copySkillClipboardText(
                 {
-                  skillCommand: viewerSkills.inspectCopySkillCommand,
+                  skillCommand: viewerSkillsRef.current.inspectCopySkillCommand,
                   payload: combinedInfo,
                 },
                 {
-                  successPrefix: `已复制 ${selectedElements.length} 个元素的 skill 指令`,
-                  terminalGuide: viewerSkills.copyTerminalGuide,
+                  successPrefix: `已复制 ${selectedElementsRef.current.length} 个元素的 skill 指令`,
+                  terminalGuide: viewerSkillsRef.current.copyTerminalGuide,
                 }
               );
             } catch (error) {
@@ -599,7 +610,7 @@ export default function Preview({
 
         // ESC: 清空选择
         if (e.key === 'Escape') {
-          if (selectedElements.length > 0) {
+          if (selectedElementsRef.current.length > 0) {
             e.preventDefault();
             setSelectedElements([]);
             message.info('已清空选择');
@@ -609,27 +620,23 @@ export default function Preview({
         // Shift+Tab: 切换单选/多选模式
         if (e.shiftKey && e.key === 'Tab') {
           e.preventDefault();
-          const newMode = selectionMode === 'single' ? 'multiple' : 'single';
+          const newMode = selectionModeRef.current === 'single' ? 'multiple' : 'single';
           setSelectionMode(newMode);
         }
-
       };
 
       window.addEventListener('keydown', handleKeyDown, true);
       iframeWindow.addEventListener('keydown', handleKeyDown, true);
-      iframeDoc.addEventListener('keydown', handleKeyDown, true);
 
       currentCleanup = () => {
         window.removeEventListener('keydown', handleKeyDown, true);
         iframeWindow.removeEventListener('keydown', handleKeyDown, true);
-        iframeDoc.removeEventListener('keydown', handleKeyDown, true);
       };
     };
 
-    // 立即尝试设置
     setupKeyboardListeners();
 
-    // 监听 iframe load 事件
+    // 监听 iframe load 事件，重新加载后自动重注册
     iframe.addEventListener('load', setupKeyboardListeners);
 
     return () => {
@@ -638,110 +645,111 @@ export default function Preview({
         currentCleanup();
       }
     };
-  }, [viewMode, selectionMode, selectedElements, prototypesDir, filePath, projectName, viewerSkills]);
+  }, [viewMode]);
 
-  // 标记模式键盘快捷键监听
+  // 标记模式键盘快捷键监听（通过 ref 读取数据，仅 viewMode 变化时重建）
   useEffect(() => {
     if (viewMode !== 'mark') return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const isInputFocused = isEditableTarget(e.target);
-
-      // X 键: 切换标记显示/隐藏
-      if (isToggleMarksKey(e)) {
-        if (!isInputFocused) {
-          e.preventDefault();
-          setMarksVisible(prev => !prev);
-        }
-      }
-
-      // 上箭头: 选择上一个标记（不在输入框中时）
-      if (e.key === 'ArrowUp' && !isInputFocused) {
-        e.preventDefault();
-        if (marks.length === 0) return;
-
-        const currentIndex = selectedMarkId
-          ? marks.findIndex(m => m.id === selectedMarkId)
-          : -1;
-
-        const prevIndex = currentIndex <= 0 ? marks.length - 1 : currentIndex - 1;
-        onMarkSelect(marks[prevIndex].id);
-      }
-
-      // 下箭头: 选择下一个标记（不在输入框中时）
-      if (e.key === 'ArrowDown' && !isInputFocused) {
-        e.preventDefault();
-        if (marks.length === 0) return;
-
-        const currentIndex = selectedMarkId
-          ? marks.findIndex(m => m.id === selectedMarkId)
-          : -1;
-
-        const nextIndex = currentIndex >= marks.length - 1 ? 0 : currentIndex + 1;
-        onMarkSelect(marks[nextIndex].id);
-      }
-
-      // ESC: 退出详情/新增，返回列表（任何时候都可以）
-      if (e.key === 'Escape') {
-        if (pendingMarkInfo) {
-          // 如果在创建视图，取消创建
-          e.preventDefault();
-          onMarkCancel();
-        } else if (selectedMarkId) {
-          // 如果在详情视图，返回列表
-          e.preventDefault();
-          onMarkSelect('');
-        }
-      }
-
-      // H 键: 返回列表并折叠面板
-      if (e.key === 'h' || e.key === 'H') {
-        if (!isInputFocused) {
-          e.preventDefault();
-          // 如果有选中的标记或待创建的标记，先返回列表
-          if (pendingMarkInfo) {
-            onMarkCancel();
-          } else if (selectedMarkId) {
-            onMarkSelect('');
-          }
-          // 折叠面板
-          onToggleMarkPanel?.();
-        }
-      }
-    };
-
     const iframe = iframeRef.current;
+    if (!iframe) return;
 
-    // 在 window 级别监听
-    window.addEventListener('keydown', handleKeyDown, true);
+    let currentCleanup: (() => void) | null = null;
 
-    // 同时在 iframe 中监听
-    const setupIframeListener = () => {
-      const iframeDoc = iframe?.contentDocument || iframe?.contentWindow?.document;
-      const iframeWindow = iframe?.contentWindow;
-      if (iframeDoc && iframeWindow) {
-        iframeWindow.addEventListener('keydown', handleKeyDown, true);
-        iframeDoc.addEventListener('keydown', handleKeyDown, true);
+    const setup = () => {
+      if (currentCleanup) {
+        currentCleanup();
+        currentCleanup = null;
       }
+
+      const iframeWin = iframe.contentWindow;
+      if (!iframeWin) return;
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+        const isInputFocused = isEditableTarget(e.target);
+
+        // X 键: 切换标记显示/隐藏
+        if (isToggleMarksKey(e)) {
+          if (!isInputFocused) {
+            e.preventDefault();
+            setMarksVisible(prev => !prev);
+          }
+        }
+
+        // 上箭头: 选择上一个标记（不在输入框中时）
+        if (e.key === 'ArrowUp' && !isInputFocused) {
+          e.preventDefault();
+          const marks = marksRef.current;
+          if (marks.length === 0) return;
+
+          const currentIndex = selectedMarkIdRef.current
+            ? marks.findIndex(m => m.id === selectedMarkIdRef.current)
+            : -1;
+
+          const prevIndex = currentIndex <= 0 ? marks.length - 1 : currentIndex - 1;
+          onMarkSelectRef.current(marks[prevIndex].id);
+        }
+
+        // 下箭头: 选择下一个标记（不在输入框中时）
+        if (e.key === 'ArrowDown' && !isInputFocused) {
+          e.preventDefault();
+          const marks = marksRef.current;
+          if (marks.length === 0) return;
+
+          const currentIndex = selectedMarkIdRef.current
+            ? marks.findIndex(m => m.id === selectedMarkIdRef.current)
+            : -1;
+
+          const nextIndex = currentIndex >= marks.length - 1 ? 0 : currentIndex + 1;
+          onMarkSelectRef.current(marks[nextIndex].id);
+        }
+
+        // ESC: 退出详情/新增，返回列表（任何时候都可以）
+        if (e.key === 'Escape') {
+          if (pendingMarkInfoRef.current) {
+            e.preventDefault();
+            onMarkCancelRef.current();
+          } else if (selectedMarkIdRef.current) {
+            e.preventDefault();
+            onMarkSelectRef.current('');
+          }
+        }
+
+        // H 键: 返回列表并折叠面板
+        if (e.key === 'h' || e.key === 'H') {
+          if (!isInputFocused) {
+            e.preventDefault();
+            if (pendingMarkInfoRef.current) {
+              onMarkCancelRef.current();
+            } else if (selectedMarkIdRef.current) {
+              onMarkSelectRef.current('');
+            }
+            onToggleMarkPanelRef.current?.();
+          }
+        }
+      };
+
+      window.addEventListener('keydown', handleKeyDown, true);
+      iframeWin.addEventListener('keydown', handleKeyDown, true);
+
+      currentCleanup = () => {
+        window.removeEventListener('keydown', handleKeyDown, true);
+        iframeWin.removeEventListener('keydown', handleKeyDown, true);
+      };
     };
 
-    // 立即设置 iframe 监听
-    setupIframeListener();
+    setup();
 
-    // iframe 加载后重新设置
-    iframe?.addEventListener('load', setupIframeListener);
+    // iframe 重新加载后自动重注册
+    iframe.addEventListener('load', setup);
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown, true);
-      const iframeDoc = iframe?.contentDocument || iframe?.contentWindow?.document;
-      const iframeWindow = iframe?.contentWindow;
-      if (iframeDoc && iframeWindow) {
-        iframeWindow.removeEventListener('keydown', handleKeyDown, true);
-        iframeDoc.removeEventListener('keydown', handleKeyDown, true);
+      iframe.removeEventListener('load', setup);
+      if (currentCleanup) {
+        currentCleanup();
       }
-      iframe?.removeEventListener('load', setupIframeListener);
     };
-  }, [viewMode, marks, selectedMarkId, pendingMarkInfo, onMarkSelect, onMarkCancel, onToggleMarkPanel]);
+  }, [viewMode]);
 
   // 复制所有选中的元素信息
   const handleCopyAll = async () => {
