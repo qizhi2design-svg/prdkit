@@ -1,5 +1,6 @@
 import { MenuFoldOutlined, MenuUnfoldOutlined, FileOutlined, CaretRightOutlined, HistoryOutlined } from '@ant-design/icons';
 import { Badge, Button, Tooltip, Segmented } from 'antd';
+import { useRef, useEffect } from 'react';
 import type { ViewMode } from '../types';
 import './Header.css';
 
@@ -38,6 +39,23 @@ export default function Header({
   saveSubmitting = false,
   saveChangeCount = 0,
 }: HeaderProps) {
+  const segmentedRef = useRef<HTMLDivElement>(null);
+
+  // 在捕获阶段拦截上下键，避免 antd Segmented 内置键盘导航触发模式切换
+  useEffect(() => {
+    const el = segmentedRef.current;
+    if (!el) return;
+
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    };
+
+    el.addEventListener('keydown', handler, true);
+    return () => el.removeEventListener('keydown', handler, true);
+  }, []);
   // 从路径中提取文件名（去掉父级目录）
   const getFileName = (path: string | null) => {
     if (!path) return null;
@@ -75,25 +93,20 @@ export default function Header({
         )}
       </div>
 
-      <Segmented
-        options={['预览模式', '编辑模式', '标记模式']}
-        value={viewMode === 'preview' ? '预览模式' : viewMode === 'inspect' ? '编辑模式' : '标记模式'}
-        onChange={(value) => {
-          const newMode: ViewMode =
-            value === '预览模式' ? 'preview' :
-            value === '编辑模式' ? 'inspect' :
-            'mark';
-          onViewModeChange(newMode);
-        }}
-        className="header-mode-segmented"
-        onKeyDown={(e) => {
-          // 阻止上下键切换模式，与标记模式的上下键选择标记冲突
-          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-            e.stopPropagation();
-            e.preventDefault();
-          }
-        }}
-      />
+      <div ref={segmentedRef}>
+        <Segmented
+          options={['预览模式', '编辑模式', '标记模式']}
+          value={viewMode === 'preview' ? '预览模式' : viewMode === 'inspect' ? '编辑模式' : '标记模式'}
+          onChange={(value) => {
+            const newMode: ViewMode =
+              value === '预览模式' ? 'preview' :
+              value === '编辑模式' ? 'inspect' :
+              'mark';
+            onViewModeChange(newMode);
+          }}
+          className="header-mode-segmented"
+        />
+      </div>
 
       <div className="header-actions">
         <Button
