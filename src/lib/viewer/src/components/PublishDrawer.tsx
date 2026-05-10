@@ -322,7 +322,7 @@ export default function PublishDrawer({
       onCancel={onClose}
       footer={null}
       width={pagePanelOpen ? 900 : 340}
-      destroyOnClose={false}
+      destroyOnHidden={false}
       centered
       className="publish-dialog"
     >

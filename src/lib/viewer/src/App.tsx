@@ -526,6 +526,7 @@ function App() {
                 onMarkCancel={marks.cancelMark}
                 onMarkResolutionChange={marks.setMissingMarkIds}
                 onToggleMarkPanel={markPanel.actions.toggle}
+                markPanelCollapsed={markPanel.state.collapsed}
                 previewUrlOverride={checkpoint.activePreview?.prototypePath === fileNav.selectedFile ? checkpoint.activePreview.previewUrl : null}
                 previewReadonly={Boolean(checkpoint.activePreview && checkpoint.activePreview.prototypePath === fileNav.selectedFile)}
               />

@@ -71,8 +71,14 @@ export function useWebSocket(options: WebSocketOptions): WebSocketReturn {
         reconnectTimerRef.current = null;
       }
       if (wsRef.current) {
+        wsRef.current.onopen = null;
         wsRef.current.onclose = null;
-        wsRef.current.close();
+        wsRef.current.onerror = null;
+        wsRef.current.onmessage = null;
+        // 只关闭已连接成功的 WebSocket，避免在 CONNECTING 状态关闭触发浏览器警告
+        if (wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.close();
+        }
         wsRef.current = null;
       }
     };

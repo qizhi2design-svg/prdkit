@@ -25,6 +25,7 @@ interface PreviewProps {
   onMarkCancel: () => void;
   onMarkResolutionChange: (missingMarkIds: string[]) => void;
   onToggleMarkPanel?: () => void;
+  markPanelCollapsed?: boolean;
   htmlContent?: string; // 用于发布模式的 HTML 内容
   previewUrlOverride?: string | null;
   previewReadonly?: boolean;
@@ -56,6 +57,7 @@ export default function Preview({
   onMarkCancel,
   onMarkResolutionChange,
   onToggleMarkPanel,
+  markPanelCollapsed = true,
   previewUrlOverride = null,
   previewReadonly = false,
 }: PreviewProps) {
@@ -81,12 +83,21 @@ export default function Preview({
   const [selectionMode, setSelectionMode] = useState<'single' | 'multiple'>('single');
   const [selectedElements, setSelectedElements] = useState<SelectedElement[]>([]);
   const [marksVisible, setMarksVisible] = useState(true); // 标记是否可见
-  const [inspectMarksVisible, setInspectMarksVisible] = useState(false); // 编辑模式下是否显示已有标记点
   const [previewViewport] = useState<PreviewViewport>('desktop');
   const [zoomPercent] = useState(100);
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const [, setOverlayRefreshTick] = useState(0);
   const [iframeReloadToken, setIframeReloadToken] = useState(0);
+
+  // WebSocket 断开提示增加 2s 延迟，避免初次加载时闪烁
+  const [showDisconnected, setShowDisconnected] = useState(false);
+  useEffect(() => {
+    if (!wsConnected) {
+      const timer = setTimeout(() => setShowDisconnected(true), 2000);
+      return () => clearTimeout(timer);
+    }
+    setShowDisconnected(false);
+  }, [wsConnected]);
 
   // 更新 refs
   useEffect(() => {
@@ -104,11 +115,7 @@ export default function Preview({
   });
 
   const marksVisibleInCurrentMode = viewMode === 'mark' ? marksVisible : false;
-  const markOverlaysVisible = viewMode === 'mark'
-    ? marksVisible
-    : viewMode === 'inspect'
-      ? inspectMarksVisible
-      : false;
+  const markOverlaysVisible = viewMode === 'mark' && marksVisible;
 
   const isEditableTarget = (target: EventTarget | null) => {
     const element = target as HTMLElement | null;
@@ -147,12 +154,6 @@ export default function Preview({
   useEffect(() => {
     requestOverlayRefresh();
   }, [previewViewport, zoomPercent]);
-
-  useEffect(() => {
-    if (viewMode === 'inspect') {
-      setInspectMarksVisible(false);
-    }
-  }, [viewMode]);
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -612,10 +613,6 @@ export default function Preview({
           setSelectionMode(newMode);
         }
 
-        if (isToggleMarksKey(e)) {
-          e.preventDefault();
-          setInspectMarksVisible(prev => !prev);
-        }
       };
 
       window.addEventListener('keydown', handleKeyDown, true);
@@ -863,7 +860,6 @@ export default function Preview({
                 <Hotkey keys={['ESC']} description="清空" />
               </>
             )}
-            <Hotkey keys={['X']} description={inspectMarksVisible ? '隐藏标记点' : '显示标记点'} />
           </span>
 
           <div className="preview-inspect-banner-controls">
@@ -902,12 +898,6 @@ export default function Preview({
                 </Button>
               </>
             )}
-            <Button
-              size="small"
-              onClick={() => setInspectMarksVisible(prev => !prev)}
-            >
-              {inspectMarksVisible ? '隐藏标记点' : '显示标记点'}
-            </Button>
           </div>
         </div>
       )}
@@ -934,7 +924,7 @@ export default function Preview({
               <Hotkey keys={['Delete']} description="删除标记" />
             )}
             <Hotkey keys={['X']} description={marksVisible ? '隐藏标记' : '显示标记'} />
-            <Hotkey keys={['H']} description="折叠面板" />
+            <Hotkey keys={['H']} description={markPanelCollapsed ? '展开面板' : '折叠面板'} />
           </span>
 
           <div className="preview-inspect-banner-controls">
@@ -944,11 +934,17 @@ export default function Preview({
             >
               {marksVisible ? '隐藏标记' : '显示标记'}
             </Button>
+            <Button
+              size="small"
+              onClick={onToggleMarkPanel}
+            >
+              {markPanelCollapsed ? '展开面板' : '折叠面板'}
+            </Button>
           </div>
         </div>
       )}
 
-      {!wsConnected && (
+      {showDisconnected && (
         <div className="preview-floating-status">
           <div className="preview-ws-disconnected">
             热更新已断开
@@ -1068,7 +1064,7 @@ export default function Preview({
           })()}
 
           {/* 标记高亮框覆盖层 */}
-          {(viewMode === 'mark' || viewMode === 'inspect') && markOverlaysVisible && marks.map((mark) => {
+          {(viewMode === 'mark') && markOverlaysVisible && marks.map((mark) => {
             try {
               const iframe = iframeRef.current;
               if (!iframe) return null;
@@ -1091,14 +1087,14 @@ export default function Preview({
               return (
                 <div
                   key={mark.id}
-                  className={`preview-mark-highlight ${selectedMarkId === mark.id ? 'selected' : ''} ${viewMode === 'inspect' ? 'inspect-mode' : ''}`}
+                  className={`preview-mark-highlight ${selectedMarkId === mark.id ? 'selected' : ''}`}
                   style={{
                     ...overlayRect,
                     zIndex: zIndexValue,
                   }}
                   onClick={viewMode === 'mark' ? () => onMarkSelect(mark.id) : undefined}
                 >
-                  <div className={`preview-mark-number ${viewMode === 'inspect' ? 'inspect-mode' : ''}`}>
+                  <div className="preview-mark-number">
                     {marks.indexOf(mark) + 1}
                   </div>
                 </div>
