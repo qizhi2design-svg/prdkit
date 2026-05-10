@@ -86,6 +86,13 @@ export default function Header({
           onViewModeChange(newMode);
         }}
         className="header-mode-segmented"
+        onKeyDown={(e) => {
+          // 阻止上下键切换模式，与标记模式的上下键选择标记冲突
+          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            e.stopPropagation();
+            e.preventDefault();
+          }
+        }}
       />
 
       <div className="header-actions">
