@@ -77,7 +77,7 @@
   background-color: var(--color-bg-tertiary);
 }
 
-.header-mode-segmented {
+.header-mode-segmented-wrapper {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);

@@ -93,7 +93,7 @@ export default function Header({
         )}
       </div>
 
-      <div ref={segmentedRef}>
+      <div ref={segmentedRef} className="header-mode-segmented-wrapper">
         <Segmented
           options={['预览模式', '编辑模式', '标记模式']}
           value={viewMode === 'preview' ? '预览模式' : viewMode === 'inspect' ? '编辑模式' : '标记模式'}
@@ -104,7 +104,6 @@ export default function Header({
               'mark';
             onViewModeChange(newMode);
           }}
-          className="header-mode-segmented"
         />
       </div>
 
