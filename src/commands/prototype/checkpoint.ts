@@ -1,18 +1,11 @@
 import { Command } from "commander";
-import { existsSync } from "node:fs";
-import path from "node:path";
 import chalk from "chalk";
 import open from "open";
 import { COPY } from "#constants/command-text.js";
-import { resolveProjectRoot } from "#utils/config.js";
 import { flattenPrototypes, scanPrototypes } from "#lib/server/scanner.js";
-import { logger } from "#utils/logger.js";
-import { ConfigError, FileSystemError, PrototypeError, ValidationError } from "#utils/errors.js";
-import { runCreateTemplate, type CreateTemplateOptions } from "#core/create-command.js";
-import { registerPrototypePublish } from "#commands/prototype-publish.js";
 import {
   diffCheckpoints,
-  diffCurrentAgainstLatest
+  diffCurrentAgainstLatest,
 } from "#lib/checkpoints/prototype/diff.js";
 import { materializeCheckpointPreview } from "#lib/checkpoints/prototype/preview.js";
 import { pruneAutoCheckpoints } from "#lib/checkpoints/prototype/retention.js";
@@ -24,171 +17,24 @@ import {
   getLatestCheckpointRecord,
   listCheckpointRecords,
   readCheckpointData,
-  startCheckpointSession
+  startCheckpointSession,
 } from "#lib/checkpoints/prototype/store.js";
 import { collectPrototypeSnapshot } from "#lib/checkpoints/prototype/snapshot.js";
-import type { CheckpointDiffSummary, CheckpointRecord } from "#lib/checkpoints/prototype/types.js";
+import { logger } from "#utils/logger.js";
+import {
+  CheckpointBaseOptions,
+  CreateOptions,
+  RestoreOptions,
+  SessionStartOptions,
+  resolveCheckpointContext,
+  ensurePrototypeExists,
+  outputJson,
+  formatRecord,
+  formatSummary,
+  printPathList,
+} from "./common.js";
 
-interface PrototypeListOptions {
-  json?: boolean;
-}
-
-interface PrototypeCreateOptions extends CreateTemplateOptions {
-  template?: string;
-}
-
-interface CheckpointBaseOptions {
-  json?: boolean;
-}
-
-interface CreateOptions extends CheckpointBaseOptions {
-  message?: string;
-}
-
-interface RestoreOptions extends CheckpointBaseOptions {
-  force?: boolean;
-}
-
-interface SessionStartOptions extends CheckpointBaseOptions {
-  name?: string;
-}
-
-const prototypeTemplateAliases: Record<string, string> = {
-  default: "prototype",
-  web: "prototype",
-  desktop: "prototype",
-  mobile: "prototype-mobile",
-  admin: "prototype-admin",
-  "pc-admin": "prototype-admin",
-  "prototype-mobile": "prototype-mobile",
-  "prototype-admin": "prototype-admin",
-  prototype: "prototype"
-};
-
-function resolvePrototypeTemplate(template?: string): string {
-  if (!template?.trim()) {
-    return "prototype";
-  }
-
-  const normalized = template.trim().toLowerCase();
-  const resolved = prototypeTemplateAliases[normalized];
-  if (!resolved) {
-    throw ValidationError.invalidInput(
-      "template",
-      "不支持的原型模板，请使用 web、mobile、admin、prototype-mobile 或 prototype-admin"
-    );
-  }
-  return resolved;
-}
-
-function formatPrototypeList(prototypes: string[]): string {
-  if (prototypes.length === 0) {
-    return chalk.yellow("未找到任何原型");
-  }
-
-  return prototypes.map((name, index) => `${chalk.cyan(`${index + 1}.`)} ${name}`).join("\n");
-}
-
-function outputJson(value: unknown): void {
-  console.log(`${JSON.stringify(value, null, 2)}\n`);
-}
-
-async function resolveCheckpointContext(): Promise<{ projectRoot: string; prototypesDir: string }> {
-  const projectRoot = await resolveProjectRoot(process.cwd());
-  if (!projectRoot) {
-    throw ConfigError.projectNotInitialized();
-  }
-
-  const prototypesDir = path.join(projectRoot, "workspace", "prototypes");
-  if (!existsSync(prototypesDir)) {
-    throw FileSystemError.directoryNotFound(prototypesDir);
-  }
-
-  return { projectRoot, prototypesDir };
-}
-
-function ensurePrototypeExists(prototypesDir: string, prototypePath: string): void {
-  const target = path.join(prototypesDir, prototypePath);
-  if (!existsSync(target)) {
-    throw PrototypeError.notFound(prototypePath);
-  }
-}
-
-function formatRecord(record: CheckpointRecord, index?: number): string {
-  const prefix = index === undefined ? "" : `${chalk.cyan(`${index + 1}.`)} `;
-  const message = record.message ? ` ${chalk.gray(`- ${record.message}`)}` : "";
-  return `${prefix}${chalk.bold(record.id)} ${chalk.yellow(`[${record.kind}]`)} ${chalk.dim(record.prototypePath)}${message}`;
-}
-
-function formatSummary(summary: CheckpointDiffSummary): string {
-  const lines = [
-    `${chalk.dim("from:")} ${summary.fromCheckpointId}`,
-    `${chalk.dim("to:")} ${summary.toCheckpointId}`,
-    `${chalk.dim("files +")} ${summary.addedFiles.length}`,
-    `${chalk.dim("files ~")} ${summary.modifiedFiles.length}`,
-    `${chalk.dim("files -")} ${summary.deletedFiles.length}`,
-    `${chalk.dim("marks +")} ${summary.markAdded.length}`,
-    `${chalk.dim("marks ~")} ${summary.markUpdated.length}`,
-    `${chalk.dim("marks -")} ${summary.markDeleted.length}`
-  ];
-  return lines.join("\n");
-}
-
-function printPathList(label: string, values: string[]): void {
-  if (values.length === 0) return;
-  console.log(`${chalk.bold(label)} (${values.length})`);
-  for (const value of values) {
-    console.log(`  - ${value}`);
-  }
-}
-
-export function registerPrototype(program: Command): void {
-  const prototype = program.command("prototype").description(COPY.prototypeDescription);
-
-  prototype
-    .command("create")
-    .argument("[title]", "原型标题")
-    .description(COPY.prototypeCreateDescription)
-    .option("-t, --template <type>", "原型模板类型：web | mobile | admin")
-    .option("-o, --output <file-or-dir>", "输出文件路径或目录")
-    .option("-d, --dir <dir>", "输出目录")
-    .option("-n, --name <project-name>", "项目名称")
-    .option("-a, --author <author>", "作者")
-    .option("-D, --date <yyyy-mm-dd>", "文档日期")
-    .option("--non-interactive", "禁用交互式输入")
-    .addHelpText("after", `\n${COPY.prototypeCreateHelpAfter}`)
-    .action(async (titleArg: string | undefined, options: PrototypeCreateOptions) => {
-      const templateId = resolvePrototypeTemplate(options.template);
-      await runCreateTemplate(titleArg, { ...options, template: templateId }, templateId);
-    });
-
-  prototype
-    .command("list")
-    .description(COPY.prototypeListDescription)
-    .option("-j, --json", "以 JSON 输出")
-    .addHelpText("after", `\n${COPY.prototypeListHelpAfter}`)
-    .action(async (options: PrototypeListOptions) => {
-      const projectRoot = await resolveProjectRoot(process.cwd());
-      if (!projectRoot) {
-        throw ConfigError.projectNotInitialized();
-      }
-
-      const prototypesDir = path.join(projectRoot, "workspace", "prototypes");
-      const tree = scanPrototypes(prototypesDir);
-      const prototypeList = flattenPrototypes(tree);
-
-      if (options.json) {
-        console.log(`${JSON.stringify({ prototypes: prototypeList }, null, 2)}\n`);
-        return;
-      }
-
-      console.log(formatPrototypeList(prototypeList));
-      console.log(chalk.dim(`\n共找到 ${prototypeList.length} 个原型`));
-    });
-
-  registerPrototypePublish(prototype);
-
-  // Checkpoint 子命令
+export function registerPrototypeCheckpoint(prototype: Command): void {
   const checkpoint = prototype.command("checkpoint").description(COPY.checkpointDescription);
 
   checkpoint
@@ -229,7 +75,7 @@ export function registerPrototype(program: Command): void {
         prototypesDir,
         prototypePath,
         kind: "manual",
-        message: options.message
+        message: options.message,
       });
 
       if (options.json) {
@@ -401,7 +247,7 @@ export function registerPrototype(program: Command): void {
         projectRoot,
         prototypesDir,
         checkpointId,
-        force: options.force
+        force: options.force,
       });
 
       if (options.json) {
@@ -435,7 +281,7 @@ export function registerPrototype(program: Command): void {
           latestCheckpointId: latest?.id,
           contentHash: snapshot.contentHash,
           hasChanges: diff.hasChanges,
-          summary: diff.summary
+          summary: diff.summary,
         };
       });
 

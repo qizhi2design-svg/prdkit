@@ -10,7 +10,7 @@ import {
   readMarkSync,
   readPrototypeMarksSync,
   type MarkPatch,
-  updateMarkSync
+  updateMarkSync,
 } from "#lib/server/marks.js";
 import { logger } from "#utils/logger.js";
 import { ConfigError, PrototypeError, ValidationError } from "#utils/errors.js";
@@ -94,7 +94,7 @@ function buildRect(options: {
     top: top as number,
     left: left as number,
     width: width as number,
-    height: height as number
+    height: height as number,
   };
 }
 
@@ -141,7 +141,7 @@ async function autoCreateCheckpoint(
       prototypesDir,
       prototypePath,
       kind: "auto",
-      message
+      message,
     });
 
     if (result.created) {
@@ -157,8 +157,8 @@ function outputJson(value: unknown): void {
   console.log(`${JSON.stringify(value, null, 2)}\n`);
 }
 
-export function registerMark(program: Command): void {
-  const mark = program.command("mark").description(COPY.markDescription);
+export function registerPrototypeMark(prototype: Command): void {
+  const mark = prototype.command("mark").description(COPY.markDescription);
 
   mark
     .command("list")
@@ -233,7 +233,7 @@ export function registerMark(program: Command): void {
         selector: options.selector.trim(),
         domPath: options.domPath?.trim(),
         position: buildPosition(options),
-        rect: buildRect(options)
+        rect: buildRect(options),
       });
 
       if (options.json) {
@@ -264,7 +264,7 @@ export function registerMark(program: Command): void {
       const description = resolveDescription(options.desc, options.descFile);
       const patch: MarkPatch = {
         title: options.title?.trim(),
-        description
+        description,
       };
 
       const hasUpdates = Object.values(patch).some((value) => value !== undefined);

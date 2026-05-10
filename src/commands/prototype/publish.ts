@@ -2,7 +2,7 @@ import open from "open";
 import path from "node:path";
 import { Command } from "commander";
 import { COPY } from "#constants/command-text.js";
-import { buildDefaultPublishOutputDir, publishArtifacts } from "#lib/publisher.js";
+import { buildDefaultPublishOutputDir, publishArtifacts } from "#lib/server/publish.js";
 import { publishToCloud } from "#lib/cloud/publisher.js";
 import { ConfigError } from "#utils/errors.js";
 import { ensureCloudConfig, loadCloudConfig, loadConfig, resolveProjectRoot, saveCloudConfig } from "#utils/config.js";
@@ -18,7 +18,7 @@ export interface PrototypePublishOptions {
   open?: boolean;
 }
 
-export async function runPrototypePublish(options: PrototypePublishOptions): Promise<void> {
+async function runPrototypePublish(options: PrototypePublishOptions): Promise<void> {
   const projectRoot = await resolveProjectRoot(process.cwd());
   if (!projectRoot) {
     throw ConfigError.projectNotInitialized();
@@ -84,7 +84,7 @@ export async function runPrototypePublish(options: PrototypePublishOptions): Pro
     projectRoot,
     prototypesDir,
     outputDir,
-    projectName: config.projectName
+    projectName: config.projectName,
   });
 
   logger.success(`发布产物已生成：${result.outputDir}`);

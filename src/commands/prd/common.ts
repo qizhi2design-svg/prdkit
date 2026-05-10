@@ -1,39 +1,32 @@
-import { Command } from "commander";
 import fs from "node:fs";
 import path from "node:path";
 import chalk from "chalk";
 import matter from "gray-matter";
-import { COPY } from "#constants/command-text.js";
-import { diffCurrentPrdAgainstLatest, diffPrdCheckpoints } from "#lib/checkpoints/prd/diff.js";
-import { restorePrdCheckpoint } from "#lib/checkpoints/prd/restore.js";
-import { createPrdCheckpoint, findPrdCheckpointRecord, listPrdCheckpointRecords, readPrdCheckpointData } from "#lib/checkpoints/prd/store.js";
+import type { CreateTemplateOptions } from "#core/create-command.js";
 import type { PrdCheckpointDiffSummary, PrdCheckpointRecord } from "#lib/checkpoints/prd/types.js";
-import { resolveProjectRoot } from "#utils/config.js";
-import { logger } from "#utils/logger.js";
-import { ConfigError, FileSystemError, ValidationError } from "#utils/errors.js";
-import { runCreateTemplate, type CreateTemplateOptions } from "#core/create-command.js";
+import { FileSystemError, ValidationError } from "#utils/errors.js";
 
-interface PrdListOptions {
+export interface PrdListOptions {
   json?: boolean;
 }
 
-interface PrdCheckOptions {
+export interface PrdCheckOptions {
   json?: boolean;
 }
 
-interface PrdCheckpointBaseOptions {
+export interface PrdCheckpointBaseOptions {
   json?: boolean;
 }
 
-interface PrdCheckpointCreateOptions extends PrdCheckpointBaseOptions {
+export interface PrdCheckpointCreateOptions extends PrdCheckpointBaseOptions {
   message?: string;
 }
 
-interface PrdCheckpointRestoreOptions extends PrdCheckpointBaseOptions {
+export interface PrdCheckpointRestoreOptions extends PrdCheckpointBaseOptions {
   force?: boolean;
 }
 
-interface PrdCreateOptions extends CreateTemplateOptions {
+export interface PrdCreateOptions extends CreateTemplateOptions {
   fromPlan?: string;
   author?: string;
   date?: string;
@@ -48,7 +41,7 @@ interface PrdFrontmatter {
   version?: string;
 }
 
-interface PrdInfo {
+export interface PrdInfo {
   fileName: string;
   title: string;
   author?: string;
@@ -100,7 +93,7 @@ interface LoadedPrdPlan {
   extraVariables: Record<string, string>;
 }
 
-interface ResolvedPrdCheckTarget {
+export interface ResolvedPrdCheckTarget {
   title: string;
   fileName: string;
   absolutePath: string;
@@ -108,11 +101,11 @@ interface ResolvedPrdCheckTarget {
   selectionReason: "explicit" | "latest";
 }
 
-function outputJson(value: unknown): void {
+export function outputJson(value: unknown): void {
   console.log(`${JSON.stringify(value, null, 2)}\n`);
 }
 
-const DEFAULT_PRD_TEMPLATE_VARIABLES: Record<string, string> = {
+export const DEFAULT_PRD_TEMPLATE_VARIABLES: Record<string, string> = {
   projectName: "待补充",
   documentDate: "",
   complexityLevel: "L2",
@@ -142,11 +135,9 @@ function extractPrdInfo(filePath: string, fileName: string): PrdInfo {
   const content = fs.readFileSync(filePath, 'utf-8');
   const stats = fs.statSync(filePath);
 
-  // 解析 frontmatter
   const parsed = matter(content);
   const frontmatter = parsed.data as PrdFrontmatter;
 
-  // 优先使用 frontmatter 中的标题，否则从内容中提取
   let title = frontmatter.title || '(无标题)';
   if (!frontmatter.title) {
     const lines = parsed.content.split('\n');
@@ -168,11 +159,11 @@ function extractPrdInfo(filePath: string, fileName: string): PrdInfo {
     path: path.relative(process.cwd(), filePath),
     modifiedAt: stats.mtime.toISOString(),
     createdAt: stats.birthtime.toISOString(),
-    size: stats.size
+    size: stats.size,
   };
 }
 
-function scanPrdFiles(prdsDir: string): PrdInfo[] {
+export function scanPrdFiles(prdsDir: string): PrdInfo[] {
   if (!fs.existsSync(prdsDir)) {
     return [];
   }
@@ -219,7 +210,7 @@ function scanPrdEntries(prdsDir: string, projectRoot: string): Array<{ info: Prd
   return entries.sort((a, b) => b.info.modifiedAt.localeCompare(a.info.modifiedAt));
 }
 
-function formatPrdList(prds: PrdInfo[]): string {
+export function formatPrdList(prds: PrdInfo[]): string {
   if (prds.length === 0) {
     return chalk.yellow("未找到任何 PRD 文档");
   }
@@ -234,13 +225,13 @@ function formatPrdList(prds: PrdInfo[]): string {
   }).join("\n\n");
 }
 
-function formatPrdCheckpointRecord(record: PrdCheckpointRecord, index?: number): string {
+export function formatPrdCheckpointRecord(record: PrdCheckpointRecord, index?: number): string {
   const prefix = index === undefined ? "" : `${chalk.cyan(`${index + 1}.`)} `;
   const message = record.message ? ` ${chalk.gray(`- ${record.message}`)}` : "";
   return `${prefix}${chalk.bold(record.id)} ${chalk.yellow(`[${record.kind}]`)} ${chalk.dim(record.prdPath)}${message}`;
 }
 
-function formatPrdCheckpointSummary(summary: PrdCheckpointDiffSummary): string {
+export function formatPrdCheckpointSummary(summary: PrdCheckpointDiffSummary): string {
   return [
     `${chalk.dim("from:")} ${summary.fromCheckpointId}`,
     `${chalk.dim("to:")} ${summary.toCheckpointId}`,
@@ -339,7 +330,7 @@ export function loadPrdPlan(planPath: string, cwd = process.cwd()): LoadedPrdPla
       openQuestions: toBulletList(confirmed.open_questions),
       planAssumptions: toBulletList(frontmatter.plan_assumptions),
       selfcheckFocus: toBulletList(frontmatter.high_complexity_selfcheck),
-    }
+    },
   };
 }
 
@@ -369,7 +360,7 @@ export async function resolvePrdCheckTarget(projectRoot: string, target?: string
   const absoluteCandidates = [
     path.resolve(process.cwd(), rawTarget),
     path.resolve(prdsDir, rawTarget),
-    rawTarget.endsWith(".md") ? "" : path.resolve(prdsDir, `${rawTarget}.md`)
+    rawTarget.endsWith(".md") ? "" : path.resolve(prdsDir, `${rawTarget}.md`),
   ].filter(Boolean) as string[];
 
   for (const candidate of absoluteCandidates) {
@@ -426,289 +417,4 @@ export async function resolvePrdCheckTarget(projectRoot: string, target?: string
   }
 
   throw FileSystemError.fileNotFound(rawTarget);
-}
-
-export function registerPrd(program: Command): void {
-  const prd = program.command("prd").description(COPY.prdDescription);
-
-  prd
-    .command("create")
-    .argument("[title]", "PRD 标题")
-    .description(COPY.prdCreateDescription)
-    .option("-o, --output <file-or-dir>", "输出文件路径或目录")
-    .option("-d, --dir <dir>", "输出目录")
-    .option("-n, --name <project-name>", "项目名称")
-    .option("-a, --author <author>", "作者")
-    .option("-D, --date <yyyy-mm-dd>", "文档日期")
-    .option("-f, --from-plan <file>", "从第一阶段方案稿生成正式 PRD")
-    .option("--non-interactive", "禁用交互式输入")
-    .addHelpText("after", `\n${COPY.prdCreateHelpAfter}`)
-    .action(async (titleArg: string | undefined, options: PrdCreateOptions) => {
-      let resolvedTitle = titleArg;
-      let resolvedOptions: CreateTemplateOptions = { ...options };
-
-      resolvedOptions = {
-        ...resolvedOptions,
-        creator: resolvedOptions.creator ?? options.author,
-        extraVariables: {
-          ...DEFAULT_PRD_TEMPLATE_VARIABLES,
-          ...(options.name ? { projectName: options.name } : {}),
-          ...(options.date ? { documentDate: options.date } : {}),
-          ...(resolvedOptions.extraVariables ?? {}),
-        }
-      };
-
-      if (options.fromPlan) {
-        const loadedPlan = loadPrdPlan(options.fromPlan);
-        resolvedTitle = resolvedTitle ?? loadedPlan.title;
-        resolvedOptions = {
-          ...resolvedOptions,
-          creator: resolvedOptions.creator ?? loadedPlan.creator,
-          extraVariables: {
-            ...DEFAULT_PRD_TEMPLATE_VARIABLES,
-            ...(resolvedOptions.extraVariables ?? {}),
-            ...loadedPlan.extraVariables,
-          }
-        };
-      }
-
-      await runCreateTemplate(resolvedTitle, resolvedOptions, "prd");
-    });
-
-  prd
-    .command("check")
-    .argument("[target]", "PRD 标题、文件名或路径")
-    .description(COPY.prdCheckDescription)
-    .option("-j, --json", "以 JSON 输出")
-    .addHelpText("after", `\n${COPY.prdCheckHelpAfter}`)
-    .action(async (target: string | undefined, options: PrdCheckOptions) => {
-      const projectRoot = await resolveProjectRoot(process.cwd());
-      if (!projectRoot) {
-        throw ConfigError.projectNotInitialized();
-      }
-
-      const resolved = await resolvePrdCheckTarget(projectRoot, target);
-      const suggestedSkillCommand = `/skill prdkit-prd-check ${resolved.absolutePath}`;
-      const promptHint = `请审查这份 PRD：${resolved.absolutePath}`;
-
-      if (options.json) {
-        console.log(`${JSON.stringify({
-          prd: resolved,
-          suggestedSkillCommand,
-          promptHint,
-        }, null, 2)}\n`);
-        return;
-      }
-
-      logger.success(`已定位 PRD：${resolved.title}`);
-      logger.info(`文件：${resolved.projectRelativePath}`);
-      logger.info(`绝对路径：${resolved.absolutePath}`);
-      if (resolved.selectionReason === "latest") {
-        logger.info("未指定目标，已默认选择最近修改的一份 PRD");
-      }
-      console.log("");
-      console.log(chalk.bold("推荐下一步"));
-      console.log(`  ${suggestedSkillCommand}`);
-      console.log(chalk.dim(`  或直接告诉支持 skill 的终端：${promptHint}`));
-    });
-
-  prd
-    .command("list")
-    .description(COPY.prdListDescription)
-    .option("-j, --json", "以 JSON 输出")
-    .addHelpText("after", `\n${COPY.prdListHelpAfter}`)
-    .action(async (options: PrdListOptions) => {
-      const projectRoot = await resolveProjectRoot(process.cwd());
-      if (!projectRoot) {
-        throw ConfigError.projectNotInitialized();
-      }
-
-      const prdsDir = path.join(projectRoot, "workspace", "prds");
-      const prdList = scanPrdFiles(prdsDir);
-
-      if (options.json) {
-        console.log(`${JSON.stringify({ prds: prdList }, null, 2)}\n`);
-        return;
-      }
-
-      console.log(formatPrdList(prdList));
-      console.log(chalk.dim(`\n共找到 ${prdList.length} 个 PRD 文档`));
-    });
-
-  const prdCheckpoint = prd.command("checkpoint").description(COPY.prdCheckpointDescription);
-
-  prdCheckpoint
-    .command("create")
-    .argument("[target]", "PRD 标题、文件名或路径，默认为最近修改的一份")
-    .description(COPY.prdCheckpointCreateDescription)
-    .option("-m, --message <text>", "checkpoint 说明")
-    .option("-j, --json", "以 JSON 输出")
-    .addHelpText("after", `\n${COPY.prdCheckpointCreateHelpAfter}`)
-    .action(async (target: string | undefined, options: PrdCheckpointCreateOptions) => {
-      const projectRoot = await resolveProjectRoot(process.cwd());
-      if (!projectRoot) {
-        throw ConfigError.projectNotInitialized();
-      }
-
-      const resolved = await resolvePrdCheckTarget(projectRoot, target);
-      const result = await createPrdCheckpoint({
-        projectRoot,
-        prdPath: resolved.projectRelativePath,
-        kind: "manual",
-        message: options.message,
-      });
-
-      if (options.json) {
-        outputJson(result);
-        return;
-      }
-
-      if (!result.created) {
-        logger.warn(`没有检测到新变更，最近 checkpoint：${result.record.id}`);
-        return;
-      }
-
-      logger.success(`已创建 PRD checkpoint：${result.record.id}`);
-      logger.info(`文档：${resolved.projectRelativePath}`);
-    });
-
-  prdCheckpoint
-    .command("list")
-    .argument("[target]", "PRD 标题、文件名或路径")
-    .description(COPY.prdCheckpointListDescription)
-    .option("-j, --json", "以 JSON 输出")
-    .addHelpText("after", `\n${COPY.prdCheckpointListHelpAfter}`)
-    .action(async (target: string | undefined, options: PrdCheckpointBaseOptions) => {
-      const projectRoot = await resolveProjectRoot(process.cwd());
-      if (!projectRoot) {
-        throw ConfigError.projectNotInitialized();
-      }
-
-      let prdPath: string | undefined;
-      if (target?.trim()) {
-        prdPath = (await resolvePrdCheckTarget(projectRoot, target)).projectRelativePath;
-      }
-
-      const records = listPrdCheckpointRecords(projectRoot, prdPath);
-      if (options.json) {
-        outputJson({ checkpoints: records });
-        return;
-      }
-
-      if (records.length === 0) {
-        logger.warn("未找到任何 PRD checkpoint");
-        return;
-      }
-
-      console.log(records.map((record, index) => formatPrdCheckpointRecord(record, index)).join("\n"));
-      console.log(chalk.dim(`\n共找到 ${records.length} 个 PRD checkpoint`));
-    });
-
-  prdCheckpoint
-    .command("show")
-    .argument("<checkpoint-id>", "checkpoint ID")
-    .description(COPY.prdCheckpointShowDescription)
-    .option("-j, --json", "以 JSON 输出")
-    .addHelpText("after", `\n${COPY.prdCheckpointShowHelpAfter}`)
-    .action(async (checkpointId: string, options: PrdCheckpointBaseOptions) => {
-      const projectRoot = await resolveProjectRoot(process.cwd());
-      if (!projectRoot) {
-        throw ConfigError.projectNotInitialized();
-      }
-
-      const data = readPrdCheckpointData(projectRoot, checkpointId);
-      if (options.json) {
-        outputJson(data);
-        return;
-      }
-
-      console.log(formatPrdCheckpointRecord(data.manifest));
-      console.log(`${chalk.dim("title:")} ${data.manifest.title}`);
-      console.log(`${chalk.dim("size:")} ${data.document.size} bytes`);
-      console.log(`${chalk.dim("lines:")} ${data.document.lineCount}`);
-    });
-
-  prdCheckpoint
-    .command("diff")
-    .argument("<from-id>", "起始 checkpoint ID")
-    .argument("<to-id>", "目标 checkpoint ID")
-    .description(COPY.prdCheckpointDiffDescription)
-    .option("-j, --json", "以 JSON 输出")
-    .addHelpText("after", `\n${COPY.prdCheckpointDiffHelpAfter}`)
-    .action(async (fromId: string, toId: string, options: PrdCheckpointBaseOptions) => {
-      const projectRoot = await resolveProjectRoot(process.cwd());
-      if (!projectRoot) {
-        throw ConfigError.projectNotInitialized();
-      }
-
-      const summary = await diffPrdCheckpoints(projectRoot, fromId, toId);
-      if (options.json) {
-        outputJson(summary);
-        return;
-      }
-
-      console.log(formatPrdCheckpointSummary(summary));
-    });
-
-  prdCheckpoint
-    .command("status")
-    .argument("[target]", "PRD 标题、文件名或路径，默认为最近修改的一份")
-    .description(COPY.prdCheckpointStatusDescription)
-    .option("-j, --json", "以 JSON 输出")
-    .addHelpText("after", `\n${COPY.prdCheckpointStatusHelpAfter}`)
-    .action(async (target: string | undefined, options: PrdCheckpointBaseOptions) => {
-      const projectRoot = await resolveProjectRoot(process.cwd());
-      if (!projectRoot) {
-        throw ConfigError.projectNotInitialized();
-      }
-
-      const resolved = await resolvePrdCheckTarget(projectRoot, target);
-      const status = await diffCurrentPrdAgainstLatest(projectRoot, resolved.projectRelativePath);
-      if (options.json) {
-        outputJson(status);
-        return;
-      }
-
-      logger.info(`文档：${resolved.projectRelativePath}`);
-      if (status.latestCheckpointId) {
-        logger.info(`最近 checkpoint：${status.latestCheckpointId}`);
-      }
-      console.log(formatPrdCheckpointSummary(status.summary));
-    });
-
-  prdCheckpoint
-    .command("restore")
-    .argument("<checkpoint-id>", "checkpoint ID")
-    .description(COPY.prdCheckpointRestoreDescription)
-    .option("-f, --force", "存在未归档变更时先创建 pre-restore checkpoint 再恢复")
-    .option("-j, --json", "以 JSON 输出")
-    .addHelpText("after", `\n${COPY.prdCheckpointRestoreHelpAfter}`)
-    .action(async (checkpointId: string, options: PrdCheckpointRestoreOptions) => {
-      const projectRoot = await resolveProjectRoot(process.cwd());
-      if (!projectRoot) {
-        throw ConfigError.projectNotInitialized();
-      }
-
-      const record = findPrdCheckpointRecord(projectRoot, checkpointId);
-      if (!record) {
-        throw new Error(`未找到 PRD checkpoint：${checkpointId}`);
-      }
-
-      const result = await restorePrdCheckpoint({
-        projectRoot,
-        checkpointId,
-        force: options.force,
-      });
-
-      if (options.json) {
-        outputJson(result);
-        return;
-      }
-
-      logger.success(`已恢复到 PRD checkpoint：${checkpointId}`);
-      logger.info(`文档：${record.prdPath}`);
-      if (result.preRestore) {
-        logger.info(`已创建 pre-restore checkpoint：${result.preRestore.id}`);
-      }
-    });
 }

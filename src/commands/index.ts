@@ -1,0 +1,8 @@
+export { registerAuth } from "./auth.js";
+export { registerDoctor } from "./doctor.js";
+export { registerInfo } from "./info.js";
+export { registerInit } from "./init.js";
+export { registerServe } from "./serve.js";
+export { registerUpdate } from "./update.js";
+export { registerPrd } from "./prd/index.js";
+export { registerPrototype } from "./prototype/index.js";

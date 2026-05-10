@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { saveConfig } from "../src/utils/config.js";
-import { resolvePrdCheckTarget } from "../src/commands/prd.js";
+import { resolvePrdCheckTarget } from "../src/commands/prd/common.js";
 
 const tempDirs: string[] = [];
 

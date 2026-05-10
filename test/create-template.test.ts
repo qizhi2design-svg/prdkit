@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { saveConfig } from "../src/utils/config.js";
 import { runCreateTemplate } from "../src/core/create-command.js";
 import { listCheckpointRecords } from "../src/lib/checkpoints/prototype/store.js";
-import { loadPrdPlan } from "../src/commands/prd.js";
+import { loadPrdPlan } from "../src/commands/prd/common.js";
 
 const tempDirs: string[] = [];
 const __filename = fileURLToPath(import.meta.url);

@@ -5,15 +5,16 @@ import { fileURLToPath } from "node:url";
 import chalk from "chalk";
 import { Command } from "commander";
 import { COPY } from "#constants/command-text.js";
-import { registerDoctor } from "#commands/doctor.js";
-import { registerInit } from "#commands/init.js";
-import { registerMark } from "#commands/mark.js";
-import { registerPrd } from "#commands/prd.js";
-import { registerPrototype } from "#commands/prototype.js";
-import { registerServe } from "#commands/serve.js";
-import { registerUpdate } from "#commands/update.js";
-import { registerInfo } from "#commands/info.js";
-import { registerAuth } from "#commands/auth.js";
+import {
+  registerAuth,
+  registerDoctor,
+  registerInfo,
+  registerInit,
+  registerPrd,
+  registerPrototype,
+  registerServe,
+  registerUpdate,
+} from "#commands/index.js";
 import { handleError } from "#utils/error-handler.js";
 import { UserCancelledError } from "#utils/errors.js";
 
@@ -38,14 +39,13 @@ program
     sortSubcommands: false,
     sortOptions: true,
     showGlobalOptions: true,
-    subcommandTerm: (cmd) => cmd.name()
+    subcommandTerm: (cmd) => cmd.name(),
   })
   .addHelpText("after", `\n${COPY.rootHelpAfter.trim()}\n`);
 
 registerInit(program);
 registerPrd(program);
 registerPrototype(program);
-registerMark(program);
 registerInfo(program);
 registerDoctor(program);
 registerServe(program);
