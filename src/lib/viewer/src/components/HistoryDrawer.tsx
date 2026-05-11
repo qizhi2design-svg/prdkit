@@ -149,6 +149,7 @@ export default function HistoryDrawer({
       title="版本记录"
       open={open}
       onClose={onClose}
+      placement="right"
       width={360}
       className="history-drawer compact"
       extra={(

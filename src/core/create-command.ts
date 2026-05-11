@@ -19,8 +19,6 @@ import {
   copyTemplateDirectory
 } from "#utils/templates.js";
 import { resolveOutputPath, assertFileDoesNotExist, writeTextFile } from "#utils/files.js";
-import path from "node:path";
-import { createCheckpoint } from "#lib/checkpoints/prototype/store.js";
 
 /**
  * Create 命令选项
@@ -350,36 +348,6 @@ class CreateTemplateRunner extends CreateCommand {
 
   protected getDefaultTemplateId(): string | undefined {
     return this.preferredTemplateId;
-  }
-
-  protected async afterCreate(
-    outputPath: string,
-    templateId: string,
-    isDirectory: boolean
-  ): Promise<void> {
-    if (!isDirectory || !templateId.startsWith("prototype")) {
-      return;
-    }
-
-    try {
-      const projectRoot = this.getProjectRoot();
-      const prototypesDir = path.join(projectRoot, "workspace", "prototypes");
-      const prototypePath = path.relative(prototypesDir, outputPath);
-
-      const result = await createCheckpoint({
-        projectRoot,
-        prototypesDir,
-        prototypePath,
-        kind: "auto",
-        message: "初始版本"
-      });
-
-      if (result.created) {
-        this.log.info(`已创建初始 checkpoint：${result.record.id}`);
-      }
-    } catch (error) {
-      this.log.debug(`创建初始 checkpoint 失败：${error instanceof Error ? error.message : String(error)}`);
-    }
   }
 }
 

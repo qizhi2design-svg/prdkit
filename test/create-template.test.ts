@@ -5,7 +5,6 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { saveConfig } from "../src/utils/config.js";
 import { runCreateTemplate } from "../src/core/create-command.js";
-import { listCheckpointRecords } from "../src/lib/checkpoints/prototype/store.js";
 import { loadPrdPlan } from "../src/commands/prd/common.js";
 
 const tempDirs: string[] = [];
@@ -21,7 +20,7 @@ afterEach(() => {
 });
 
 describe("runCreateTemplate", () => {
-  it("creates an initial checkpoint for prototype directory templates", async () => {
+  it("creates prototype directory from template", async () => {
     const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "prdkit-create-template-"));
     tempDirs.push(projectRoot);
 
@@ -50,13 +49,9 @@ describe("runCreateTemplate", () => {
     }, "prototype-admin");
 
     const outputDir = path.join(projectRoot, "workspace", "prototypes", "运营后台");
-    const records = listCheckpointRecords(projectRoot, "运营后台");
 
     expect(fs.existsSync(path.join(outputDir, "index.html"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "mock.js"))).toBe(true);
-    expect(records).toHaveLength(1);
-    expect(records[0].kind).toBe("auto");
-    expect(records[0].message).toBe("初始版本");
   });
 
   it("renders complexity-aware prd template variables from a plan file", async () => {

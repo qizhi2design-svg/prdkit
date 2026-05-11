@@ -13,7 +13,7 @@ export default function PreferencesDrawer({ open, onClose }: PreferencesDrawerPr
   const setTheme = useViewerStore((state) => state.setTheme);
 
   return (
-    <Drawer title="用户偏好设置" open={open} onClose={onClose} width={400}>
+    <Drawer title="用户偏好设置" open={open} onClose={onClose} placement="right" width={400}>
       <Form layout="vertical">
         <Form.Item label="主题">
           <Radio.Group value={theme} onChange={(e) => setTheme(e.target.value)}>

@@ -13,7 +13,7 @@
   "author": "purity3",
   "license": "MIT",
   "bin": {
-    "prdkit": "dist/cli.js"
+    "prdkit": "dist/index.js"
   },
   "imports": {
     "#commands/*.js": "./dist/commands/*.js",

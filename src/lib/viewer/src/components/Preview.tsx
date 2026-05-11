@@ -485,9 +485,16 @@ export default function Preview({
       }
     };
 
+    // 鼠标移出 iframe 时清除高亮
+    const handleMouseLeave = () => {
+      if (unmountedRef.current) return;
+      setHoveredElement(null);
+    };
+
     // 添加事件监听
       iframeDoc.addEventListener('mousemove', handleMouseMove);
       iframeDoc.addEventListener('click', handleClick, true);
+      iframe.addEventListener('mouseleave', handleMouseLeave);
 
       // 添加样式来改变鼠标指针
       const style = iframeDoc.createElement('style');
@@ -498,6 +505,7 @@ export default function Preview({
       currentCleanup = () => {
         iframeDoc.removeEventListener('mousemove', handleMouseMove);
         iframeDoc.removeEventListener('click', handleClick, true);
+        iframe.removeEventListener('mouseleave', handleMouseLeave);
         style.remove();
       };
     };

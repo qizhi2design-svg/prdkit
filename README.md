@@ -439,7 +439,7 @@ prdkit info
 prdkit auth login
 ```
 
-通过浏览器登录云端服务，登录地址默认来自环境变量 `PRDKIT_CLOUD_HOST`。
+通过浏览器登录云端服务，登录地址来自项目 `.prdkit/cloud.json` 中的 `host` 配置。
 
 #### `prdkit auth logout`
 
