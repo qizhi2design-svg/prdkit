@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Empty, message, Segmented, Button } from 'antd';
 import './Preview.css';
-import { getElementInfo, getElementPath, formatMultipleElementsInfo, generateUniqueSelector, findElementBySelector, type ElementInfo } from '../utils/domUtils';
+import { getElementInfo, getElementPath, formatMultipleElementsInfo, generateUniqueSelector, findElementBySelector, isElementVisible, isElementCovered, type ElementInfo } from '../utils/domUtils';
 import { getModifierKey } from '../utils/platform';
 import { copySkillClipboardText } from '../utils/clipboard';
 import Hotkey from './Hotkey';
@@ -24,6 +24,7 @@ interface PreviewProps {
   onMarkSelect: (markId: string) => void;
   onMarkCancel: () => void;
   onMarkResolutionChange: (missingMarkIds: string[]) => void;
+  onMarkVisibilityChange?: (hiddenMarkIds: string[]) => void;
   onToggleMarkPanel?: () => void;
   markPanelCollapsed?: boolean;
   htmlContent?: string; // 用于发布模式的 HTML 内容
@@ -56,6 +57,7 @@ export default function Preview({
   onMarkSelect,
   onMarkCancel,
   onMarkResolutionChange,
+  onMarkVisibilityChange,
   onToggleMarkPanel,
   markPanelCollapsed = true,
   previewUrlOverride = null,
@@ -92,7 +94,7 @@ export default function Preview({
   const [previewViewport] = useState<PreviewViewport>('desktop');
   const [zoomPercent] = useState(100);
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
-  const [, setOverlayRefreshTick] = useState(0);
+  const [overlayRefreshTick, setOverlayRefreshTick] = useState(0);
   const [iframeReloadToken, setIframeReloadToken] = useState(0);
 
   // WebSocket 断开提示增加 2s 延迟，避免初次加载时闪烁
@@ -528,26 +530,33 @@ export default function Preview({
     const iframe = iframeRef.current;
     if (!iframe) return;
 
-    const updateMissingMarks = () => {
+    const updateMarkStates = () => {
       const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
       if (!iframeDoc) return;
 
-      const nextMissingMarkIds = marks
-        .filter((mark) => {
-          return !findElementBySelector(iframeDoc, mark.selector);
-        })
-        .map((mark) => mark.id);
+      const nextMissingMarkIds: string[] = [];
+      const nextHiddenMarkIds: string[] = [];
+
+      for (const mark of marks) {
+        const element = findElementBySelector(iframeDoc, mark.selector);
+        if (!element) {
+          nextMissingMarkIds.push(mark.id);
+        } else if (!isElementVisible(element, iframeDoc) || isElementCovered(element, iframeDoc)) {
+          nextHiddenMarkIds.push(mark.id);
+        }
+      }
 
       onMarkResolutionChange(nextMissingMarkIds);
+      onMarkVisibilityChange?.(nextHiddenMarkIds);
     };
 
-    updateMissingMarks();
-    iframe.addEventListener('load', updateMissingMarks);
+    updateMarkStates();
+    iframe.addEventListener('load', updateMarkStates);
 
     return () => {
-      iframe.removeEventListener('load', updateMissingMarks);
+      iframe.removeEventListener('load', updateMarkStates);
     };
-  }, [marks, onMarkResolutionChange, reloadVersion, filePath]);
+  }, [marks, onMarkResolutionChange, onMarkVisibilityChange, reloadVersion, filePath, overlayRefreshTick]);
 
   // 清理选中元素（当切换模式时）
   useEffect(() => {
@@ -1089,7 +1098,7 @@ export default function Preview({
               if (!iframeDoc) return null;
 
               const element = findElementBySelector(iframeDoc, mark.selector);
-              if (!element) return null;
+              if (!element || !isElementVisible(element, iframeDoc) || isElementCovered(element, iframeDoc)) return null;
 
               const overlayRect = getOverlayRect(element);
               if (!overlayRect) return null;

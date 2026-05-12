@@ -11,6 +11,7 @@ export function useMarks(options: UseMarksOptions): UseMarksReturn {
   const [pendingMarkInfo, setPendingMarkInfo] = useState<PendingMarkInfo | null>(null);
   const [relinkingMarkId, setRelinkingMarkId] = useState<string | null>(null);
   const [missingMarkIds, setMissingMarkIds] = useState<string[]>([]);
+  const [hiddenMarkIds, setHiddenMarkIds] = useState<string[]>([]);
 
   const loadMarksRef = useRef<() => void>(() => {});
 
@@ -223,6 +224,7 @@ export function useMarks(options: UseMarksOptions): UseMarksReturn {
     pendingMarkInfo,
     relinkingMarkId,
     missingMarkIds,
+    hiddenMarkIds,
     effectiveMarks,
     loadMarks,
     selectMark,
@@ -235,6 +237,7 @@ export function useMarks(options: UseMarksOptions): UseMarksReturn {
     confirmRelink,
     cancelRelink,
     setMissingMarkIds,
+    setHiddenMarkIds,
     loadMarksRef,
   };
 }

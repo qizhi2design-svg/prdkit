@@ -806,6 +806,52 @@
   margin-top: 12px;
 }
 
+.mark-hidden-tag {
+  margin-inline-end: 0;
+  flex: none;
+  white-space: nowrap;
+}
+
+.mark-list-hidden-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mark-hidden-hint {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.mark-hidden-card {
+  margin-bottom: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #ffe699;
+  background: #fffbe6;
+}
+
+.mark-hidden-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  font-size: 13px;
+  color: #ad6800;
+}
+
+.mark-list-hidden-notice {
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #ad6800;
+  background: #fffbe6;
+  border: 1px solid #ffe699;
+}
+
 .mark-panel-actions {
   display: flex;
   flex-direction: column;

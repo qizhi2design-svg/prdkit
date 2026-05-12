@@ -137,6 +137,73 @@ function findElementByLegacySelector(root: Document | Element, selector: string)
   return currentMatches[0] ?? null;
 }
 
+/**
+ * 检查元素是否在页面中实际可见
+ * 使用 checkVisibility() API，不兼容时回退到 offsetParent + 计算样式遍历
+ */
+export function isElementVisible(element: Element, ownerDocument?: Document): boolean {
+  // 透明度为0视为不可见（检查自身及所有祖先）
+  const win = ownerDocument?.defaultView;
+  if (win) {
+    let current: Element | null = element;
+    while (current) {
+      if (parseFloat(win.getComputedStyle(current).opacity) === 0) return false;
+      current = current.parentElement;
+    }
+  }
+
+  if (typeof element.checkVisibility === 'function') {
+    return element.checkVisibility();
+  }
+
+  // Legacy fallback
+  const el = element as HTMLElement;
+  if (el.offsetParent === null) {
+    if (!ownerDocument?.contains(element)) return false;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return false;
+  }
+
+  let current: Element | null = element;
+  while (current && win) {
+    const style = win.getComputedStyle(current);
+    if (style.display === 'none') return false;
+    if (style.visibility === 'hidden' || style.visibility === 'collapse') return false;
+    current = current.parentElement;
+  }
+
+  return true;
+}
+
+/**
+ * 检查元素是否被其他元素视觉覆盖（如弹窗遮罩层）
+ * 使用 elementsFromPoint API 检测目标元素的中心点是否被非祖先元素遮挡
+ */
+export function isElementCovered(element: Element, iframeDoc: Document): boolean {
+  const rect = element.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return false;
+
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+
+  let topElements: Element[];
+  try {
+    topElements = Array.from(iframeDoc.elementsFromPoint(centerX, centerY));
+  } catch {
+    return false; // 跨域或其他错误，假设未被覆盖
+  }
+
+  for (const el of topElements) {
+    if (el === element) return false;         // mark 元素在最顶部
+    if (el.contains(element)) continue;       // mark 的祖先——跳过
+    if (element.contains(el)) continue;       // mark 的后代——跳过
+    if (el.tagName === 'HTML' || el.tagName === 'BODY') continue;
+    return true;                              // 有其他元素覆盖在 mark 之上
+  }
+
+  return false;
+}
+
 export function findElementBySelector(root: Document | Element, selector: string): Element | null {
   try {
     return root.querySelector(selector);

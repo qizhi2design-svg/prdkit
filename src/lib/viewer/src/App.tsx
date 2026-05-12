@@ -525,6 +525,7 @@ function App() {
                 onMarkSelect={marks.selectMark}
                 onMarkCancel={marks.cancelMark}
                 onMarkResolutionChange={marks.setMissingMarkIds}
+                onMarkVisibilityChange={marks.setHiddenMarkIds}
                 onToggleMarkPanel={markPanel.actions.toggle}
                 markPanelCollapsed={markPanel.state.collapsed}
                 previewUrlOverride={checkpoint.activePreview?.prototypePath === fileNav.selectedFile ? checkpoint.activePreview.previewUrl : null}
@@ -559,6 +560,7 @@ function App() {
                       pendingMarkInfo={marks.pendingMarkInfo}
                       relinkingMarkId={marks.relinkingMarkId}
                       missingMarkIds={marks.missingMarkIds}
+                      hiddenMarkIds={marks.hiddenMarkIds}
                       viewerSkills={config?.viewerSkills || {
                         pageCreateSkillCommand: DEFAULT_PAGE_CREATE_SKILL_COMMAND,
                         inspectCopySkillCommand: DEFAULT_INSPECT_COPY_SKILL_COMMAND,

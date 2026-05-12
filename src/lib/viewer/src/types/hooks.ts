@@ -89,6 +89,7 @@ export interface UseMarksReturn {
   pendingMarkInfo: PendingMarkInfo | null;
   relinkingMarkId: string | null;
   missingMarkIds: string[];
+  hiddenMarkIds: string[];
   effectiveMarks: Mark[]; // 考虑 checkpoint 预览的标记
 
   // 操作方法
@@ -103,6 +104,7 @@ export interface UseMarksReturn {
   confirmRelink: (markId: string, info: PendingMarkInfo) => void;
   cancelRelink: () => void;
   setMissingMarkIds: (ids: string[]) => void;
+  setHiddenMarkIds: (ids: string[]) => void;
 
   // Ref (用于 WebSocket 回调)
   loadMarksRef: MutableRefObject<() => void>;

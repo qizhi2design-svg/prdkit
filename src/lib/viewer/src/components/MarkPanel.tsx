@@ -18,6 +18,7 @@ interface MarkPanelProps {
   pendingMarkInfo: PendingMarkInfo | null;
   relinkingMarkId: string | null;
   missingMarkIds: string[];
+  hiddenMarkIds: string[];
   viewerSkills: ViewerSkillConfig;
   onMarkSelect: (markId: string) => void;
   onMarkCreate: (title: string, description: string) => void;
@@ -40,6 +41,7 @@ export default function MarkPanel({
   pendingMarkInfo,
   relinkingMarkId,
   missingMarkIds,
+  hiddenMarkIds,
   viewerSkills,
   onMarkSelect,
   onMarkCreate,
@@ -126,6 +128,7 @@ DOM 路径: ${domPath}`;
 
   const selectedMark = marks.find(m => m.id === selectedMarkId);
   const missingMarkIdSet = new Set(missingMarkIds);
+  const hiddenMarkIdSet = new Set(hiddenMarkIds);
 
   // 当进入创建视图时，自动生成标题
   useEffect(() => {
@@ -339,6 +342,11 @@ DOM 路径: ${domPath}`;
             onChange={(e) => setSearchKeyword(e.target.value)}
             allowClear
           />
+          {hiddenMarkIdSet.size > 0 && (
+            <div className="mark-list-hidden-notice">
+              部分标记位于隐藏区域，相关标记已标注「隐藏」
+            </div>
+          )}
         </div>
         <div className="mark-panel-content">
           {filteredMarks.length === 0 ? (
@@ -410,6 +418,8 @@ DOM 路径: ${domPath}`;
                           重新绑定
                         </Button>
                       </div>
+                    ) : hiddenMarkIdSet.has(mark.id) ? (
+                      <Tag color="warning" className="mark-hidden-tag">隐藏</Tag>
                     ) : null}
                   />
                 </List.Item>
@@ -604,6 +614,13 @@ DOM 路径: ${domPath}`;
                 <Button size="small" onClick={onMarkRelinkCancel}>
                   取消
                 </Button>
+              </div>
+            </div>
+          ) : null}
+          {hiddenMarkIdSet.has(selectedMark.id) && !missingMarkIdSet.has(selectedMark.id) ? (
+            <div className="mark-hidden-card">
+              <div className="mark-hidden-card-title">
+                <span>该标记当前位于隐藏区域（如已关闭的弹窗内）</span>
               </div>
             </div>
           ) : null}
