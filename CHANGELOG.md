@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.0.1] - 2026-05-12
+
+### Added
+
+- **原型发布链接**: `prdkit prototype publish` 支持生成线下预览链接并与云端发布集成
+- **PRD 创建集成**: PRD 创建流程中集成 release 机制，支持创建后生成发布链接
+
+### Changed
+
+- 重构 prototype publish 和 prd create 命令，统一 release 流程
+- 移除原型创建时自动生成 checkpoint 的逻辑
+
+### Fixed
+
+- antd Drawer 关闭按钮位置错误
+- Preview 组件在特定场景下的渲染问题
+
 ## [2.0.0] - 2026-05-10
 
 > **Breaking changes**: 重构 CLI 命令结构、云端配置和 viewer 架构。
