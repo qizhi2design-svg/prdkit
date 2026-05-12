@@ -5,6 +5,7 @@ import { registerPrototypeList } from "./list.js";
 import { registerPrototypePublish } from "./publish.js";
 import { registerPrototypeCheckpoint } from "./checkpoint.js";
 import { registerPrototypeMark } from "./mark.js";
+import { registerRelease } from "./release/index.js";
 
 export function registerPrototype(program: Command): void {
   const prototype = program.command("prototype").description(COPY.prototypeDescription);
@@ -14,4 +15,5 @@ export function registerPrototype(program: Command): void {
   registerPrototypePublish(prototype);
   registerPrototypeCheckpoint(prototype);
   registerPrototypeMark(prototype);
+  registerRelease(prototype);
 }

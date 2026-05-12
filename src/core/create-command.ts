@@ -19,6 +19,8 @@ import {
   copyTemplateDirectory
 } from "#utils/templates.js";
 import { resolveOutputPath, assertFileDoesNotExist, writeTextFile } from "#utils/files.js";
+import matter from "gray-matter";
+import { readFile, writeFile } from "node:fs/promises";
 
 /**
  * Create 命令选项
@@ -33,6 +35,7 @@ export interface CreateOptions {
   status?: string;
   nonInteractive?: boolean;
   extraVariables?: Record<string, string>;
+  extraFrontmatter?: Record<string, string>;
 }
 
 export type CreateTemplateOptions = CreateOptions;
@@ -322,6 +325,18 @@ export abstract class CreateCommand extends CommandBase<CreateArgs, CreateOption
       const templateContent = await readTemplateContent(repoDir, template);
       const finalContent = renderTemplate(templateContent, variables);
       await writeTextFile(outputPath, finalContent);
+
+      // 若有额外 front matter（如 TAPD 字段），合并到输出文件中
+      if (options.extraFrontmatter && Object.keys(options.extraFrontmatter).length > 0) {
+        try {
+          const raw = await readFile(outputPath, "utf8");
+          const parsed = matter(raw);
+          const mergedData = { ...parsed.data, ...options.extraFrontmatter };
+          await writeFile(outputPath, matter.stringify(parsed.content, mergedData), "utf8");
+        } catch (error) {
+          this.log.warn(`无法合并额外前置元数据: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
     }
 
     // 输出成功消息

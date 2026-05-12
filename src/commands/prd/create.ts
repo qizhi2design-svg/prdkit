@@ -47,6 +47,14 @@ export function registerPrdCreate(prd: Command): void {
             ...loadedPlan.extraVariables,
           },
         };
+
+        // 保留 plan 文件中的额外 front matter（如 TAPD tapd_id / workspace_id）
+        if (Object.keys(loadedPlan.extraFrontmatter).length > 0) {
+          resolvedOptions = {
+            ...resolvedOptions,
+            extraFrontmatter: loadedPlan.extraFrontmatter,
+          };
+        }
       }
 
       await runCreateTemplate(resolvedTitle, resolvedOptions, "prd");

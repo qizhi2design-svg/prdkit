@@ -4,6 +4,7 @@ import fs from 'fs';
 import { requireCloudHost, loadConfig, loadCloudConfig, updateCloudConfig } from '#utils/config.js';
 import { createCloudClient } from '../../cloud/client.js';
 import { buildDefaultPublishDirName, publishArtifacts } from '../publish.js';
+import { registerReleaseLink } from '../../links/registry.js';
 import type { ApiHelpers } from './helpers.js';
 
 export function createPublishRouter(helpers: ApiHelpers): Router {
@@ -128,6 +129,17 @@ export function createPublishRouter(helpers: ApiHelpers): Router {
         projectName: selectedProject?.name,
         lastReleaseId: result.releaseId,
         lastPublishedAt: new Date().toISOString(),
+      });
+
+      await registerReleaseLink(projectRoot, {
+        releaseId: result.releaseId,
+        projectId: result.projectId,
+        url: result.releaseUrl,
+        prototypePaths: result.results.map((r) => r.prototypePath),
+        source: "viewer-publish",
+        publishedAt: new Date().toISOString(),
+      }).catch(() => {
+        console.warn('注册 release 链接失败，不影响发布结果');
       });
 
       res.json({

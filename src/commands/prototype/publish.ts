@@ -6,6 +6,7 @@ import { buildDefaultPublishOutputDir, publishArtifacts } from "#lib/server/publ
 import { publishToCloud } from "#lib/cloud/publisher.js";
 import { ConfigError } from "#utils/errors.js";
 import { ensureCloudConfig, loadCloudConfig, loadConfig, resolveProjectRoot, saveCloudConfig } from "#utils/config.js";
+import { registerReleaseLink } from "#lib/links/registry.js";
 import { logger } from "#utils/logger.js";
 
 export interface PrototypePublishOptions {
@@ -44,6 +45,23 @@ async function runPrototypePublish(options: PrototypePublishOptions): Promise<vo
     });
 
     if (options.json) {
+      const nextConfig = {
+        ...(await loadCloudConfig(projectRoot) ?? cloudConfig),
+        projectId: result.projectId,
+        lastReleaseId: result.releaseId,
+        lastPublishedAt: new Date().toISOString(),
+      };
+      await saveCloudConfig(nextConfig, projectRoot);
+
+      await registerReleaseLink(projectRoot, {
+        releaseId: result.releaseId,
+        projectId: result.projectId,
+        url: result.releaseUrl,
+        prototypePaths: result.results.map((r) => r.prototypePath),
+        source: "cli-publish",
+        publishedAt: new Date().toISOString(),
+      }).catch(() => undefined);
+
       console.log(JSON.stringify(result, null, 2));
       return;
     }
@@ -66,6 +84,17 @@ async function runPrototypePublish(options: PrototypePublishOptions): Promise<vo
       lastPublishedAt: new Date().toISOString(),
     };
     await saveCloudConfig(nextConfig, projectRoot);
+
+    await registerReleaseLink(projectRoot, {
+      releaseId: result.releaseId,
+      projectId: result.projectId,
+      url: result.releaseUrl,
+      prototypePaths: result.results.map((r) => r.prototypePath),
+      source: "cli-publish",
+      publishedAt: new Date().toISOString(),
+    }).catch(() => {
+      logger.warn("注册 release 链接失败，不影响发布结果");
+    });
 
     if (options.open !== false) {
       await open(result.releaseUrl).catch(() => undefined);

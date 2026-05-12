@@ -39,6 +39,13 @@ interface PrdFrontmatter {
   date?: string;
   status?: string;
   version?: string;
+  // 以下字段可能来自 TAPD story 的 front matter，与 PRD 共存
+  tapd_id?: string;
+  workspace_id?: string;
+  iteration_id?: string;
+  owner?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface PrdInfo {
@@ -51,6 +58,7 @@ export interface PrdInfo {
   modifiedAt: string;
   createdAt: string;
   size: number;
+  tapdId?: string;
 }
 
 interface PrdPlanFrontmatter {
@@ -91,6 +99,7 @@ interface LoadedPrdPlan {
   title: string;
   creator?: string;
   extraVariables: Record<string, string>;
+  extraFrontmatter: Record<string, string>;
 }
 
 export interface ResolvedPrdCheckTarget {
@@ -160,6 +169,7 @@ function extractPrdInfo(filePath: string, fileName: string): PrdInfo {
     modifiedAt: stats.mtime.toISOString(),
     createdAt: stats.birthtime.toISOString(),
     size: stats.size,
+    tapdId: frontmatter.tapd_id,
   };
 }
 
@@ -304,6 +314,24 @@ export function loadPrdPlan(planPath: string, cwd = process.cwd()): LoadedPrdPla
     throw new Error(`方案稿缺少标题：${resolvedPath}`);
   }
 
+  // 收集不属于 PrdPlanFrontmatter 的额外 front matter 字段
+  // （如 TAPD 的 tapd_id / workspace_id 等），以便在创建 PRD 时保留
+  const knownPlanKeys = new Set<string>([
+    'title', 'creator', 'project_name', 'product_mode', 'product_type',
+    'product_type_reasoning', 'complexity_level', 'complexity_reasoning',
+    'recommended_sections', 'chapter_strategy', 'plan_assumptions',
+    'high_complexity_selfcheck', 'confirmed_info',
+    // PRD 模板已处理的字段（与 TAPD 语义不同，不应被覆盖）
+    'label', 'status',
+  ]);
+  const extraFrontmatter: Record<string, string> = {};
+  const rawData = parsed.data as Record<string, unknown>;
+  for (const [key, value] of Object.entries(rawData)) {
+    if (!knownPlanKeys.has(key) && typeof value === 'string' && value.trim()) {
+      extraFrontmatter[key] = value.trim();
+    }
+  }
+
   return {
     title,
     creator: frontmatter.creator?.trim() || undefined,
@@ -331,6 +359,7 @@ export function loadPrdPlan(planPath: string, cwd = process.cwd()): LoadedPrdPla
       planAssumptions: toBulletList(frontmatter.plan_assumptions),
       selfcheckFocus: toBulletList(frontmatter.high_complexity_selfcheck),
     },
+    extraFrontmatter,
   };
 }
 
