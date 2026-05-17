@@ -44,6 +44,16 @@ export default function Header({
 
   const fileName = getFileName(currentFile);
   const displaySaveChangeCount = saveHasChanges && saveChangeCount > 0 ? saveChangeCount : 0;
+  const saveButton = (
+    <Button
+      className="header-save-button"
+      onClick={onSaveVersion}
+      disabled={saveDisabled}
+      loading={saveSubmitting}
+    >
+      更新版本
+    </Button>
+  );
 
   return (
     <div className="header-container">
@@ -85,16 +95,11 @@ export default function Header({
           >
             历史记录
           </Button>
-          <Badge count={displaySaveChangeCount} size="small" offset={[-6, 6]} className="header-save-badge">
-            <Button
-              className="header-save-button"
-              onClick={onSaveVersion}
-              disabled={saveDisabled}
-              loading={saveSubmitting}
-            >
-              更新版本
-            </Button>
-          </Badge>
+          {displaySaveChangeCount > 0 ? (
+            <Badge count={displaySaveChangeCount} size="small" offset={[-6, 6]} className="header-save-badge">
+              {saveButton}
+            </Badge>
+          ) : saveButton}
           <Button color="primary" variant="solid" icon={<CaretRightOutlined />} iconPosition="end" onClick={onOpenPublish}>
             发布项目
           </Button>

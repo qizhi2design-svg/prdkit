@@ -586,6 +586,8 @@ function App() {
             >
               <Preview
                 filePath={fileNav.selectedFile}
+                fileList={fileNav.fileList}
+                onLinkNavigation={(path) => fileNav.selectFile(path)}
                 activeTool={activeTool}
                 onToolChange={handleToolChange}
                 projectName={config?.projectName || 'PRDKit'}

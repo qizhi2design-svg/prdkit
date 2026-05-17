@@ -64,6 +64,8 @@ interface PreviewProps {
   onZoomChange?: (zoomPercent: number) => void;
   previewUrlOverride?: string | null;
   previewReadonly?: boolean;
+  fileList?: string[];
+  onLinkNavigation?: (filePath: string) => void;
 }
 
 type SelectedElement = ElementInfo;
@@ -152,6 +154,8 @@ export default function Preview({
   onZoomChange,
   previewUrlOverride = null,
   previewReadonly = false,
+  fileList,
+  onLinkNavigation,
 }: PreviewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -177,6 +181,8 @@ export default function Preview({
   const filePathRef = useRef(filePath);
   const onCanvasPanMoveRef = useRef(onCanvasPanMove);
   const onCanvasPanEndRef = useRef(onCanvasPanEnd);
+  const fileListRef = useRef(fileList);
+  const onLinkNavigationRef = useRef(onLinkNavigation);
 
   const [hoveredElement, setHoveredElement] = useState<HTMLElement | null>(null);
   const [selectionMode, setSelectionMode] = useState<'single' | 'multiple'>('single');
@@ -217,6 +223,8 @@ export default function Preview({
     filePathRef.current = filePath;
     onCanvasPanMoveRef.current = onCanvasPanMove;
     onCanvasPanEndRef.current = onCanvasPanEnd;
+    fileListRef.current = fileList;
+    onLinkNavigationRef.current = onLinkNavigation;
   });
 
   const inspectToolActive = activeTool === 'inspect';
@@ -309,6 +317,59 @@ export default function Preview({
       unbindIframeListeners();
     };
   }, []);
+
+  // iframe 超链接拦截：依赖 fileList，确保文件列表就绪后才绑定
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!fileList || fileList.length === 0) return;
+    if (!iframe) return;
+
+    const handleLinkClick = (event: MouseEvent) => {
+      const link = (event.target as HTMLElement).closest('a');
+      if (!link || !link.href) return;
+
+      try {
+        const url = new URL(link.href);
+        if (url.origin !== window.location.origin) return;
+
+        const pathname = url.pathname.replace(/\/$/, '');
+        const files = fileListRef.current;
+        if (!files || files.length === 0) return;
+
+        const match = files.find((f) => {
+          const normalized = f.replace(/\/index\.html$/, '');
+          return normalized === pathname || `/${normalized}` === pathname;
+        });
+        if (match) {
+          event.preventDefault();
+          event.stopPropagation();
+          onLinkNavigationRef.current?.(match);
+        }
+      } catch {
+        // 忽略非 URL 或无效的 href
+      }
+    };
+
+    const setupIframeListener = () => {
+      const iframeDoc = iframe?.contentDocument || iframe?.contentWindow?.document;
+      if (!iframeDoc) return;
+      iframeDoc.addEventListener('click', handleLinkClick, true);
+    };
+
+    const cleanupIframeListener = () => {
+      const iframeDoc = iframe?.contentDocument || iframe?.contentWindow?.document;
+      if (!iframeDoc) return;
+      iframeDoc.removeEventListener('click', handleLinkClick, true);
+    };
+
+    setupIframeListener();
+    iframe.addEventListener('load', setupIframeListener);
+
+    return () => {
+      cleanupIframeListener();
+      iframe.removeEventListener('load', setupIframeListener);
+    };
+  }, [fileList]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
