@@ -1,5 +1,7 @@
-// 视图模式类型
-export type ViewMode = 'preview' | 'inspect' | 'mark';
+// 工具态类型
+export type ActiveTool = 'none' | 'inspect' | 'mark';
+// 兼容旧命名，逐步迁移中
+export type ViewMode = ActiveTool;
 
 // 原型节点类型
 export interface PrototypeNode {

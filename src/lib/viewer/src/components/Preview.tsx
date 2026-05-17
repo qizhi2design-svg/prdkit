@@ -1,15 +1,18 @@
+import { CompressOutlined, CopyOutlined } from '@ant-design/icons';
+import { Button, Dropdown, Empty, Tooltip, message, type MenuProps } from 'antd';
 import { useEffect, useRef, useState } from 'react';
-import { Empty, message, Segmented, Button } from 'antd';
-import './Preview.css';
 import { getElementInfo, getElementPath, formatMultipleElementsInfo, generateUniqueSelector, findElementBySelector, isElementVisible, isElementCovered, type ElementInfo } from '../utils/domUtils';
 import { getModifierKey } from '../utils/platform';
 import { copySkillClipboardText } from '../utils/clipboard';
-import Hotkey from './Hotkey';
-import type { ViewMode, Mark, PendingMarkInfo, ViewerSkillConfig } from '../types';
+import MarkPanel from './MarkPanel';
+import { computePreviewOverlayRect } from './previewGeometry';
+import type { ActiveTool, Mark, PendingMarkInfo, ViewerSkillConfig, MarkUpdatePatch, CanvasPanOffset, CanvasViewportSize } from '../types';
+import './Preview.css';
 
 interface PreviewProps {
   filePath: string | null;
-  viewMode: ViewMode;
+  activeTool: ActiveTool;
+  onToolChange: (tool: ActiveTool) => void;
   projectName: string;
   prototypesDir: string;
   wsConnected: boolean;
@@ -21,28 +24,83 @@ interface PreviewProps {
   relinkingMarkId: string | null;
   onMarkPrepare: (info: PendingMarkInfo) => void;
   onMarkRelink: (markId: string, info: PendingMarkInfo) => void;
-  onMarkSelect: (markId: string) => void;
+  onMarkSelect: (markId: string | null) => void;
   onMarkCancel: () => void;
   onMarkResolutionChange: (missingMarkIds: string[]) => void;
   onMarkVisibilityChange?: (hiddenMarkIds: string[]) => void;
   onToggleMarkPanel?: () => void;
   markPanelCollapsed?: boolean;
-  htmlContent?: string; // 用于发布模式的 HTML 内容
+  markPanelWidth?: number;
+  markPanelResizing?: boolean;
+  onMarkPanelResizeStart?: (e: React.MouseEvent) => void;
+  onMarkPanelCollapsedChange?: (collapsed: boolean) => void;
+  onMarkCreate: (title: string, description: string) => void;
+  onMarkUpdate: (markId: string, patch: MarkUpdatePatch) => void;
+  onMarkDelete: (markId: string) => void;
+  onMarkRelinkStart: (markId: string) => void;
+  onMarkRelinkCancel: () => void;
+  onMarkRefresh: () => void;
+  missingMarkIds: string[];
+  hiddenMarkIds: string[];
+  viewportSize: CanvasViewportSize;
+  canvasScale: number;
+  canvasWidth: number;
+  canvasHeight: number;
+  panOffset: CanvasPanOffset;
+  isPannable: boolean;
+  isDraggingCanvas: boolean;
+  onStageSizeChange: (size: CanvasViewportSize) => void;
+  onCanvasContentSizeChange?: (size: CanvasViewportSize) => void;
+  onCanvasPanStart: (point: { x: number; y: number }) => void;
+  onCanvasPanMove: (point: { x: number; y: number }) => void;
+  onCanvasPanEnd: () => void;
+  onZoomReset?: () => void;
+  zoomPercent?: number;
+  zoomOptions?: number[];
+  canZoomIn?: boolean;
+  canZoomOut?: boolean;
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+  onZoomChange?: (zoomPercent: number) => void;
   previewUrlOverride?: string | null;
   previewReadonly?: boolean;
 }
 
 type SelectedElement = ElementInfo;
-type PreviewViewport = 'desktop' | 'mobile';
+const TOOL_CYCLE_ORDER: ActiveTool[] = ['none', 'inspect', 'mark'];
 
-const VIEWPORT_DIMENSIONS: Record<PreviewViewport, { width: number; height: number }> = {
-  desktop: { width: 1440, height: 900 },
-  mobile: { width: 390, height: 844 },
-};
+function isEditableTarget(target: EventTarget | null) {
+  const element = target as HTMLElement | null;
+  if (!element || typeof element.tagName !== 'string') return false;
+
+  const tagName = element.tagName;
+  return tagName === 'INPUT'
+    || tagName === 'TEXTAREA'
+    || tagName === 'SELECT'
+    || element.isContentEditable;
+}
+
+function isMarkInteractionTarget(target: EventTarget | null) {
+  const element = target as HTMLElement | null;
+  return Boolean(element?.closest('.preview-mark-highlight, .preview-mark-number'));
+}
+
+function getFallbackOverlayRect(mark: Mark, canvasScale: number) {
+  const borderCompensation = 2;
+
+  return {
+    display: 'block',
+    left: Math.max((mark.rect?.left ?? 0) * canvasScale - borderCompensation / 2, 0),
+    top: Math.max((mark.rect?.top ?? 0) * canvasScale - borderCompensation / 2, 0),
+    width: Math.max((mark.rect?.width ?? 0) * canvasScale + borderCompensation, 18),
+    height: Math.max((mark.rect?.height ?? 0) * canvasScale + borderCompensation, 18),
+  };
+}
 
 export default function Preview({
   filePath,
-  viewMode,
+  activeTool,
+  onToolChange,
   projectName,
   prototypesDir,
   wsConnected,
@@ -60,6 +118,38 @@ export default function Preview({
   onMarkVisibilityChange,
   onToggleMarkPanel,
   markPanelCollapsed = true,
+  markPanelWidth = 350,
+  markPanelResizing = false,
+  onMarkPanelResizeStart,
+  onMarkPanelCollapsedChange,
+  onMarkCreate,
+  onMarkUpdate,
+  onMarkDelete,
+  onMarkRelinkStart,
+  onMarkRelinkCancel,
+  onMarkRefresh,
+  missingMarkIds,
+  hiddenMarkIds,
+  viewportSize,
+  canvasScale,
+  canvasWidth,
+  canvasHeight,
+  panOffset,
+  isPannable,
+  isDraggingCanvas,
+  onStageSizeChange,
+  onCanvasContentSizeChange,
+  onCanvasPanStart,
+  onCanvasPanMove,
+  onCanvasPanEnd,
+  onZoomReset,
+  zoomPercent = 100,
+  zoomOptions = [],
+  canZoomIn = false,
+  canZoomOut = false,
+  onZoomIn,
+  onZoomOut,
+  onZoomChange,
   previewUrlOverride = null,
   previewReadonly = false,
 }: PreviewProps) {
@@ -68,8 +158,7 @@ export default function Preview({
   const canvasRef = useRef<HTMLDivElement>(null);
   const unmountedRef = useRef(false);
 
-  // 使用 ref 存储最新的 props 和状态，避免频繁重新注册事件监听器
-  const viewModeRef = useRef(viewMode);
+  const activeToolRef = useRef(activeTool);
   const marksRef = useRef(marks);
   const relinkingMarkIdRef = useRef(relinkingMarkId);
   const onMarkPrepareRef = useRef(onMarkPrepare);
@@ -84,20 +173,20 @@ export default function Preview({
   const pendingMarkInfoRef = useRef(pendingMarkInfo);
   const onMarkCancelRef = useRef(onMarkCancel);
   const onToggleMarkPanelRef = useRef(onToggleMarkPanel);
+  const onToolChangeRef = useRef(onToolChange);
   const filePathRef = useRef(filePath);
+  const onCanvasPanMoveRef = useRef(onCanvasPanMove);
+  const onCanvasPanEndRef = useRef(onCanvasPanEnd);
 
   const [hoveredElement, setHoveredElement] = useState<HTMLElement | null>(null);
   const [selectionMode, setSelectionMode] = useState<'single' | 'multiple'>('single');
   const [selectedElements, setSelectedElements] = useState<SelectedElement[]>([]);
   const selectedElementsRef = useRef(selectedElements);
-  const [marksVisible, setMarksVisible] = useState(true); // 标记是否可见
-  const [previewViewport] = useState<PreviewViewport>('desktop');
-  const [zoomPercent] = useState(100);
-  const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
+  const [marksVisible, setMarksVisible] = useState(true);
   const [overlayRefreshTick, setOverlayRefreshTick] = useState(0);
   const [iframeReloadToken, setIframeReloadToken] = useState(0);
+  const [spacePressed, setSpacePressed] = useState(false);
 
-  // WebSocket 断开提示增加 2s 延迟，避免初次加载时闪烁
   const [showDisconnected, setShowDisconnected] = useState(false);
   useEffect(() => {
     if (!wsConnected) {
@@ -107,9 +196,8 @@ export default function Preview({
     setShowDisconnected(false);
   }, [wsConnected]);
 
-  // 更新 refs
   useEffect(() => {
-    viewModeRef.current = viewMode;
+    activeToolRef.current = activeTool;
     marksRef.current = marks;
     relinkingMarkIdRef.current = relinkingMarkId;
     onMarkPrepareRef.current = onMarkPrepare;
@@ -117,6 +205,7 @@ export default function Preview({
     onMarkSelectRef.current = onMarkSelect;
     onMarkCancelRef.current = onMarkCancel;
     onToggleMarkPanelRef.current = onToggleMarkPanel;
+    onToolChangeRef.current = onToolChange;
     previewReadonlyRef.current = previewReadonly;
     projectNameRef.current = projectName;
     prototypesDirRef.current = prototypesDir;
@@ -126,29 +215,36 @@ export default function Preview({
     pendingMarkInfoRef.current = pendingMarkInfo;
     selectedElementsRef.current = selectedElements;
     filePathRef.current = filePath;
+    onCanvasPanMoveRef.current = onCanvasPanMove;
+    onCanvasPanEndRef.current = onCanvasPanEnd;
   });
 
-  const marksVisibleInCurrentMode = viewMode === 'mark' ? marksVisible : false;
-  const markOverlaysVisible = viewMode === 'mark' && marksVisible;
-
-  const isEditableTarget = (target: EventTarget | null) => {
-    const element = target as HTMLElement | null;
-    if (!element || typeof element.tagName !== 'string') return false;
-
-    const tagName = element.tagName;
-    return tagName === 'INPUT'
-      || tagName === 'TEXTAREA'
-      || tagName === 'SELECT'
-      || element.isContentEditable;
-  };
-
-  const isToggleMarksKey = (event: KeyboardEvent) => {
-    return event.code === 'KeyX' || event.key === 'x' || event.key === 'X';
-  };
+  const inspectToolActive = activeTool === 'inspect';
+  const markToolActive = activeTool === 'mark';
+  const marksVisibleInCurrentMode = markToolActive ? marksVisible : false;
+  const markOverlaysVisible = markToolActive && marksVisible;
+  const isPanModeActive = isPannable && spacePressed;
+  const shouldRenderMarkPanel = markToolActive;
+  const zoomMenuItems: MenuProps['items'] = zoomOptions.map((option) => ({
+    key: String(option),
+    label: (
+      <div className="preview-zoom-menu-item">
+        <span>{option}%</span>
+        <span className="preview-zoom-menu-check">{Math.abs(option - zoomPercent) < 0.5 ? '✓' : ''}</span>
+      </div>
+    ),
+    onClick: () => onZoomChange?.(option),
+  }));
 
   const requestOverlayRefresh = () => {
     if (unmountedRef.current) return;
-    setOverlayRefreshTick(prev => prev + 1);
+    setOverlayRefreshTick((prev) => prev + 1);
+  };
+
+  const cycleTool = (currentTool: ActiveTool) => {
+    const currentIndex = TOOL_CYCLE_ORDER.indexOf(currentTool);
+    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % TOOL_CYCLE_ORDER.length;
+    return TOOL_CYCLE_ORDER[nextIndex];
   };
 
   useEffect(() => {
@@ -161,22 +257,155 @@ export default function Preview({
   useEffect(() => {
     if (reloadVersion === 0) return;
     if (unmountedRef.current) return;
-    console.log('收到刷新通知，重新加载预览');
     setIframeReloadToken(Date.now());
   }, [reloadVersion]);
 
   useEffect(() => {
     requestOverlayRefresh();
-  }, [previewViewport, zoomPercent]);
+  }, [canvasScale]);
+
+  useEffect(() => {
+    if (!isPanModeActive && isDraggingCanvas) {
+      onCanvasPanEndRef.current();
+    }
+  }, [isDraggingCanvas, isPanModeActive]);
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+
+    const handleToolHotkey = (event: KeyboardEvent) => {
+      if (!event.shiftKey || event.key !== 'Tab') return;
+      if (isEditableTarget(event.target)) return;
+
+      event.preventDefault();
+      onToolChangeRef.current(cycleTool(activeToolRef.current));
+    };
+
+    const bindIframeListeners = () => {
+      const iframeDoc = iframe?.contentDocument || iframe?.contentWindow?.document;
+      const iframeWindow = iframe?.contentWindow;
+      if (!iframeDoc || !iframeWindow) return;
+
+      iframeWindow.addEventListener('keydown', handleToolHotkey, true);
+      iframeDoc.addEventListener('keydown', handleToolHotkey, true);
+    };
+
+    const unbindIframeListeners = () => {
+      const iframeDoc = iframe?.contentDocument || iframe?.contentWindow?.document;
+      const iframeWindow = iframe?.contentWindow;
+      if (!iframeDoc || !iframeWindow) return;
+
+      iframeWindow.removeEventListener('keydown', handleToolHotkey, true);
+      iframeDoc.removeEventListener('keydown', handleToolHotkey, true);
+    };
+
+    window.addEventListener('keydown', handleToolHotkey, true);
+    iframe?.addEventListener('load', bindIframeListeners);
+    bindIframeListeners();
+
+    return () => {
+      window.removeEventListener('keydown', handleToolHotkey, true);
+      iframe?.removeEventListener('load', bindIframeListeners);
+      unbindIframeListeners();
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== 'Space') return;
+      if (isEditableTarget(event.target)) return;
+      event.preventDefault();
+      setSpacePressed(true);
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.code !== 'Space') return;
+      setSpacePressed(false);
+    };
+
+    const iframe = iframeRef.current;
+
+    const bindIframeListeners = () => {
+      const iframeDoc = iframe?.contentDocument || iframe?.contentWindow?.document;
+      const iframeWindow = iframe?.contentWindow;
+      if (!iframeDoc || !iframeWindow) return;
+
+      iframeWindow.addEventListener('keydown', handleKeyDown, true);
+      iframeDoc.addEventListener('keydown', handleKeyDown, true);
+      iframeWindow.addEventListener('keyup', handleKeyUp, true);
+      iframeDoc.addEventListener('keyup', handleKeyUp, true);
+      iframeWindow.addEventListener('blur', () => setSpacePressed(false));
+    };
+
+    const unbindIframeListeners = () => {
+      const iframeDoc = iframe?.contentDocument || iframe?.contentWindow?.document;
+      const iframeWindow = iframe?.contentWindow;
+      if (!iframeDoc || !iframeWindow) return;
+
+      iframeWindow.removeEventListener('keydown', handleKeyDown, true);
+      iframeDoc.removeEventListener('keydown', handleKeyDown, true);
+      iframeWindow.removeEventListener('keyup', handleKeyUp, true);
+      iframeDoc.removeEventListener('keyup', handleKeyUp, true);
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keyup', handleKeyUp, true);
+    window.addEventListener('blur', () => setSpacePressed(false));
+    iframe?.addEventListener('load', bindIframeListeners);
+    bindIframeListeners();
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('keyup', handleKeyUp, true);
+      iframe?.removeEventListener('load', bindIframeListeners);
+      unbindIframeListeners();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isDraggingCanvas) return;
+
+    const handlePointerMove = (event: PointerEvent) => {
+      onCanvasPanMoveRef.current({ x: event.clientX, y: event.clientY });
+    };
+
+    const handlePointerEnd = () => {
+      onCanvasPanEndRef.current();
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerEnd);
+    window.addEventListener('pointercancel', handlePointerEnd);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerEnd);
+      window.removeEventListener('pointercancel', handlePointerEnd);
+    };
+  }, [isDraggingCanvas]);
+
+  useEffect(() => {
+    onCanvasContentSizeChange?.(viewportSize);
+  }, [onCanvasContentSizeChange, viewportSize]);
 
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
 
     const updateStageSize = () => {
-      setStageSize({
-        width: stage.clientWidth,
-        height: stage.clientHeight,
+      const caption = stage.querySelector<HTMLElement>('.preview-stage-caption');
+      const stageStyle = window.getComputedStyle(stage);
+      const paddingLeft = Number.parseFloat(stageStyle.paddingLeft || '0') || 0;
+      const paddingRight = Number.parseFloat(stageStyle.paddingRight || '0') || 0;
+      const paddingBottom = Number.parseFloat(stageStyle.paddingBottom || '0') || 0;
+      const captionHeight = caption?.offsetHeight ?? 0;
+      const captionMarginBottom = caption
+        ? Number.parseFloat(window.getComputedStyle(caption).marginBottom || '0') || 0
+        : 0;
+
+      onStageSizeChange({
+        width: Math.max(stage.clientWidth - paddingLeft - paddingRight, 0),
+        height: Math.max(stage.clientHeight - captionHeight - captionMarginBottom - paddingBottom, 0),
       });
     };
 
@@ -187,9 +416,8 @@ export default function Preview({
     return () => {
       resizeObserver.disconnect();
     };
-  }, []);
+  }, [onStageSizeChange]);
 
-  // 当预览容器、iframe 尺寸或 iframe 内部滚动/重排变化时，强制重绘 overlay
   useEffect(() => {
     const iframe = iframeRef.current;
     const stage = stageRef.current;
@@ -222,8 +450,7 @@ export default function Preview({
     };
 
     const startTransitionLoop = () => {
-      if (unmountedRef.current) return;
-      if (transitionLoopId !== null) return;
+      if (unmountedRef.current || transitionLoopId !== null) return;
 
       const tick = () => {
         scheduleRefresh();
@@ -241,7 +468,32 @@ export default function Preview({
       const iframeDoc = iframe.contentDocument || iframeWindow?.document;
       if (!iframeWindow || !iframeDoc) return;
 
+      const updateCanvasContentSize = () => {
+        const docEl = iframeDoc.documentElement;
+        const body = iframeDoc.body;
+        const contentWidth = Math.max(
+          viewportSize.width,
+          docEl?.scrollWidth ?? 0,
+          docEl?.offsetWidth ?? 0,
+          body?.scrollWidth ?? 0,
+          body?.offsetWidth ?? 0
+        );
+        const contentHeight = Math.max(
+          viewportSize.height,
+          docEl?.scrollHeight ?? 0,
+          docEl?.offsetHeight ?? 0,
+          body?.scrollHeight ?? 0,
+          body?.offsetHeight ?? 0
+        );
+
+        onCanvasContentSizeChange?.({
+          width: contentWidth,
+          height: contentHeight,
+        });
+      };
+
       const resizeObserver = new ResizeObserver(() => {
+        updateCanvasContentSize();
         scheduleRefresh();
       });
       resizeObserver.observe(iframeDoc.documentElement);
@@ -250,6 +502,7 @@ export default function Preview({
       }
 
       const mutationObserver = new MutationObserver(() => {
+        updateCanvasContentSize();
         scheduleRefresh();
       });
       mutationObserver.observe(iframeDoc.documentElement, {
@@ -260,15 +513,18 @@ export default function Preview({
       });
 
       iframeWindow.addEventListener('scroll', scheduleRefresh, { passive: true });
+      iframeDoc.addEventListener('scroll', scheduleRefresh, { passive: true, capture: true });
       iframeWindow.addEventListener('resize', scheduleRefresh);
 
       iframeObserversCleanup = () => {
         resizeObserver.disconnect();
         mutationObserver.disconnect();
         iframeWindow.removeEventListener('scroll', scheduleRefresh);
+        iframeDoc.removeEventListener('scroll', scheduleRefresh, true);
         iframeWindow.removeEventListener('resize', scheduleRefresh);
       };
 
+      updateCanvasContentSize();
       scheduleRefresh();
     };
 
@@ -325,24 +581,38 @@ export default function Preview({
       window.removeEventListener('scroll', scheduleRefresh);
       iframe.removeEventListener('load', setupIframeObservers);
     };
-  }, [filePath]);
+  }, [filePath, onCanvasContentSizeChange, viewportSize.height, viewportSize.width]);
 
-  // 元素检查模式和标记模式
+  const getOverlayRect = (element: Element) => {
+    const iframe = iframeRef.current;
+    const canvas = canvasRef.current;
+    if (!iframe || !canvas) return null;
+
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!iframeDoc) return null;
+
+    return computePreviewOverlayRect({
+      elementRect: element.getBoundingClientRect(),
+      iframeRect: iframe.getBoundingClientRect(),
+      canvasRect: canvas.getBoundingClientRect(),
+      iframeViewportWidth: iframeDoc.documentElement?.clientWidth || iframe.clientWidth || viewportSize.width,
+      iframeViewportHeight: iframeDoc.documentElement?.clientHeight || iframe.clientHeight || viewportSize.height,
+    });
+  };
+
   useEffect(() => {
     const iframe = iframeRef.current;
-    const isInteractiveMode = viewMode === 'inspect' || (viewMode === 'mark' && marksVisibleInCurrentMode);
+    const isInteractiveMode = inspectToolActive || (markToolActive && marksVisibleInCurrentMode);
 
     if (!iframe || !isInteractiveMode) {
       setHoveredElement(null);
       return;
     }
 
-    // 等待 iframe 加载完成后再添加事件监听器
     let currentCleanup: (() => void) | null = null;
 
     const setupInspectMode = () => {
       if (unmountedRef.current) return;
-      // 先清理旧的监听器
       if (currentCleanup) {
         currentCleanup();
         currentCleanup = null;
@@ -351,54 +621,78 @@ export default function Preview({
       const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
       if (!iframeDoc || !iframeDoc.head) return;
 
-    // 鼠标移动事件
-    const handleMouseMove = (e: MouseEvent) => {
-      if (unmountedRef.current) return;
-      const target = e.target as HTMLElement;
-      if (target && target !== iframeDoc.body && target !== iframeDoc.documentElement) {
-        setHoveredElement(target);
-      } else {
-        // 鼠标移到 body 或 documentElement 时清除高亮
-        setHoveredElement(null);
-      }
-    };
+      const handleMouseMove = (e: MouseEvent) => {
+        if (unmountedRef.current) return;
+        const target = e.target as HTMLElement;
+        if (target && target !== iframeDoc.body && target !== iframeDoc.documentElement) {
+          setHoveredElement(target);
+        } else {
+          setHoveredElement(null);
+        }
+      };
 
-    // 点击事件
-    const handleClick = async (e: MouseEvent) => {
-      if (unmountedRef.current) return;
-      e.preventDefault();
-      e.stopPropagation();
+      const handleClick = async (e: MouseEvent) => {
+        if (unmountedRef.current) return;
+        e.preventDefault();
+        e.stopPropagation();
 
-      const target = e.target as HTMLElement;
-      if (!target) return;
+        const target = e.target as HTMLElement;
+        if (!target) return;
 
-      // 从 ref 读取最新值
-      const currentViewMode = viewModeRef.current;
-      const currentMarks = marksRef.current;
-      const currentRelinkingMarkId = relinkingMarkIdRef.current;
-      const currentOnMarkPrepare = onMarkPrepareRef.current;
-      const currentOnMarkRelink = onMarkRelinkRef.current;
-      const currentOnMarkSelect = onMarkSelectRef.current;
-      const currentPreviewReadonly = previewReadonlyRef.current;
-      const currentProjectName = projectNameRef.current;
-      const currentPrototypesDir = prototypesDirRef.current;
-      const currentSelectionMode = selectionModeRef.current;
-      const currentViewerSkills = viewerSkillsRef.current;
+        const currentActiveTool = activeToolRef.current;
+        const currentMarks = marksRef.current;
+        const currentRelinkingMarkId = relinkingMarkIdRef.current;
+        const currentOnMarkPrepare = onMarkPrepareRef.current;
+        const currentOnMarkRelink = onMarkRelinkRef.current;
+        const currentOnMarkSelect = onMarkSelectRef.current;
+        const currentPreviewReadonly = previewReadonlyRef.current;
+        const currentProjectName = projectNameRef.current;
+        const currentPrototypesDir = prototypesDirRef.current;
+        const currentSelectionMode = selectionModeRef.current;
+        const currentViewerSkills = viewerSkillsRef.current;
+        const wantsMultiSelect = currentSelectionMode === 'multiple' || e.shiftKey;
 
-      // 标记模式：检查是否已有标记，有则显示详情，无则准备创建
-      if (currentViewMode === 'mark') {
-        // 生成唯一选择器
-        const selector = generateUniqueSelector(target);
+        if (currentActiveTool === 'mark') {
+          const selector = generateUniqueSelector(target);
 
-        if (currentRelinkingMarkId) {
-          const duplicatedMark = currentMarks.find((mark) => mark.selector === selector && mark.id !== currentRelinkingMarkId);
-          if (duplicatedMark) {
-            message.warning(`该元素已绑定到标记”${duplicatedMark.title}”`);
+          if (currentRelinkingMarkId) {
+            const duplicatedMark = currentMarks.find((mark) => mark.selector === selector && mark.id !== currentRelinkingMarkId);
+            if (duplicatedMark) {
+              message.warning(`该元素已绑定到标记”${duplicatedMark.title}”`);
+              return;
+            }
+
+            const rect = target.getBoundingClientRect();
+            currentOnMarkRelink(currentRelinkingMarkId, {
+              selector,
+              domPath: getElementPath(target),
+              position: {
+                x: e.clientX,
+                y: e.clientY,
+              },
+              rect: {
+                top: rect.top,
+                left: rect.left,
+                width: rect.width,
+                height: rect.height,
+              },
+            });
+            return;
+          }
+
+          const existingMark = currentMarks.find((mark) => mark.selector === selector);
+          if (existingMark) {
+            currentOnMarkSelect(existingMark.id);
+            return;
+          }
+
+          if (currentPreviewReadonly) {
+            message.info('历史版本预览中不可新增标记，请先还原到该版本');
             return;
           }
 
           const rect = target.getBoundingClientRect();
-          currentOnMarkRelink(currentRelinkingMarkId, {
+          currentOnMarkPrepare({
             selector,
             domPath: getElementPath(target),
             position: {
@@ -415,95 +709,51 @@ export default function Preview({
           return;
         }
 
-        // 检查是否已经有标记使用这个选择器
-        const existingMark = currentMarks.find(mark => mark.selector === selector);
+        const info = getElementInfo(target, currentProjectName, currentPrototypesDir, filePath);
 
-        if (existingMark) {
-          // 如果已有标记，切换到详情视图
-          currentOnMarkSelect(existingMark.id);
-          return;
-        }
-
-        if (currentPreviewReadonly) {
-          message.info('历史版本预览中不可新增标记，请先还原到该版本');
-          return;
-        }
-
-        // 如果没有标记，准备创建新标记
-        const rect = target.getBoundingClientRect();
-        const domPath = getElementPath(target);
-
-        // 调用 onMarkPrepare 传递待创建标记信息
-        currentOnMarkPrepare({
-          selector: selector,
-          domPath: domPath,
-          position: {
-            x: e.clientX,
-            y: e.clientY
-          },
-          rect: {
-            top: rect.top,
-            left: rect.left,
-            width: rect.width,
-            height: rect.height
+        if (!wantsMultiSelect) {
+          try {
+            await copySkillClipboardText(
+              {
+                skillCommand: currentViewerSkills.inspectCopySkillCommand,
+                payload: info,
+              },
+              {
+                successPrefix: '已复制 DOM skill 指令',
+                terminalGuide: currentViewerSkills.copyTerminalGuide,
+              }
+            );
+          } catch (error) {
+            console.error('复制失败:', error);
+            message.error('复制失败，请检查浏览器权限');
           }
-        });
-        return;
-      }
-
-      // 编辑模式：复制 DOM 信息
-      const info = getElementInfo(target, currentProjectName, currentPrototypesDir, filePath);
-
-      if (currentSelectionMode === 'single') {
-        // 单选模式：直接复制
-        try {
-          await copySkillClipboardText(
-            {
-              skillCommand: currentViewerSkills.inspectCopySkillCommand,
-              payload: info,
-            },
-            {
-              successPrefix: '已复制 DOM skill 指令',
-              terminalGuide: currentViewerSkills.copyTerminalGuide,
+        } else {
+          if (currentSelectionMode !== 'multiple') {
+            setSelectionMode('multiple');
+          }
+          setSelectedElements((prev) => {
+            const isSelected = prev.some((item) => item.element === target);
+            if (isSelected) {
+              return prev.filter((item) => item.element !== target);
             }
-          );
-        } catch (error) {
-          console.error('复制失败:', error);
-          message.error('复制失败，请检查浏览器权限');
-        }
-      } else {
-        // 多选模式：添加到选中列表
-        setSelectedElements(prev => {
-          // 检查是否已选中
-          const isSelected = prev.some(item => item.element === target);
-          if (isSelected) {
-            // 取消选中
-            return prev.filter(item => item.element !== target);
-          } else {
-            // 添加选中
             return [...prev, { element: target, info }];
-          }
-        });
-      }
-    };
+          });
+        }
+      };
 
-    // 鼠标移出 iframe 时清除高亮
-    const handleMouseLeave = () => {
-      if (unmountedRef.current) return;
-      setHoveredElement(null);
-    };
+      const handleMouseLeave = () => {
+        if (unmountedRef.current) return;
+        setHoveredElement(null);
+      };
 
-    // 添加事件监听
       iframeDoc.addEventListener('mousemove', handleMouseMove);
       iframeDoc.addEventListener('click', handleClick, true);
       iframe.addEventListener('mouseleave', handleMouseLeave);
 
-      // 添加样式来改变鼠标指针
       const style = iframeDoc.createElement('style');
       style.textContent = '* { cursor: crosshair !important; }';
       iframeDoc.head.appendChild(style);
 
-      // 保存 cleanup 函数
       currentCleanup = () => {
         iframeDoc.removeEventListener('mousemove', handleMouseMove);
         iframeDoc.removeEventListener('click', handleClick, true);
@@ -512,10 +762,7 @@ export default function Preview({
       };
     };
 
-    // 立即尝试设置（如果 iframe 已加载）
     setupInspectMode();
-
-    // 监听 iframe load 事件（处理文件切换的情况）
     iframe.addEventListener('load', setupInspectMode);
 
     return () => {
@@ -524,7 +771,7 @@ export default function Preview({
         currentCleanup();
       }
     };
-  }, [viewMode, filePath, marksVisibleInCurrentMode]);
+  }, [inspectToolActive, markToolActive, filePath, marksVisibleInCurrentMode]);
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -558,22 +805,19 @@ export default function Preview({
     };
   }, [marks, onMarkResolutionChange, onMarkVisibilityChange, reloadVersion, filePath, overlayRefreshTick]);
 
-  // 清理选中元素（当切换模式时）
   useEffect(() => {
-    if (viewMode !== 'inspect' || selectionMode !== 'multiple') {
+    if (!inspectToolActive || selectionMode !== 'multiple') {
       setSelectedElements([]);
     }
-  }, [viewMode, selectionMode]);
+  }, [inspectToolActive, selectionMode]);
 
-  // 切换文件时清空选中元素
   useEffect(() => {
     setSelectedElements([]);
     setHoveredElement(null);
   }, [filePath]);
 
-  // 编辑模式键盘快捷键监听（通过 ref 读取数据，仅 viewMode 变化时重建）
   useEffect(() => {
-    if (viewMode !== 'inspect') return;
+    if (!inspectToolActive) return;
 
     const iframe = iframeRef.current;
     if (!iframe) return;
@@ -595,7 +839,6 @@ export default function Preview({
           return;
         }
 
-        // Ctrl/Cmd+C: 复制选中的元素
         if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
           if (selectionModeRef.current === 'multiple' && selectedElementsRef.current.length > 0) {
             e.preventDefault();
@@ -625,21 +868,15 @@ export default function Preview({
           }
         }
 
-        // ESC: 清空选择
         if (e.key === 'Escape') {
-          if (selectedElementsRef.current.length > 0) {
+          if (selectionModeRef.current === 'multiple') {
             e.preventDefault();
             setSelectedElements([]);
-            message.info('已清空选择');
+            setSelectionMode('single');
+            message.info(selectedElementsRef.current.length > 0 ? '已清空选择并退出批量选择' : '已退出批量选择');
           }
         }
 
-        // Shift+Tab: 切换单选/多选模式
-        if (e.shiftKey && e.key === 'Tab') {
-          e.preventDefault();
-          const newMode = selectionModeRef.current === 'single' ? 'multiple' : 'single';
-          setSelectionMode(newMode);
-        }
       };
 
       window.addEventListener('keydown', handleKeyDown, true);
@@ -652,8 +889,6 @@ export default function Preview({
     };
 
     setupKeyboardListeners();
-
-    // 监听 iframe load 事件，重新加载后自动重注册
     iframe.addEventListener('load', setupKeyboardListeners);
 
     return () => {
@@ -662,11 +897,10 @@ export default function Preview({
         currentCleanup();
       }
     };
-  }, [viewMode]);
+  }, [inspectToolActive]);
 
-  // 标记模式键盘快捷键监听（通过 ref 读取数据，仅 viewMode 变化时重建）
   useEffect(() => {
-    if (viewMode !== 'mark') return;
+    if (!markToolActive) return;
 
     const iframe = iframeRef.current;
     if (!iframe) return;
@@ -685,64 +919,48 @@ export default function Preview({
       const handleKeyDown = (e: KeyboardEvent) => {
         const isInputFocused = isEditableTarget(e.target);
 
-        // X 键: 切换标记显示/隐藏
-        if (isToggleMarksKey(e)) {
-          if (!isInputFocused) {
-            e.preventDefault();
-            setMarksVisible(prev => !prev);
-          }
+        if ((e.code === 'KeyX' || e.key === 'x' || e.key === 'X') && !isInputFocused) {
+          e.preventDefault();
+          setMarksVisible((prev) => !prev);
         }
 
-        // 上箭头: 选择上一个标记（不在输入框中时）
         if (e.key === 'ArrowUp' && !isInputFocused) {
           e.preventDefault();
-          const marks = marksRef.current;
-          if (marks.length === 0) return;
+          const currentMarks = marksRef.current;
+          if (currentMarks.length === 0) return;
 
           const currentIndex = selectedMarkIdRef.current
-            ? marks.findIndex(m => m.id === selectedMarkIdRef.current)
+            ? currentMarks.findIndex((m) => m.id === selectedMarkIdRef.current)
             : -1;
-
-          const prevIndex = currentIndex <= 0 ? marks.length - 1 : currentIndex - 1;
-          onMarkSelectRef.current(marks[prevIndex].id);
+          const prevIndex = currentIndex <= 0 ? currentMarks.length - 1 : currentIndex - 1;
+          onMarkSelectRef.current(currentMarks[prevIndex].id);
         }
 
-        // 下箭头: 选择下一个标记（不在输入框中时）
         if (e.key === 'ArrowDown' && !isInputFocused) {
           e.preventDefault();
-          const marks = marksRef.current;
-          if (marks.length === 0) return;
+          const currentMarks = marksRef.current;
+          if (currentMarks.length === 0) return;
 
           const currentIndex = selectedMarkIdRef.current
-            ? marks.findIndex(m => m.id === selectedMarkIdRef.current)
+            ? currentMarks.findIndex((m) => m.id === selectedMarkIdRef.current)
             : -1;
-
-          const nextIndex = currentIndex >= marks.length - 1 ? 0 : currentIndex + 1;
-          onMarkSelectRef.current(marks[nextIndex].id);
+          const nextIndex = currentIndex >= currentMarks.length - 1 ? 0 : currentIndex + 1;
+          onMarkSelectRef.current(currentMarks[nextIndex].id);
         }
 
-        // ESC: 退出详情/新增，返回列表（任何时候都可以）
         if (e.key === 'Escape') {
           if (pendingMarkInfoRef.current) {
             e.preventDefault();
             onMarkCancelRef.current();
           } else if (selectedMarkIdRef.current) {
             e.preventDefault();
-            onMarkSelectRef.current('');
+            onMarkSelectRef.current(null);
           }
         }
 
-        // H 键: 返回列表并折叠面板
-        if (e.key === 'h' || e.key === 'H') {
-          if (!isInputFocused) {
-            e.preventDefault();
-            if (pendingMarkInfoRef.current) {
-              onMarkCancelRef.current();
-            } else if (selectedMarkIdRef.current) {
-              onMarkSelectRef.current('');
-            }
-            onToggleMarkPanelRef.current?.();
-          }
+        if ((e.key === 'h' || e.key === 'H') && !isInputFocused) {
+          e.preventDefault();
+          onToggleMarkPanelRef.current?.();
         }
       };
 
@@ -756,8 +974,6 @@ export default function Preview({
     };
 
     setup();
-
-    // iframe 重新加载后自动重注册
     iframe.addEventListener('load', setup);
 
     return () => {
@@ -766,9 +982,24 @@ export default function Preview({
         currentCleanup();
       }
     };
-  }, [viewMode]);
+  }, [markToolActive]);
 
-  // 复制所有选中的元素信息
+  useEffect(() => {
+    if (!inspectToolActive) {
+      setSelectedElements([]);
+      setSelectionMode('single');
+    }
+  }, [inspectToolActive]);
+
+  useEffect(() => {
+    if (!markToolActive) {
+      setHoveredElement(null);
+      setMarksVisible(true);
+    }
+  }, [markToolActive]);
+
+  // auto-expand 逻辑由 App.tsx 统一处理
+
   const handleCopyAll = async () => {
     if (selectedElements.length === 0) {
       message.warning('请先选择元素');
@@ -799,24 +1030,18 @@ export default function Preview({
     }
   };
 
-  // 清空选择
-  const handleClearSelection = () => {
-    setSelectedElements([]);
-    message.info('已清空选择');
-  };
-
-  // 切换选择模式时清空选择
-  const handleSelectionModeChange = (mode: 'single' | 'multiple') => {
-    setSelectionMode(mode);
-    if (mode === 'single') {
-      setSelectedElements([]);
-    }
-  };
-
   if (!filePath) {
     return (
       <div className="preview-empty">
-        <Empty description="请选择一个原型文件" />
+        <Empty
+          description={(
+            <span>
+              当前还没有可预览的页面
+              <br />
+              选择或创建一个原型页面后，这里会显示正常预览画布
+            </span>
+          )}
+        />
       </div>
     );
   }
@@ -825,311 +1050,381 @@ export default function Preview({
   const previewUrl = previewUrlOverride
     ? `${previewUrlOverride}${iframeReloadToken ? `${previewUrlOverride.includes('?') ? '&' : '?'}t=${iframeReloadToken}` : ''}`
     : `${previewBasePath}/${filePath}/index.html${iframeReloadToken ? `?t=${iframeReloadToken}` : ''}`;
-  const stageHasBanner = viewMode !== 'preview';
-  const viewportSize = VIEWPORT_DIMENSIONS[previewViewport];
-  const horizontalPadding = previewViewport === 'mobile' ? 64 : 48;
-  const verticalPadding = 96;
-  const availableWidth = Math.max(stageSize.width - horizontalPadding, 0);
-  const availableHeight = Math.max(stageSize.height - verticalPadding, 0);
-  const fitScale = stageSize.width && stageSize.height
-    ? Math.min(
-        availableWidth / viewportSize.width,
-        availableHeight / viewportSize.height
-      )
-    : 1;
-  const canvasScale = Math.max(fitScale, 0.1) * (zoomPercent / 100);
-  const scaledCanvasWidth = viewportSize.width * canvasScale;
-  const scaledCanvasHeight = viewportSize.height * canvasScale;
-
-  const getOverlayRect = (element: Element) => {
-    const iframe = iframeRef.current;
-    const canvas = canvasRef.current;
-    if (!iframe || !canvas) return null;
-
-    const elementRect = element.getBoundingClientRect();
-    const iframeRect = iframe.getBoundingClientRect();
-    const canvasRect = canvas.getBoundingClientRect();
-    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-    const iframeViewportWidth = iframeDoc?.documentElement?.clientWidth || iframe.clientWidth || viewportSize.width;
-    const iframeViewportHeight = iframeDoc?.documentElement?.clientHeight || iframe.clientHeight || viewportSize.height;
-    const scaleX = iframeViewportWidth > 0 ? iframeRect.width / iframeViewportWidth : 1;
-    const scaleY = iframeViewportHeight > 0 ? iframeRect.height / iframeViewportHeight : 1;
-
-    const left = iframeRect.left - canvasRect.left + (elementRect.left * scaleX);
-    const top = iframeRect.top - canvasRect.top + (elementRect.top * scaleY);
-    const width = elementRect.width * scaleX;
-    const height = elementRect.height * scaleY;
-    const borderCompensation = 2;
-
-    return {
-      // overlay 直接挂到 preview-canvas 上，避免 stage 的 padding / 居中布局带入额外 left 偏移
-      // 同时把矩形向外补一点，避免 2px/3px 边框都画在元素内部，导致视觉上“左边没贴齐”
-      left: Math.max(left - borderCompensation / 2, 0),
-      top: Math.max(top - borderCompensation / 2, 0),
-      width: width + borderCompensation,
-      height: height + borderCompensation,
-    };
-  };
-
   return (
     <div className="preview-container">
-      {/* 检查模式提示条 */}
-      {viewMode === 'inspect' && (
-        <div className="preview-inspect-banner">
-          <span className="preview-inspect-banner-text">
-            点击页面元素复制 DOM 信息
-            <Hotkey keys={['Shift', 'Tab']} description="切换模式" />
-            {selectionMode === 'multiple' && (
-              <>
-                <Hotkey keys={[getModifierKey(), 'C']} description="复制" />
-                <Hotkey keys={['ESC']} description="清空" />
-              </>
-            )}
-          </span>
-
-          <div className="preview-inspect-banner-controls">
-            <Segmented
-              options={[
-                { label: '单选', value: 'single' },
-                { label: '多选', value: 'multiple' }
-              ]}
-              value={selectionMode}
-              onChange={(value) => handleSelectionModeChange(value as 'single' | 'multiple')}
-              size="small"
-            />
-
-            {selectionMode === 'multiple' && (
-              <>
-                {selectedElements.length > 0 && (
-                  <span className="preview-inspect-banner-count">
-                    已选: {selectedElements.length} 个元素
-                  </span>
-                )}
+      <div className={`preview-inspect-banner${markToolActive ? ' mark-mode' : ''}`}>
+        <div className="preview-inspect-banner-text">
+          <div className="preview-inspect-banner-left">
+              <div className="preview-tool-toggle-group" aria-label="预览工具切换">
+                <Tooltip title="预览模式" getPopupContainer={() => document.body}>
                 <Button
-                  type="primary"
-                  size="small"
-                  onClick={handleCopyAll}
-                  disabled={selectedElements.length === 0}
-                  className="preview-ai-action-button"
+                  type="text"
+                  className={`preview-tool-toggle-btn${activeTool === 'none' ? ' active' : ''}`}
+                  onClick={() => onToolChange('none')}
                 >
-                  复制所有给 AI
+                  预览
                 </Button>
+                </Tooltip>
+                <Tooltip title="编辑模式 (Shift+Tab 切换)" getPopupContainer={() => document.body}>
                 <Button
-                  size="small"
-                  onClick={handleClearSelection}
-                  disabled={selectedElements.length === 0}
+                  type="text"
+                  className={`preview-tool-toggle-btn${inspectToolActive ? ' active' : ''}`}
+                  onClick={() => onToolChange('inspect')}
                 >
-                  清空
+                  编辑
                 </Button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 标记模式提示条 */}
-      {viewMode === 'mark' && (
-        <div className="preview-inspect-banner mark-mode">
-          <span className="preview-inspect-banner-text">
-            {previewReadonly
-              ? (marksVisible ? '历史版本预览中，仅支持查看标记' : '历史版本预览中')
-              : relinkingMarkId
-                ? '请点击页面中的新元素，重新绑定当前标记'
-                : (marksVisible ? '点击页面元素创建标记' : '预览模式')}
-            {marks.length > 0 && marksVisible && (
+                </Tooltip>
+                <Tooltip title="标记模式 (Shift+Tab 切换)" getPopupContainer={() => document.body}>
+                <Button
+                  type="text"
+                  className={`preview-tool-toggle-btn${markToolActive ? ' active' : ''}`}
+                  onClick={() => onToolChange('mark')}
+                >
+                  标记
+                </Button>
+                </Tooltip>
+              </div>
+{inspectToolActive ? (
               <>
-                <Hotkey keys={['↑']} description="上一个" />
-                <Hotkey keys={['↓']} description="下一个" />
+                {selectionMode === 'multiple' && selectedElements.length > 0 ? (
+                  <span className="preview-inspect-banner-count">已选 {selectedElements.length} 个元素</span>
+                ) : null}
+                <span className="preview-inspect-banner-status">
+                  点击元素复制 · <kbd className="hotkey-key">Shift</kbd>+点击多选 · <kbd className="hotkey-key">空格</kbd>拖拽画布
+                </span>
+              </>
+            ) : markToolActive ? (
+              <>
+                <span className="preview-inspect-banner-status">
+                  {previewReadonly
+                    ? (marksVisible ? '历史版本预览中，仅支持查看标记' : '历史版本预览中')
+                    : relinkingMarkId
+                      ? '请点击页面中的新元素，重新绑定当前标记'
+                      : (marksVisible ? '点击页面元素创建标记或查看详情' : '标记已隐藏')}
+                  · <kbd className="hotkey-key">空格</kbd>拖拽画布
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="preview-inspect-banner-status">
+                  只读预览画布，支持缩放与平移浏览 · <kbd className="hotkey-key">空格</kbd>拖拽画布
+                </span>
               </>
             )}
-            {(selectedMarkId || pendingMarkInfo) && (
-              <Hotkey keys={['ESC']} description="返回列表" />
-            )}
-            {selectedMarkId && (
-              <Hotkey keys={['Delete']} description="删除标记" />
-            )}
-            <Hotkey keys={['X']} description={marksVisible ? '隐藏标记' : '显示标记'} />
-            <Hotkey keys={['H']} description={markPanelCollapsed ? '展开面板' : '折叠面板'} />
-          </span>
-
-          <div className="preview-inspect-banner-controls">
-            <Button
-              size="small"
-              onClick={() => setMarksVisible(prev => !prev)}
-            >
-              {marksVisible ? '隐藏标记' : '显示标记'}
-            </Button>
-            <Button
-              size="small"
-              onClick={onToggleMarkPanel}
-            >
-              {markPanelCollapsed ? '展开面板' : '折叠面板'}
-            </Button>
+          </div>
+          <div className="preview-inspect-banner-hotkeys">
+            {showDisconnected ? (
+              <div className="preview-ws-disconnected">
+                热更新已断开
+              </div>
+            ) : null}
+            <div className="preview-inspect-banner-controls">
+              {inspectToolActive ? (
+                <>
+                  <Tooltip title="开启后连续点击即可多选，Shift+点击也可临时多选" getPopupContainer={() => document.body}>
+                    <Button
+                      type="text"
+                      className={`preview-selection-toggle-btn${selectionMode === 'multiple' ? ' active' : ''}`}
+                      onClick={() => {
+                        setSelectionMode((currentMode) => {
+                          const nextMode = currentMode === 'multiple' ? 'single' : 'multiple';
+                          if (nextMode === 'single') {
+                            setSelectedElements([]);
+                          }
+                          return nextMode;
+                        });
+                      }}
+                    >
+                      {selectionMode === 'multiple' ? '退出批量选择' : '批量选择'}
+                    </Button>
+                  </Tooltip>
+                  {selectionMode === 'multiple' ? (
+                    <>
+                      <Tooltip title={'复制 (' + getModifierKey() + '+C)'} getPopupContainer={() => document.body}>
+                        <Button
+                          type="text"
+                          className="preview-copy-batch-button"
+                          icon={<CopyOutlined />}
+                          onClick={handleCopyAll}
+                          disabled={selectedElements.length === 0}
+                        >
+                          复制给 AI
+                        </Button>
+                      </Tooltip>
+                    </>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+            <span className="preview-inspect-banner-hotkey-divider" />
+            <div className="preview-zoom-controls" aria-label="预览缩放控制">
+              <Tooltip title="缩小 (⌘/Ctrl -)" getPopupContainer={() => document.body}>
+                <Button
+                  type="text"
+                  className="preview-zoom-step-button"
+                  onClick={onZoomOut}
+                  disabled={!canZoomOut}
+                >
+                  -
+                </Button>
+              </Tooltip>
+              <Dropdown placement="bottom" menu={{ items: zoomMenuItems }} trigger={['click']}>
+                <button type="button" className="preview-zoom-value-button" aria-label="选择缩放比例">
+                  <span>{Math.round(zoomPercent)}%</span>
+                  <span className="preview-zoom-value-icon">⌄</span>
+                </button>
+              </Dropdown>
+              <Tooltip title="放大 (⌘/Ctrl +)" getPopupContainer={() => document.body}>
+                <Button
+                  type="text"
+                  className="preview-zoom-step-button"
+                  onClick={onZoomIn}
+                  disabled={!canZoomIn}
+                >
+                  +
+                </Button>
+              </Tooltip>
+              {onZoomReset ? (
+                <Tooltip title="适应屏幕 (⌘/Ctrl 0)" getPopupContainer={() => document.body}>
+                  <Button type="text" icon={<CompressOutlined />} onClick={onZoomReset} />
+                </Tooltip>
+              ) : null}
+            </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {showDisconnected && (
-        <div className="preview-floating-status">
-          <div className="preview-ws-disconnected">
-            热更新已断开
-          </div>
-        </div>
-      )}
-
-      <div
-        ref={stageRef}
-        className={`preview-stage ${stageHasBanner ? 'with-banner' : ''} ${previewViewport}`}
-      >
+      <div className="preview-body">
         <div
-          ref={canvasRef}
-          className="preview-canvas"
-          style={{
-            width: scaledCanvasWidth,
-            height: scaledCanvasHeight,
-          }}
+          ref={stageRef}
+          className={`preview-stage desktop ${isPanModeActive ? 'pannable' : ''} ${isDraggingCanvas ? 'dragging' : ''}`}
         >
+          <div className="preview-stage-caption">
+            <span className="preview-stage-caption-line" />
+            <span className="preview-stage-caption-text">
+              {previewReadonly ? '历史版本只读预览' : '当前原型预览'}
+            </span>
+          </div>
+
           <div
-            className={`preview-frame-shell ${previewViewport}`}
+            ref={canvasRef}
+            className="preview-canvas"
             style={{
-              width: viewportSize.width,
-              height: viewportSize.height,
-              transform: `scale(${canvasScale})`,
+              width: canvasWidth,
+              height: canvasHeight,
+              transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+            }}
+            onPointerDown={(event) => {
+              if (!isPannable || isMarkInteractionTarget(event.target)) return;
+              event.preventDefault();
+              onCanvasPanStart({ x: event.clientX, y: event.clientY });
             }}
           >
-            <iframe
-              ref={iframeRef}
-              src={previewUrl}
-              className="preview-iframe"
-              title="原型预览"
+            <div
+              className="preview-frame-shell desktop"
+              style={{
+                width: viewportSize.width,
+                height: viewportSize.height,
+                transform: `scale(${canvasScale})`,
+              }}
+            >
+              <iframe
+                ref={iframeRef}
+                src={previewUrl}
+                className="preview-iframe"
+                title="原型预览"
+              />
+              <div
+                className={`preview-pan-surface ${isPanModeActive ? 'active' : ''}`}
+                onPointerDown={(event) => {
+                  if (!isPanModeActive || isMarkInteractionTarget(event.target)) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onCanvasPanStart({ x: event.clientX, y: event.clientY });
+                }}
+                onPointerUp={() => {
+                  if (isDraggingCanvas) {
+                    onCanvasPanEnd();
+                  }
+                }}
+              />
+            </div>
+
+            {inspectToolActive && selectionMode === 'multiple' && selectedElements.map(({ element }, index) => {
+              try {
+                const overlayRect = getOverlayRect(element);
+                if (!overlayRect) return null;
+
+                return (
+                  <div
+                    key={index}
+                    className="preview-highlight-overlay selected"
+                    style={{ ...overlayRect, display: 'block' }}
+                  >
+                    <div className="preview-highlight-tag selected">
+                      {element.tagName.toLowerCase()}
+                      {element.id && `#${element.id}`}
+                      {element.className && `.${element.className.split(' ')[0]}`}
+                    </div>
+                  </div>
+                );
+              } catch (error) {
+                console.error('Error rendering selected element:', error);
+                return null;
+              }
+            })}
+
+            {(inspectToolActive || (markToolActive && marksVisibleInCurrentMode)) && hoveredElement && !pendingMarkInfo && (() => {
+              const overlayRect = getOverlayRect(hoveredElement);
+              if (!overlayRect) return null;
+
+              return (
+                <div
+                  className={`preview-highlight-overlay ${markToolActive ? 'mark-mode' : ''}`}
+                  style={{ ...overlayRect, display: 'block' }}
+                >
+                  <div className={`preview-highlight-tag ${markToolActive ? 'mark-mode' : ''}`}>
+                    {hoveredElement.tagName.toLowerCase()}
+                    {hoveredElement.id && `#${hoveredElement.id}`}
+                    {hoveredElement.className && `.${hoveredElement.className.split(' ')[0]}`}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {markToolActive && marksVisibleInCurrentMode && pendingMarkInfo && (() => {
+              try {
+                const iframe = iframeRef.current;
+                if (!iframe) return null;
+
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+                if (!iframeDoc) return null;
+
+                const element = findElementBySelector(iframeDoc, pendingMarkInfo.selector);
+                if (!element) return null;
+
+                const overlayRect = getOverlayRect(element);
+                if (!overlayRect) return null;
+
+                const computedStyle = iframeDoc.defaultView?.getComputedStyle(element);
+                const elementZIndex = computedStyle?.zIndex;
+                const zIndexValue = elementZIndex && elementZIndex !== 'auto'
+                  ? parseInt(elementZIndex, 10)
+                  : 1;
+
+                return (
+                  <div
+                    className="preview-mark-highlight pending"
+                    style={{
+                      ...overlayRect,
+                      display: 'block',
+                      zIndex: zIndexValue,
+                    }}
+                  >
+                    <div className="preview-mark-number pending">
+                      {marks.length + 1}
+                    </div>
+                  </div>
+                );
+              } catch (error) {
+                console.error('Error rendering pending mark highlight:', error);
+                return null;
+              }
+            })()}
+
+            {markToolActive && markOverlaysVisible && marks.map((mark, index) => {
+              try {
+                const iframe = iframeRef.current;
+                if (!iframe) return (
+                  <div
+                    key={mark.id}
+                    data-mark-id={mark.id}
+                    className={`preview-mark-highlight ${selectedMarkId === mark.id ? 'selected' : ''}`}
+                    style={getFallbackOverlayRect(mark, canvasScale)}
+                    onClick={() => onMarkSelect(mark.id)}
+                  >
+                    <div className={`preview-mark-number ${selectedMarkId === mark.id ? 'selected' : ''}`}>
+                      {index + 1}
+                    </div>
+                  </div>
+                );
+
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+                if (!iframeDoc) return null;
+
+                const element = findElementBySelector(iframeDoc, mark.selector);
+                if (!element || !isElementVisible(element, iframeDoc) || isElementCovered(element, iframeDoc)) return null;
+
+                const overlayRect = getOverlayRect(element);
+                if (!overlayRect) return null;
+
+                const computedStyle = iframeDoc.defaultView?.getComputedStyle(element);
+                const elementZIndex = computedStyle?.zIndex;
+                const zIndexValue = elementZIndex && elementZIndex !== 'auto'
+                  ? parseInt(elementZIndex, 10)
+                  : 1;
+
+                return (
+                  <div
+                    key={mark.id}
+                    data-mark-id={mark.id}
+                    className={`preview-mark-highlight ${selectedMarkId === mark.id ? 'selected' : ''}`}
+                    style={{
+                      ...overlayRect,
+                      display: 'block',
+                      zIndex: zIndexValue,
+                    }}
+                    onClick={() => onMarkSelect(mark.id)}
+                  >
+                    <div className={`preview-mark-number ${selectedMarkId === mark.id ? 'selected' : ''}`}>
+                      {index + 1}
+                    </div>
+                  </div>
+                );
+              } catch (error) {
+                console.error('Error rendering mark:', error);
+                return null;
+              }
+            })}
+          </div>
+
+        </div>
+
+        {shouldRenderMarkPanel ? (
+          <div
+            className={`preview-mark-floating-panel ${markPanelCollapsed ? 'collapsed' : ''}`}
+            style={markPanelCollapsed ? undefined : { width: markPanelWidth }}
+          >
+            {!markPanelCollapsed ? (
+              <div
+                onMouseDown={onMarkPanelResizeStart}
+                className={`app-resize-handle mark-panel-resize ${markPanelResizing ? 'resizing' : ''}`}
+              />
+            ) : null}
+            <MarkPanel
+              marks={marks}
+              selectedMarkId={selectedMarkId}
+              pendingMarkInfo={pendingMarkInfo}
+              relinkingMarkId={relinkingMarkId}
+              missingMarkIds={missingMarkIds}
+              hiddenMarkIds={hiddenMarkIds}
+              viewerSkills={viewerSkills}
+              onMarkSelect={onMarkSelect}
+              onMarkCreate={onMarkCreate}
+              onMarkUpdate={onMarkUpdate}
+              onMarkDelete={onMarkDelete}
+              onMarkRelinkStart={onMarkRelinkStart}
+              onMarkRelinkCancel={onMarkRelinkCancel}
+              onMarkCancel={onMarkCancel}
+              onRefresh={onMarkRefresh}
+              collapsed={markPanelCollapsed}
+              onCollapsedChange={(collapsed) => onMarkPanelCollapsedChange?.(collapsed)}
+              projectName={projectName}
+              filePath={filePath}
+              prototypesDir={prototypesDir}
             />
           </div>
-          {/* 选中元素的高亮覆盖层（绿色） */}
-          {viewMode === 'inspect' && selectionMode === 'multiple' && selectedElements.map(({ element }, index) => {
-            try {
-              const overlayRect = getOverlayRect(element);
-              if (!overlayRect) return null;
-
-              return (
-                <div
-                  key={index}
-                  className="preview-highlight-overlay selected"
-                  style={overlayRect}
-                >
-                  <div className="preview-highlight-tag selected">
-                    {element.tagName.toLowerCase()}
-                    {element.id && `#${element.id}`}
-                    {element.className && `.${element.className.split(' ')[0]}`}
-                  </div>
-                </div>
-              );
-            } catch (error) {
-              console.error('Error rendering selected element:', error);
-              return null;
-            }
-          })}
-
-          {/* 悬停元素的高亮覆盖层（编辑模式：蓝色，标记模式：绿色） */}
-          {((viewMode === 'inspect') || (viewMode === 'mark' && marksVisibleInCurrentMode)) && hoveredElement && !pendingMarkInfo && (() => {
-            const overlayRect = getOverlayRect(hoveredElement);
-            if (!overlayRect) return null;
-
-            return (
-              <div
-                className={`preview-highlight-overlay ${viewMode === 'mark' ? 'mark-mode' : ''}`}
-                style={overlayRect}
-              >
-                <div className={`preview-highlight-tag ${viewMode === 'mark' ? 'mark-mode' : ''}`}>
-                  {hoveredElement.tagName.toLowerCase()}
-                  {hoveredElement.id && `#${hoveredElement.id}`}
-                  {hoveredElement.className && `.${hoveredElement.className.split(' ')[0]}`}
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* 待创建标记的高亮框 */}
-          {viewMode === 'mark' && marksVisibleInCurrentMode && pendingMarkInfo && (() => {
-            try {
-              const iframe = iframeRef.current;
-              if (!iframe) return null;
-
-              const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-              if (!iframeDoc) return null;
-
-              const element = findElementBySelector(iframeDoc, pendingMarkInfo.selector);
-              if (!element) return null;
-
-              const overlayRect = getOverlayRect(element);
-              if (!overlayRect) return null;
-
-              const computedStyle = iframeDoc.defaultView?.getComputedStyle(element);
-              const elementZIndex = computedStyle?.zIndex;
-              const zIndexValue = elementZIndex && elementZIndex !== 'auto'
-                ? parseInt(elementZIndex, 10)
-                : 1;
-
-              return (
-                <div
-                  className="preview-mark-highlight pending"
-                  style={{
-                    ...overlayRect,
-                    zIndex: zIndexValue,
-                  }}
-                >
-                  <div className="preview-mark-number pending">
-                    {marks.length + 1}
-                  </div>
-                </div>
-              );
-            } catch (error) {
-              console.error('Error rendering pending mark highlight:', error);
-              return null;
-            }
-          })()}
-
-          {/* 标记高亮框覆盖层 */}
-          {(viewMode === 'mark') && markOverlaysVisible && marks.map((mark) => {
-            try {
-              const iframe = iframeRef.current;
-              if (!iframe) return null;
-
-              const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-              if (!iframeDoc) return null;
-
-              const element = findElementBySelector(iframeDoc, mark.selector);
-              if (!element || !isElementVisible(element, iframeDoc) || isElementCovered(element, iframeDoc)) return null;
-
-              const overlayRect = getOverlayRect(element);
-              if (!overlayRect) return null;
-
-              const computedStyle = iframeDoc.defaultView?.getComputedStyle(element);
-              const elementZIndex = computedStyle?.zIndex;
-              const zIndexValue = elementZIndex && elementZIndex !== 'auto'
-                ? parseInt(elementZIndex, 10)
-                : 1;
-
-              return (
-                <div
-                  key={mark.id}
-                  className={`preview-mark-highlight ${selectedMarkId === mark.id ? 'selected' : ''}`}
-                  style={{
-                    ...overlayRect,
-                    zIndex: zIndexValue,
-                  }}
-                  onClick={viewMode === 'mark' ? () => onMarkSelect(mark.id) : undefined}
-                >
-                  <div className="preview-mark-number">
-                    {marks.indexOf(mark) + 1}
-                  </div>
-                </div>
-              );
-            } catch (error) {
-              console.error('Error rendering mark:', error);
-              return null;
-            }
-          })}
-        </div>
+        ) : null}
       </div>
     </div>
   );

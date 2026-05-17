@@ -1,8 +1,4 @@
-import http from "node:http";
-import os from "node:os";
-import open from "open";
 import { Command } from "commander";
-import { createCloudClient } from "#lib/cloud/client.js";
 import { ensureCloudConfig, requireCloudHost } from "#utils/config.js";
 import { logger } from "#utils/logger.js";
 import { findAvailablePort } from "#utils/port.js";
@@ -39,6 +35,13 @@ export function registerAuth(program: Command): void {
         promptMessage: "输入默认云端服务器地址",
       });
       const host = await requireCloudHost();
+      // 懒加载：auth login 的重型依赖
+      const [{ default: open }, { createCloudClient }, os, http] = await Promise.all([
+        import('open'),
+        import('#lib/cloud/client.js'),
+        import('node:os'),
+        import('node:http'),
+      ])
       const client = await createCloudClient(host);
       const port = await findAvailablePort(57530, 57630);
       const callbackUrl = `http://127.0.0.1:${port}${CALLBACK_PATH}`;
@@ -146,6 +149,7 @@ export function registerAuth(program: Command): void {
         promptMessage: "输入默认云端服务器地址",
       });
       const host = await requireCloudHost();
+      const { createCloudClient } = await import('#lib/cloud/client.js')
       const client = await createCloudClient(host);
       await client.logout();
       logger.success("已退出登录");

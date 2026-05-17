@@ -1,17 +1,17 @@
-import open from "open";
-import path from "node:path";
 import { Command } from "commander";
 import { COPY } from "#constants/command-text.js";
 import { buildDefaultPublishOutputDir, publishArtifacts } from "#lib/server/publish.js";
 import { publishToCloud } from "#lib/cloud/publisher.js";
 import { ConfigError } from "#utils/errors.js";
-import { ensureCloudConfig, loadCloudConfig, loadConfig, resolveProjectRoot, saveCloudConfig } from "#utils/config.js";
+import path from "node:path";
+import { ensureCloudConfig, loadCloudConfig, loadConfig, resolveProjectRoot, saveCloudConfig, requireCloudHost, normalizeHost } from "#utils/config.js";
 import { registerReleaseLink } from "#lib/links/registry.js";
 import { logger } from "#utils/logger.js";
 
 export interface PrototypePublishOptions {
   output?: string;
   cloud?: boolean;
+  host?: string;
   message?: string;
   dryRun?: boolean;
   json?: boolean;
@@ -31,28 +31,38 @@ async function runPrototypePublish(options: PrototypePublishOptions): Promise<vo
   }
 
   if (options.cloud) {
-    const cloudConfig = await ensureCloudConfig(projectRoot, {
-      promptMessage: "输入默认云端服务器地址",
-    });
+    let cloudConfig = options.host
+      ? { version: 1 as const, host: normalizeHost(options.host) }
+      : await ensureCloudConfig(projectRoot, {
+          promptMessage: "输入默认云端服务器地址",
+        });
+
     const result = await publishToCloud({
       projectRoot,
       config,
       cloudConfig,
+      hostOverride: options.host,
       message: options.message,
       dryRun: options.dryRun,
       json: options.json,
       project: options.project,
     });
 
+    if (options.host) {
+      // --host 覆盖时不修改 cloud.json（临时发布到其他服务器）
+      cloudConfig = { ...cloudConfig, host: normalizeHost(options.host) };
+    }
+
     if (options.json) {
       const nextConfig = {
-        ...(await loadCloudConfig(projectRoot) ?? cloudConfig),
+        ...cloudConfig,
         projectId: result.projectId,
         lastReleaseId: result.releaseId,
         lastPublishedAt: new Date().toISOString(),
       };
-      await saveCloudConfig(nextConfig, projectRoot);
-
+      if (!options.host) {
+        await saveCloudConfig(nextConfig, projectRoot);
+      }
       await registerReleaseLink(projectRoot, {
         releaseId: result.releaseId,
         projectId: result.projectId,
@@ -78,12 +88,14 @@ async function runPrototypePublish(options: PrototypePublishOptions): Promise<vo
     logger.info(`查看地址: ${result.releaseUrl}`);
 
     const nextConfig = {
-      ...(await loadCloudConfig(projectRoot) ?? cloudConfig),
+      ...cloudConfig,
       projectId: result.projectId,
       lastReleaseId: result.releaseId,
       lastPublishedAt: new Date().toISOString(),
     };
-    await saveCloudConfig(nextConfig, projectRoot);
+    if (!options.host) {
+      await saveCloudConfig(nextConfig, projectRoot);
+    }
 
     await registerReleaseLink(projectRoot, {
       releaseId: result.releaseId,
@@ -97,7 +109,7 @@ async function runPrototypePublish(options: PrototypePublishOptions): Promise<vo
     });
 
     if (options.open !== false) {
-      await open(result.releaseUrl).catch(() => undefined);
+      await import("open").then((m) => m.default(result.releaseUrl).catch(() => undefined));
     }
     return;
   }
@@ -127,6 +139,7 @@ export function registerPrototypePublish(parent: Command): void {
     .description(COPY.prototypePublishDescription)
     .option("-o, --output <dir>", "输出目录（默认生成到 dist/publish 下）")
     .option("-c, --cloud", "发布到云端服务器")
+    .option("-H, --host <url>", "指定云端服务器地址（临时覆盖 cloud.json）")
     .option("-m, --message <message>", "版本说明（云端发布时使用）")
     .option("--dry-run", "仅执行云端预检，不提交发布")
     .option("--json", "输出 JSON 结果")

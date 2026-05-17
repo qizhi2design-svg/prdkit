@@ -5,16 +5,6 @@ import { fileURLToPath } from "node:url";
 import chalk from "chalk";
 import { Command } from "commander";
 import { COPY } from "#constants/command-text.js";
-import {
-  registerAuth,
-  registerDoctor,
-  registerInfo,
-  registerInit,
-  registerPrd,
-  registerPrototype,
-  registerServe,
-  registerUpdate,
-} from "#commands/index.js";
 import { handleError } from "#utils/error-handler.js";
 import { UserCancelledError } from "#utils/errors.js";
 
@@ -43,14 +33,18 @@ program
   })
   .addHelpText("after", `\n${COPY.rootHelpAfter.trim()}\n`);
 
-registerInit(program);
-registerPrd(program);
-registerPrototype(program);
-registerInfo(program);
-registerDoctor(program);
-registerServe(program);
-registerUpdate(program);
-registerAuth(program);
+// 懒加载命令模块：所有命令的注册函数在启动时并行加载
+const commands = await Promise.all([
+  import("#commands/init.js").then(m => m.registerInit(program)),
+  import("#commands/prd/index.js").then(m => m.registerPrd(program)),
+  import("#commands/prototype/index.js").then(m => m.registerPrototype(program)),
+  import("#commands/info.js").then(m => m.registerInfo(program)),
+  import("#commands/doctor.js").then(m => m.registerDoctor(program)),
+  import("#commands/serve.js").then(m => m.registerServe(program)),
+  import("#commands/update.js").then(m => m.registerUpdate(program)),
+  import("#commands/auth.js").then(m => m.registerAuth(program)),
+  import("#commands/cloud.js").then(m => m.registerCloud(program)),
+])
 
 program.parseAsync(process.argv).catch((error: unknown) => {
   // 用户取消操作（Ctrl+C）

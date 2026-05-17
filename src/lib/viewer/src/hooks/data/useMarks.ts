@@ -4,7 +4,7 @@ import type { UseMarksOptions, UseMarksReturn } from '../../types/hooks';
 import type { Mark, MarkUpdatePatch, PendingMarkInfo } from '../../types';
 
 export function useMarks(options: UseMarksOptions): UseMarksReturn {
-  const { prototypePath, viewMode, activeCheckpointPreview } = options;
+  const { prototypePath, activeTool, activeCheckpointPreview } = options;
 
   const [marks, setMarks] = useState<Mark[]>([]);
   const [selectedMarkId, setSelectedMarkId] = useState<string | null>(null);
@@ -17,7 +17,7 @@ export function useMarks(options: UseMarksOptions): UseMarksReturn {
 
   // 加载标记数据
   const loadMarks = useCallback(async () => {
-    if (!prototypePath || viewMode !== 'mark') return;
+    if (!prototypePath) return;
 
     try {
       const response = await fetch(
@@ -30,7 +30,7 @@ export function useMarks(options: UseMarksOptions): UseMarksReturn {
       console.error('加载标记失败:', error);
       setMarks([]);
     }
-  }, [prototypePath, viewMode]);
+  }, [prototypePath]);
 
   // 更新 loadMarksRef
   useEffect(() => {
@@ -41,6 +41,12 @@ export function useMarks(options: UseMarksOptions): UseMarksReturn {
   useEffect(() => {
     loadMarks();
   }, [loadMarks]);
+
+  useEffect(() => {
+    if (activeTool === 'mark') return;
+    setPendingMarkInfo(null);
+    setRelinkingMarkId(null);
+  }, [activeTool]);
 
   // 计算有效标记（考虑 checkpoint 预览）
   const effectiveMarks = useMemo(() => {

@@ -7,6 +7,7 @@ import { z } from "zod";
 import type {
   AuthHostRecord,
   AuthStore,
+  PerHostProjectMeta,
   PrdkitCloudConfig,
   PrdkitConfig,
   PrdkitGlobalConfig,
@@ -52,6 +53,13 @@ const cloudConfigSchema = z.object({
 const globalConfigSchema = z.object({
   cloud: z.object({
     defaultHost: z.string().min(1).optional(),
+    perHost: z.record(z.string(), z.object({
+      projectId: z.string().min(1).optional(),
+      projectSlug: z.string().min(1).optional(),
+      projectName: z.string().min(1).optional(),
+      lastReleaseId: z.string().min(1).optional(),
+      lastPublishedAt: z.string().min(1).optional(),
+    })).optional(),
   }).optional(),
 });
 
@@ -422,6 +430,78 @@ export async function clearAuthRecord(host: string): Promise<void> {
 
 export function normalizeHost(host: string): string {
   return host.trim().replace(/\/+$/, "");
+}
+
+export type HostWithAuthStatus = {
+  host: string;
+  status: "active" | "expired";
+  user?: { id: number; email: string; name?: string | null };
+};
+
+export async function resolveHostProjectMeta(host: string): Promise<PerHostProjectMeta | undefined> {
+  const globalConfig = await loadGlobalConfig();
+  return globalConfig.cloud?.perHost?.[normalizeHost(host)];
+}
+
+export async function saveHostProjectMeta(host: string, meta: PerHostProjectMeta): Promise<void> {
+  const globalConfig = await loadGlobalConfig();
+  const normalized = normalizeHost(host);
+  const perHost = { ...globalConfig.cloud?.perHost };
+  const cleaned: PerHostProjectMeta = {};
+  if (meta.projectId) cleaned.projectId = meta.projectId;
+  if (meta.projectSlug) cleaned.projectSlug = meta.projectSlug;
+  if (meta.projectName) cleaned.projectName = meta.projectName;
+  if (meta.lastReleaseId) cleaned.lastReleaseId = meta.lastReleaseId;
+  if (meta.lastPublishedAt) cleaned.lastPublishedAt = meta.lastPublishedAt;
+  perHost[normalized] = cleaned;
+  await saveGlobalConfig({
+    ...globalConfig,
+    cloud: { ...globalConfig.cloud, perHost },
+  });
+}
+
+export async function listAuthenticatedHosts(): Promise<HostWithAuthStatus[]> {
+  const store = await loadAuthStore();
+  const hosts: HostWithAuthStatus[] = [];
+  for (const [host, record] of Object.entries(store.hosts)) {
+    const isExpired = new Date(record.expiresAt).getTime() <= Date.now();
+    hosts.push({
+      host,
+      status: isExpired ? "expired" : "active",
+      user: record.user,
+    });
+  }
+  return hosts;
+}
+
+export async function switchCloudHost(newHost: string, cwd?: string): Promise<PrdkitCloudConfig> {
+  const projectRoot = await resolveProjectRoot(cwd) ?? path.resolve(cwd ?? process.cwd());
+  const normalizedNew = normalizeUrlHost(newHost);
+
+  const current = await loadCloudConfig(projectRoot);
+  if (current?.host) {
+    await saveHostProjectMeta(current.host, {
+      projectId: current.projectId,
+      projectSlug: current.projectSlug,
+      projectName: current.projectName,
+      lastReleaseId: current.lastReleaseId,
+      lastPublishedAt: current.lastPublishedAt,
+    });
+  }
+
+  const previousMeta = await resolveHostProjectMeta(normalizedNew);
+
+  const nextConfig = cloudConfigSchema.parse({
+    version: 1,
+    host: normalizedNew,
+    projectId: previousMeta?.projectId,
+    projectSlug: previousMeta?.projectSlug,
+    projectName: previousMeta?.projectName,
+    lastReleaseId: previousMeta?.lastReleaseId,
+    lastPublishedAt: previousMeta?.lastPublishedAt,
+  });
+  await saveCloudConfig(nextConfig, projectRoot);
+  return nextConfig;
 }
 
 export async function resolveCloudHost(cwd = process.cwd(), overrideHost?: string): Promise<string> {

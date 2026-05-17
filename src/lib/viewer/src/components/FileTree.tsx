@@ -1,7 +1,6 @@
-import { Tree, Input, Tooltip, Button, Popconfirm, Modal, message } from 'antd';
-import { FileOutlined, FolderOutlined, SearchOutlined, LeftOutlined, RightOutlined, DeleteOutlined, CopyOutlined, FolderAddOutlined, FileAddOutlined, EditOutlined } from '@ant-design/icons';
-import { useEffect, useState } from 'react';
-import type { DataNode } from 'antd/es/tree';
+import { CaretDownOutlined, CopyOutlined, DeleteOutlined, EditOutlined, FileAddOutlined, FileOutlined, FolderAddOutlined, FolderFilled, LeftOutlined, RightOutlined, SearchOutlined } from '@ant-design/icons';
+import { Input, Tooltip, Button, Popconfirm, Modal, message } from 'antd';
+import { useEffect, useMemo, useState } from 'react';
 import './FileTree.css';
 
 interface FileTreeProps {
@@ -27,159 +26,6 @@ interface PrototypeNode {
   children?: PrototypeNode[];
 }
 
-function convertToTreeData(
-  node: PrototypeNode,
-  searchValue: string,
-  onFolderClick?: (key: string) => void,
-  onDeletePrototype?: (path: string) => Promise<void> | void,
-  onDuplicatePrototype?: (path: string) => Promise<void> | void,
-  onDeleteFolder?: (path: string) => Promise<void> | void,
-  onRenameNode?: (path: string, name: string, type: 'file' | 'folder') => void
-): DataNode | null {
-  const isFolder = node.type === 'folder';
-  const matchesSearch = !searchValue || node.name.toLowerCase().includes(searchValue.toLowerCase());
-
-  // 递归处理子节点
-  const children = node.children
-    ?.map(child => convertToTreeData(child, searchValue, onFolderClick, onDeletePrototype, onDuplicatePrototype, onDeleteFolder, onRenameNode))
-    .filter(Boolean) as DataNode[];
-
-  // 如果是文件夹，只有当自己或子节点匹配时才显示
-  if (isFolder && !matchesSearch && (!children || children.length === 0)) {
-    return null;
-  }
-
-  // 如果是文件，只有匹配时才显示
-  if (!isFolder && !matchesSearch) {
-    return null;
-  }
-
-  const nodeKey = node.path || 'root';
-  const isFile = node.type === 'file';
-
-  return {
-    key: nodeKey,
-    title: (
-      <Tooltip title={node.name} placement="right">
-        <div className="file-tree-node-row">
-          <div
-            className="file-tree-node-title"
-            onClick={(e) => {
-              if (isFolder && onFolderClick) {
-                e.stopPropagation();
-                onFolderClick(nodeKey);
-              }
-            }}
-          >
-            {node.name}
-          </div>
-          {isFile && (
-            <div className="file-tree-node-actions">
-              {onRenameNode && (
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<EditOutlined />}
-                  className="file-tree-edit-button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRenameNode(node.path, node.name, 'file');
-                  }}
-                  title="重命名页面"
-                />
-              )}
-              {onDuplicatePrototype && (
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<CopyOutlined />}
-                  className="file-tree-copy-button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void onDuplicatePrototype(node.path);
-                  }}
-                  title="复制页面"
-                />
-              )}
-              {onDeletePrototype && (
-                <Popconfirm
-                  title="删除页面"
-                  description="将删除页面目录及页面下的标记文件，确认继续？"
-                  placement="rightTop"
-                  overlayClassName="file-tree-popconfirm"
-                  okText="删除"
-                  cancelText="取消"
-                  okButtonProps={{ danger: true }}
-                  onConfirm={(e) => {
-                    e?.stopPropagation();
-                    return onDeletePrototype(node.path);
-                  }}
-                >
-                  <Button
-                    type="text"
-                    danger
-                    size="small"
-                    icon={<DeleteOutlined />}
-                    className="file-tree-delete-button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                    }}
-                  />
-                </Popconfirm>
-              )}
-            </div>
-          )}
-          {isFolder && node.path && onDeleteFolder && (
-            <div className="file-tree-node-actions">
-              {onRenameNode && (
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<EditOutlined />}
-                  className="file-tree-edit-button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRenameNode(node.path, node.name, 'folder');
-                  }}
-                  title="重命名文件夹"
-                />
-              )}
-              <Popconfirm
-                title="删除文件夹"
-                description="将删除该文件夹以及下面的所有页面和标记文件，确认继续？"
-                placement="rightTop"
-                overlayClassName="file-tree-popconfirm"
-                okText="删除"
-                cancelText="取消"
-                okButtonProps={{ danger: true }}
-                onConfirm={(e) => {
-                  e?.stopPropagation();
-                  return onDeleteFolder(node.path);
-                }}
-              >
-                <Button
-                  type="text"
-                  danger
-                  size="small"
-                  icon={<DeleteOutlined />}
-                  className="file-tree-delete-button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                  }}
-                />
-              </Popconfirm>
-            </div>
-          )}
-        </div>
-      </Tooltip>
-    ),
-    icon: isFolder ? <FolderOutlined /> : <FileOutlined />,
-    children: children && children.length > 0 ? children : undefined,
-    isLeaf: !isFolder,
-    selectable: !isFolder,
-  };
-}
-
 export default function FileTree({
   onSelect,
   selectedFile,
@@ -194,13 +40,10 @@ export default function FileTree({
   refreshVersion = 0,
   onFilesUpdate,
 }: FileTreeProps) {
-  const [treeData, setTreeData] = useState<DataNode[]>([]);
   const [originalData, setOriginalData] = useState<PrototypeNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchValue, setSearchValue] = useState('');
-  const [searchExpanded, setSearchExpanded] = useState(false);
-  const [projectName, setProjectName] = useState('PRDKit');
-  const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
+  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [createFolderModalOpen, setCreateFolderModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [folderSubmitting, setFolderSubmitting] = useState(false);
@@ -210,91 +53,62 @@ export default function FileTree({
   const [renameTarget, setRenameTarget] = useState<{ path: string; name: string; type: 'file' | 'folder' } | null>(null);
   const [draggingPrototypePath, setDraggingPrototypePath] = useState<string | null>(null);
   const [rootDropActive, setRootDropActive] = useState(false);
+  const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
   const [createPageModalOpen, setCreatePageModalOpen] = useState(false);
   const [createPageSubmitting, setCreatePageSubmitting] = useState(false);
 
   useEffect(() => {
-    fetchPrototypes();
-    fetchConfig();
+    void fetchPrototypes();
   }, []);
 
   useEffect(() => {
-    fetchPrototypes();
+    void fetchPrototypes();
   }, [refreshVersion]);
 
-  useEffect(() => {
-    // 当搜索值变化时，重新过滤树数据
-    if (originalData.length > 0) {
-      const filtered = originalData
-        .map(node => convertToTreeData(node, searchValue, handleFolderClick, onDeletePrototype, onDuplicatePrototype, onDeleteFolder, handleStartRename))
-        .filter(Boolean) as DataNode[];
-      setTreeData(filtered);
-    }
-  }, [searchValue, originalData, onDeletePrototype, onDuplicatePrototype, onDeleteFolder]);
+  const normalizedSearch = searchValue.trim().toLowerCase();
+  const visibleNodes = useMemo(
+    () => filterTreeNodes(originalData, normalizedSearch),
+    [normalizedSearch, originalData]
+  );
 
-  const handleFolderClick = (key: string) => {
-    setExpandedKeys(prev => {
-      if (prev.includes(key)) {
-        return prev.filter(k => k !== key);
-      } else {
-        return [...prev, key];
-      }
-    });
-  };
-
-  const fetchConfig = async () => {
-    try {
-      const response = await fetch('/api/config', { cache: 'no-store' });
-      const data = await response.json();
-      setProjectName(data.projectName || 'PRDKit');
-    } catch (error) {
-      console.error('获取配置失败:', error);
-    }
-  };
 
   const fetchPrototypes = async () => {
     try {
       const response = await fetch('/api/prototypes', { cache: 'no-store' });
-      const data: PrototypeNode = await response.json();
+      const data: { children?: PrototypeNode[] } = await response.json();
 
       if (data.children) {
         setOriginalData(data.children);
-        const treeNodes = data.children
-          .map(node => convertToTreeData(node, '', handleFolderClick, onDeletePrototype, onDuplicatePrototype, onDeleteFolder, handleStartRename))
-          .filter(Boolean) as DataNode[];
-        setTreeData(treeNodes);
 
         const files: string[] = [];
-        const collectFiles = (nodes: PrototypeNode[]) => {
+        const folderKeys: string[] = [];
+        const collect = (nodes: PrototypeNode[]) => {
           nodes.forEach((node) => {
             if (node.type === 'file' && node.path) {
               files.push(node.path);
             }
-            if (node.children) {
-              collectFiles(node.children);
-            }
-          });
-        };
-        collectFiles(data.children);
-        onFilesUpdate?.(files);
-
-        // 默认展开所有节点
-        const allKeys: React.Key[] = [];
-        const collectKeys = (nodes: PrototypeNode[]) => {
-          nodes.forEach(node => {
             if (node.type === 'folder') {
-              allKeys.push(node.path || 'root');
+              folderKeys.push(node.path || node.name);
               if (node.children) {
-                collectKeys(node.children);
+                collect(node.children);
               }
             }
           });
         };
-        collectKeys(data.children);
-        setExpandedKeys(allKeys);
+
+        collect(data.children);
+        onFilesUpdate?.(files);
+        setExpandedFolders((current) => {
+          const next = { ...current };
+          folderKeys.forEach((key) => {
+            if (!(key in next)) {
+              next[key] = true;
+            }
+          });
+          return next;
+        });
       } else {
         setOriginalData([]);
-        setTreeData([]);
         onFilesUpdate?.([]);
       }
     } catch (error) {
@@ -302,29 +116,6 @@ export default function FileTree({
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSelect = (selectedKeys: React.Key[]) => {
-    if (selectedKeys.length > 0) {
-      const path = selectedKeys[0] as string;
-      onSelect(path);
-    }
-  };
-
-  const findNodeByPath = (nodes: PrototypeNode[], targetPath: string): PrototypeNode | null => {
-    for (const node of nodes) {
-      if (node.path === targetPath) {
-        return node;
-      }
-      if (node.children) {
-        const result = findNodeByPath(node.children, targetPath);
-        if (result) {
-          return result;
-        }
-      }
-    }
-
-    return null;
   };
 
   const handleCreateFolderSubmit = async () => {
@@ -390,42 +181,18 @@ export default function FileTree({
     }
   };
 
-  const handleDrop = async (info: any) => {
-    const dragPath = String(info.dragNode?.key || '');
-    const targetPath = String(info.node?.key || '');
+  const toggleFolder = (path: string) => {
+    setExpandedFolders((current) => ({
+      ...current,
+      [path]: !current[path],
+    }));
+  };
 
-    if (!dragPath || !targetPath) {
-      return;
-    }
-
-    const dragNode = findNodeByPath(originalData, dragPath);
-    const targetNode = findNodeByPath(originalData, targetPath);
-
-    if (!dragNode || dragNode.type !== 'file') {
-      message.info('当前仅支持拖动页面');
-      return;
-    }
-
-    let targetFolderPath = '';
-
-    if (info.dropToGap) {
-      if (!targetNode) {
-        return;
-      }
-
-      const parentSegments = targetNode.path.split('/');
-      parentSegments.pop();
-      targetFolderPath = parentSegments.join('/');
-    } else {
-      if (!targetNode || targetNode.type !== 'folder') {
-        message.info('请将页面拖到目标文件夹上');
-        return;
-      }
-      targetFolderPath = targetPath;
-    }
-
-    await onMovePrototype(dragPath, targetFolderPath);
+  const handleFileDropToFolder = async (prototypePath: string, targetFolderPath: string) => {
+    if (!prototypePath || prototypePath === targetFolderPath) return;
+    await onMovePrototype(prototypePath, targetFolderPath);
     setDraggingPrototypePath(null);
+    setDropTargetPath(null);
     setRootDropActive(false);
   };
 
@@ -435,54 +202,29 @@ export default function FileTree({
 
   return (
     <div className="file-tree-container">
-      {/* 搜索栏和导航按钮 */}
       <div className="file-tree-toolbar">
-        {!searchExpanded ? (
-          <>
-            <SearchOutlined
-              className="file-tree-search-icon"
-              onClick={() => setSearchExpanded(true)}
-            />
-            <div className="file-tree-search-spacer" />
-          </>
-        ) : (
-          <Input
-            placeholder="搜索文件或文件夹"
-            value={searchValue}
-            onChange={(e) => setSearchValue(e.target.value)}
-            onBlur={() => {
-              if (!searchValue) {
-                setSearchExpanded(false);
-              }
-            }}
-            autoFocus
-            allowClear
-            prefix={<SearchOutlined />}
-            className="file-tree-search-input"
-          />
-        )}
-        <LeftOutlined
-          className="file-tree-nav-icon"
-          onClick={() => onNavigate('prev')}
+        <Input
+          placeholder="搜索页面路径"
+          prefix={<SearchOutlined />}
+          allowClear
+          value={searchValue}
+          onChange={(event) => setSearchValue(event.target.value)}
+          size="small"
+          className="file-tree-search-input"
         />
-        <RightOutlined
-          className="file-tree-nav-icon"
-          onClick={() => onNavigate('next')}
-        />
+        <ButtonIcon icon={<LeftOutlined />} onClick={() => onNavigate('prev')} aria-label="上一个页面" />
+        <ButtonIcon icon={<RightOutlined />} onClick={() => onNavigate('next')} aria-label="下一个页面" />
       </div>
 
-      {/* 项目名称 */}
       <div className="file-tree-project-name">
         <div
           className={`file-tree-project-header ${rootDropActive ? 'root-drop-active' : ''}`}
-          onDragOver={(e) => {
+          onDragOver={(event) => {
             if (!draggingPrototypePath) return;
-            e.preventDefault();
+            event.preventDefault();
             setRootDropActive(true);
           }}
-          onDragLeave={() => {
-            setRootDropActive(false);
-          }}
+          onDragLeave={() => setRootDropActive(false)}
           onDrop={() => {
             if (!draggingPrototypePath) return;
             void onMovePrototype(draggingPrototypePath, '');
@@ -490,53 +232,63 @@ export default function FileTree({
             setRootDropActive(false);
           }}
         >
-          <Tooltip title={projectName} placement="right">
-            <h2 className="file-tree-project-title">
-              {projectName}
-            </h2>
-          </Tooltip>
+          <h2 className="file-tree-project-title">页面</h2>
           <div className="file-tree-project-actions">
-            <Button
-              type="text"
-              size="small"
-              icon={<FolderAddOutlined />}
-              className="file-tree-project-action"
-              title="新建文件夹"
-              onClick={() => setCreateFolderModalOpen(true)}
-            />
-            <Button
-              type="text"
-              size="small"
-              icon={<FileAddOutlined />}
-              className="file-tree-project-action file-tree-project-action-ai"
-              title="新建页面（复制给 AI）"
-              onClick={() => setCreatePageModalOpen(true)}
-            />
+            <Tooltip title="新建文件夹" getPopupContainer={() => document.body}>
+              <Button
+                type="text"
+                size="small"
+                icon={<FolderAddOutlined />}
+                className="file-tree-project-action"
+                onClick={() => setCreateFolderModalOpen(true)}
+              />
+            </Tooltip>
+            <Tooltip title="新建页面（复制给 AI）" getPopupContainer={() => document.body}>
+              <Button
+                type="text"
+                size="small"
+                icon={<FileAddOutlined />}
+                className="file-tree-project-action file-tree-project-action-ai"
+                onClick={() => setCreatePageModalOpen(true)}
+              />
+            </Tooltip>
           </div>
         </div>
       </div>
 
-      {/* 文件树 */}
-      <div className="file-tree-content">
-        <Tree
-          showIcon
-          draggable={{ icon: false }}
-          expandedKeys={expandedKeys}
-          onExpand={(keys) => setExpandedKeys(keys)}
-          treeData={treeData}
-          onSelect={handleSelect}
-          selectedKeys={selectedFile ? [selectedFile] : []}
-          onDragStart={(info) => {
-            setDraggingPrototypePath(String(info.node.key || ''));
-          }}
-          onDragEnd={() => {
-            setDraggingPrototypePath(null);
-            setRootDropActive(false);
-          }}
-          onDrop={(info) => {
-            void handleDrop(info);
-          }}
-        />
+      <div className="file-tree-content custom-scrollbar">
+        <div className="file-tree-list" role="tree">
+          {visibleNodes.length === 0 ? (
+            <div className="file-tree-empty">未找到匹配页面</div>
+          ) : (
+            visibleNodes.map((node) => (
+              <TreeBranch
+                key={node.path || node.name}
+                node={node}
+                depth={0}
+                selectedFile={selectedFile}
+                searchValue={normalizedSearch}
+                expandedFolders={expandedFolders}
+                draggingPrototypePath={draggingPrototypePath}
+                dropTargetPath={dropTargetPath}
+                onToggleFolder={toggleFolder}
+                onSelect={onSelect}
+                onDeletePrototype={onDeletePrototype}
+                onDuplicatePrototype={onDuplicatePrototype}
+                onDeleteFolder={onDeleteFolder}
+                onRenameNode={handleStartRename}
+                onDragStart={setDraggingPrototypePath}
+                onDragEnd={() => {
+                  setDraggingPrototypePath(null);
+                  setDropTargetPath(null);
+                  setRootDropActive(false);
+                }}
+                onFolderDropActiveChange={setDropTargetPath}
+                onMovePrototype={handleFileDropToFolder}
+              />
+            ))
+          )}
+        </div>
       </div>
 
       <div className="file-tree-brand">
@@ -619,41 +371,274 @@ export default function FileTree({
                 我们会帮你复制一条带有 skill 指令的创建页面提示词。复制后，切换到 AI 对话或终端粘贴使用，再把生成的页面放回原型目录。
               </p>
             </div>
-            <Button
-              type="text"
-              onClick={() => setCreatePageModalOpen(false)}
-              disabled={createPageSubmitting}
-            >
-              关闭
-            </Button>
           </div>
-
           <div className="file-tree-create-page-content">
             <div className="file-tree-create-page-card">
-              <div className="file-tree-create-page-step">1. 点击下方按钮复制给 AI</div>
-              <div className="file-tree-create-page-step">2. 粘贴到 Claude / ChatGPT / AI 终端</div>
-              <div className="file-tree-create-page-step">3. 根据返回结果创建页面目录与页面文件</div>
+              <div className="file-tree-create-page-step">1. 复制创建页面的 skill 指令</div>
+              <div className="file-tree-create-page-step">2. 在 AI 中生成新的原型页面</div>
+              <div className="file-tree-create-page-step">3. 回到 viewer 自动看到新页面</div>
             </div>
-
             <div className="file-tree-create-page-actions">
               <Button
                 type="primary"
-                size="large"
                 className="file-tree-create-page-copy-button"
                 loading={createPageSubmitting}
-                onClick={() => {
-                  void handleCreatePageCopy();
-                }}
+                onClick={() => void handleCreatePageCopy()}
               >
-                复制给 AI
+                复制创建页面指令
               </Button>
               <div className="file-tree-create-page-hint">
-                已自动附带 skill 指令，可直接粘贴到 AI 中使用
+                复制后可直接粘贴到你的 AI 工作流中继续完成页面生成。
               </div>
             </div>
           </div>
         </div>
       </Modal>
     </div>
+  );
+}
+
+function TreeBranch({
+  node,
+  depth,
+  selectedFile,
+  searchValue,
+  expandedFolders,
+  draggingPrototypePath,
+  dropTargetPath,
+  onToggleFolder,
+  onSelect,
+  onDeletePrototype,
+  onDuplicatePrototype,
+  onDeleteFolder,
+  onRenameNode,
+  onDragStart,
+  onDragEnd,
+  onFolderDropActiveChange,
+  onMovePrototype,
+}: {
+  node: PrototypeNode;
+  depth: number;
+  selectedFile: string | null;
+  searchValue: string;
+  expandedFolders: Record<string, boolean>;
+  draggingPrototypePath: string | null;
+  dropTargetPath: string | null;
+  onToggleFolder: (path: string) => void;
+  onSelect: (path: string | null) => void;
+  onDeletePrototype: (path: string) => Promise<void> | void;
+  onDuplicatePrototype: (path: string) => Promise<void> | void;
+  onDeleteFolder: (path: string) => Promise<void> | void;
+  onRenameNode: (path: string, name: string, type: 'file' | 'folder') => void;
+  onDragStart: (path: string | null) => void;
+  onDragEnd: () => void;
+  onFolderDropActiveChange: (path: string | null) => void;
+  onMovePrototype: (prototypePath: string, targetFolderPath: string) => Promise<void>;
+}) {
+  const isFolder = node.type === 'folder';
+  const nodePath = node.path || `${node.name}-${depth}`;
+  const children = node.children || [];
+  const hasChildren = children.length > 0;
+  const expanded = searchValue ? true : expandedFolders[nodePath] ?? true;
+  const selected = !isFolder && selectedFile === node.path;
+  const isDropTarget = isFolder && dropTargetPath === nodePath;
+
+  return (
+    <div className="file-tree-branch">
+      <Tooltip title={node.path || node.name} placement="right" getPopupContainer={() => document.body}>
+        <div
+          role="button"
+          tabIndex={0}
+          className={`file-tree-item ${isFolder ? 'folder' : 'file'} ${selected ? 'selected' : ''} ${isDropTarget ? 'drop-target' : ''}`}
+          style={{ paddingLeft: `${12 + depth * 14}px` }}
+          draggable={!isFolder}
+          onDragStart={() => {
+            if (!isFolder && node.path) {
+              onDragStart(node.path);
+            }
+          }}
+          onDragEnd={onDragEnd}
+          onDragOver={(event) => {
+            if (!isFolder || !draggingPrototypePath || !node.path) return;
+            event.preventDefault();
+            onFolderDropActiveChange(nodePath);
+          }}
+          onDragLeave={() => {
+            if (isDropTarget) {
+              onFolderDropActiveChange(null);
+            }
+          }}
+          onDrop={() => {
+            if (!isFolder || !draggingPrototypePath || !node.path) return;
+            void onMovePrototype(draggingPrototypePath, node.path);
+          }}
+          onClick={() => {
+            if (isFolder) {
+              onToggleFolder(nodePath);
+              return;
+            }
+            onSelect(node.path || null);
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            if (isFolder) {
+              onToggleFolder(nodePath);
+              return;
+            }
+            onSelect(node.path || null);
+          }}
+        >
+          <span className={`file-tree-item-caret ${isFolder && hasChildren ? 'visible' : ''} ${expanded ? 'expanded' : ''}`}>
+            {isFolder && hasChildren ? <CaretDownOutlined /> : null}
+          </span>
+          <span className="file-tree-item-icon">
+            {isFolder ? <FolderFilled /> : <FileOutlined />}
+          </span>
+          <span className="file-tree-item-label">{node.name}</span>
+          <span className="file-tree-item-actions">
+            {isFolder ? (
+              <>
+                <Tooltip title="重命名" getPopupContainer={() => document.body}>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<EditOutlined />}
+                  className="file-tree-inline-action"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRenameNode(node.path, node.name, 'folder');
+                  }}
+                />
+                </Tooltip>
+                <Popconfirm
+                  title="删除文件夹"
+                  description="将删除该文件夹以及下面的所有页面和标记文件，确认继续？"
+                  placement="rightTop"
+                  overlayClassName="file-tree-popconfirm"
+                  okText="删除"
+                  cancelText="取消"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={(event) => {
+                    event?.stopPropagation();
+                    return onDeleteFolder(node.path);
+                  }}
+                >
+                  <Tooltip title="删除文件夹" getPopupContainer={() => document.body}>
+                  <Button
+                    type="text"
+                    danger
+                    size="small"
+                    icon={<DeleteOutlined />}
+                    className="file-tree-inline-action file-tree-inline-delete"
+                    onClick={(event) => event.stopPropagation()}
+                  />
+                  </Tooltip>
+                </Popconfirm>
+              </>
+            ) : (
+              <>
+                <Tooltip title="重命名" getPopupContainer={() => document.body}>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<EditOutlined />}
+                  className="file-tree-inline-action"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRenameNode(node.path, node.name, 'file');
+                  }}
+                />
+                </Tooltip>
+                <Tooltip title="复制页面" getPopupContainer={() => document.body}>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<CopyOutlined />}
+                  className="file-tree-inline-action file-tree-inline-copy"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void onDuplicatePrototype(node.path);
+                  }}
+                />
+                </Tooltip>
+                <Popconfirm
+                  title="删除页面"
+                  description="将删除页面目录及页面下的标记文件，确认继续？"
+                  placement="rightTop"
+                  overlayClassName="file-tree-popconfirm"
+                  okText="删除"
+                  cancelText="取消"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={(event) => {
+                    event?.stopPropagation();
+                    return onDeletePrototype(node.path);
+                  }}
+                >
+                  <Tooltip title="删除页面" getPopupContainer={() => document.body}>
+                  <Button
+                    type="text"
+                    danger
+                    size="small"
+                    icon={<DeleteOutlined />}
+                    className="file-tree-inline-action file-tree-inline-delete"
+                    onClick={(event) => event.stopPropagation()}
+                  />
+                  </Tooltip>
+                </Popconfirm>
+              </>
+            )}
+          </span>
+        </div>
+      </Tooltip>
+      {isFolder && expanded && hasChildren ? (
+        <div className="file-tree-children">
+          {children
+            .filter((child) => matchesNode(child, searchValue))
+            .map((child) => (
+              <TreeBranch
+                key={child.path || `${nodePath}-${child.name}`}
+                node={child}
+                depth={depth + 1}
+                selectedFile={selectedFile}
+                searchValue={searchValue}
+                expandedFolders={expandedFolders}
+                draggingPrototypePath={draggingPrototypePath}
+                dropTargetPath={dropTargetPath}
+                onToggleFolder={onToggleFolder}
+                onSelect={onSelect}
+                onDeletePrototype={onDeletePrototype}
+                onDuplicatePrototype={onDuplicatePrototype}
+                onDeleteFolder={onDeleteFolder}
+                onRenameNode={onRenameNode}
+                onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
+                onFolderDropActiveChange={onFolderDropActiveChange}
+                onMovePrototype={onMovePrototype}
+              />
+            ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function matchesNode(node: PrototypeNode, searchValue: string): boolean {
+  if (!searchValue) return true;
+  if (node.name.toLowerCase().includes(searchValue)) return true;
+  return (node.children || []).some((child) => matchesNode(child, searchValue));
+}
+
+function filterTreeNodes(nodes: PrototypeNode[], searchValue: string): PrototypeNode[] {
+  return nodes.filter((node) => matchesNode(node, searchValue));
+}
+
+function ButtonIcon({ icon, onClick, 'aria-label': ariaLabel }: { icon: React.ReactNode; onClick: () => void; 'aria-label'?: string }) {
+  return (
+    <Tooltip title={ariaLabel} getPopupContainer={() => document.body}>
+      <button type="button" className="file-tree-nav-icon" onClick={onClick} aria-label={ariaLabel}>
+        {icon}
+      </button>
+    </Tooltip>
   );
 }

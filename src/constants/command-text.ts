@@ -138,6 +138,7 @@ export const COPY = {
 说明：
   默认导出标准只读数据协议目录，包含 manifest.json、marks.json 和 prototypes/。
   使用 --cloud 时发布到云端项目；项目可通过 --project 指定，或先在本地 viewer 中选择。
+  使用 --host 可临时发布到其他服务器（不修改 cloud.json）。
 `,
   checkpointDescription: "checkpoint 存储、对比与恢复",
   checkpointCreateDescription: "为指定原型创建 checkpoint",
@@ -346,5 +347,12 @@ export const COPY = {
 说明：
   删除指定原型下对应 ID 的 mark 文件。
 `,
-  jsonOutputOption: "以 JSON 格式输出"
+  jsonOutputOption: "以 JSON 格式输出",
+
+  cloudDescription: "云端服务器管理",
+  cloudListDescription: "查看当前服务器与所有已认证服务器",
+  cloudSwitchDescription: "切换到指定云端服务器并保留项目元数据",
+  cloudLoginDescription: "登录到指定云端服务器（默认当前服务器）",
+  cloudLogoutDescription: "从指定云端服务器注销（默认当前服务器）",
+  cloudSetDefaultDescription: "设置全局默认云端服务器地址",
 } as const;

@@ -2,65 +2,74 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  color: var(--color-text-primary);
+  background: #fff;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .file-tree-toolbar {
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--color-border-light);
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(22, 119, 255, 0.08);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   user-select: none;
   -webkit-user-select: none;
   -moz-user-select: none;
-}
-
-.file-tree-search-icon {
-  font-size: 14px;
-  cursor: pointer;
-  color: var(--color-text-tertiary);
-  transition: all 0.2s;
-  padding: 4px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.file-tree-search-icon:hover {
-  color: var(--color-primary);
-  background-color: var(--color-bg-tertiary);
-}
-
-.file-tree-search-spacer {
-  flex: 1;
+  min-width: 0;
 }
 
 .file-tree-search-input {
   flex: 1;
+  min-width: 0;
+}
+
+.file-tree-search-input.ant-input-affix-wrapper,
+.file-tree-search-input.ant-input-affix-wrapper-sm {
+  padding: 0 10px;
+  border: 0 !important;
+  border-radius: 8px;
+  background: rgba(22, 119, 255, 0.04) !important;
+  box-shadow: none !important;
+}
+
+.file-tree-search-input .ant-input {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 12px;
+}
+
+.file-tree-search-input .ant-input-prefix,
+.file-tree-search-input .ant-input-clear-icon {
+  color: var(--color-text-tertiary);
 }
 
 .file-tree-nav-icon {
-  font-size: 14px;
-  cursor: pointer;
+  width: 26px;
+  height: 26px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
   color: var(--color-text-tertiary);
+  cursor: pointer;
   transition: all 0.2s;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
+  padding: 0;
 }
 
 .file-tree-nav-icon:hover {
   color: var(--color-primary);
-  background-color: var(--color-bg-tertiary);
+  border-color: rgba(22, 119, 255, 0.08);
+  background-color: rgba(22, 119, 255, 0.08);
 }
 
 .file-tree-project-name {
   padding: 8px 12px;
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid rgba(22, 119, 255, 0.08);
   user-select: none;
   -webkit-user-select: none;
   -moz-user-select: none;
@@ -70,19 +79,20 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  border-radius: 6px;
+  border-radius: 8px;
+  padding: 2px 0;
   transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .file-tree-project-header.root-drop-active {
-  background: var(--color-primary-alpha-8);
-  box-shadow: inset 0 0 0 1px var(--color-primary-alpha-20);
+  background: rgba(22, 119, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(22, 119, 255, 0.18);
 }
 
 .file-tree-project-title {
   flex: 1;
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -95,42 +105,192 @@
 .file-tree-project-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   flex-shrink: 0;
 }
 
 .file-tree-project-action.ant-btn {
+  width: 32px;
+  height: 32px;
   color: var(--color-text-tertiary);
+  border-radius: 8px;
+  font-size: 16px;
+  transition: all 0.15s ease;
 }
 
 .file-tree-project-action.ant-btn:hover {
-  color: var(--color-text-primary);
-  background: var(--color-bg-tertiary);
+  color: var(--color-primary);
+  background: rgba(22, 119, 255, 0.08);
 }
 
 .file-tree-project-action-ai.ant-btn {
   color: var(--color-primary);
+  opacity: 0.75;
 }
 
 .file-tree-project-action-ai.ant-btn:hover {
-  color: #0958d9;
-  background: var(--color-primary-alpha-8);
+  opacity: 1;
 }
 
 .file-tree-content {
   flex: 1;
   overflow: auto;
-  padding: 8px 4px;
+  padding: 6px 4px 8px;
+  min-width: 0;
+}
+
+.file-tree-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.file-tree-empty {
+  padding: 24px 12px;
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  text-align: center;
+}
+
+.file-tree-branch,
+.file-tree-children {
+  min-width: 0;
+}
+
+.file-tree-item {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  position: relative;
+}
+
+.file-tree-item:hover {
+  background: rgba(22, 119, 255, 0.06);
+}
+
+.file-tree-item.selected {
+  background: rgba(22, 119, 255, 0.1);
+  color: var(--color-primary);
+}
+
+.file-tree-item.drop-target {
+  background: rgba(22, 119, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(22, 119, 255, 0.18);
+}
+
+.file-tree-item.folder {
+  color: var(--color-text-secondary);
+}
+
+.file-tree-item-caret {
+  width: 14px;
+  min-width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-tertiary);
+  opacity: 0;
+  transform: rotate(-90deg);
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.file-tree-item-caret.visible {
+  opacity: 1;
+}
+
+.file-tree-item-caret.expanded {
+  transform: rotate(0deg);
+}
+
+.file-tree-item-icon {
+  width: 20px;
+  min-width: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #7b8db3;
+  font-size: 18px;
+}
+
+.file-tree-item.folder .file-tree-item-icon {
+  color: #5f88d9;
+}
+
+.file-tree-item.selected .file-tree-item-icon {
+  color: var(--color-primary);
+}
+
+.file-tree-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.file-tree-item-actions {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease;
+  padding-left: 8px;
+}
+
+.file-tree-item:hover .file-tree-item-actions,
+.file-tree-item.drop-target .file-tree-item-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.file-tree-inline-action.ant-btn {
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 6px;
+  color: var(--color-text-tertiary);
+}
+
+.file-tree-inline-action.ant-btn:hover {
+  color: var(--color-text-primary);
+}
+
+.file-tree-inline-copy.ant-btn {
+  color: var(--color-primary);
+}
+
+.file-tree-inline-delete.ant-btn:hover {
+  color: var(--color-error);
 }
 
 .file-tree-brand {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 12px;
-  border-top: 1px solid var(--color-border-light);
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid rgba(22, 119, 255, 0.08);
   background: #fff;
-  font-size: 12px;
+  font-size: 11px;
   white-space: nowrap;
 }
 
@@ -145,85 +305,6 @@
   flex-shrink: 0;
 }
 
-.file-tree-node-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  line-height: 24px;
-  user-select: none;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-}
-
-.file-tree-node-row {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  min-width: 0;
-  padding-right: 0;
-}
-
-.file-tree-node-actions {
-  position: absolute;
-  top: 50%;
-  right: 0;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-  padding-left: 8px;
-}
-
-.file-tree-copy-button,
-.file-tree-edit-button,
-.file-tree-delete-button {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease, background-color 0.2s ease, color 0.2s ease;
-}
-
-.file-tree-copy-button {
-  color: var(--color-primary);
-}
-
-.file-tree-delete-button {
-  color: var(--color-error);
-}
-
-.file-tree-content .ant-tree-node-content-wrapper:hover .file-tree-copy-button,
-.file-tree-content .ant-tree-node-content-wrapper:hover .file-tree-edit-button,
-.file-tree-content .ant-tree-node-content-wrapper:hover .file-tree-delete-button,
-.file-tree-content .ant-tree-treenode:hover .file-tree-copy-button,
-.file-tree-content .ant-tree-treenode:hover .file-tree-edit-button,
-.file-tree-content .ant-tree-treenode:hover .file-tree-delete-button {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.file-tree-content .ant-tree-node-content-wrapper:hover .file-tree-node-row,
-.file-tree-content .ant-tree-treenode:hover .file-tree-node-row {
-  padding-right: 78px;
-}
-
-.file-tree-content .ant-tree-node-content-wrapper:not(:hover) .file-tree-node-actions,
-.file-tree-content .ant-tree-treenode:not(:hover) .file-tree-node-actions {
-  pointer-events: none;
-}
-
-.file-tree-edit-button {
-  color: var(--color-text-tertiary);
-}
-
-.file-tree-edit-button:hover {
-  color: var(--color-text-primary);
-  background: rgba(0, 0, 0, 0.05) !important;
-}
-
 .file-tree-popconfirm {
   max-width: 260px;
 }
@@ -236,122 +317,8 @@
   line-height: 1.55;
 }
 
-.file-tree-copy-button:hover {
-  background: rgba(22, 119, 255, 0.08) !important;
-}
-
-.file-tree-delete-button:hover {
-  background: var(--color-error-alpha-8) !important;
-}
-
 .file-tree-loading {
   padding: 12px;
-}
-
-/* 覆盖 Ant Design Tree 的默认样式，防止换行 */
-.file-tree-content .ant-tree-title {
-  display: block;
-  width: 100%;
-  min-width: 0;
-  overflow: hidden;
-  vertical-align: middle;
-}
-
-.file-tree-content .ant-tree-node-content-wrapper {
-  width: calc(100% - 24px);
-  min-width: 0;
-  overflow: hidden;
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  line-height: 24px;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-}
-
-.file-tree-content .ant-tree-node-content-wrapper:hover {
-  background-color: var(--color-bg-tertiary);
-}
-
-.file-tree-content .ant-tree-node-selected .ant-tree-node-content-wrapper {
-  background-color: #e6f7ff !important;
-}
-
-.file-tree-content .ant-tree-treenode {
-  width: 100%;
-  padding: 1px 0;
-  min-width: 0;
-}
-
-.file-tree-content .ant-tree-treenode.ant-tree-treenode-drop-over > .ant-tree-node-content-wrapper {
-  background: var(--color-primary-alpha-8);
-  box-shadow: inset 0 0 0 1px var(--color-primary-alpha-18);
-}
-
-.file-tree-content .ant-tree-indent {
-  flex-shrink: 0;
-}
-
-.file-tree-content .ant-tree-indent-unit {
-  width: 20px;
-}
-
-.file-tree-content .ant-tree-iconEle {
-  width: 16px;
-  height: 16px !important;
-  line-height: 16px;
-  margin-right: 4px;
-  font-size: 16px;
-  font-weight: normal;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.file-tree-content .ant-tree-switcher {
-  width: 16px;
-  height: 28px;
-  line-height: 28px;
-  margin-right: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  padding: 0;
-}
-
-.file-tree-content .ant-tree-switcher .ant-tree-switcher-icon {
-  font-size: 10px;
-}
-
-.file-tree-content .ant-tree-switcher-noop {
-  width: 16px;
-  height: 28px;
-  line-height: 28px;
-  margin-right: 4px;
-  flex-shrink: 0;
-  padding: 0;
-}
-
-.file-tree-content .ant-tree {
-  font-size: 13px;
-}
-
-.file-tree-content .ant-tree-treenode-selected {
-  background-color: transparent !important;
-}
-
-/* 确保所有节点的布局一致 */
-.file-tree-content .ant-tree-treenode {
-  display: flex;
-  align-items: center;
-}
-
-/* 移除 switcher 内部元素的默认样式 */
-.file-tree-content .ant-tree-switcher > * {
-  margin: 0;
-  padding: 0;
 }
 
 .file-tree-create-page-modal .ant-modal-content {

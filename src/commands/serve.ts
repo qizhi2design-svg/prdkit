@@ -1,10 +1,8 @@
 import { Command } from 'commander';
-import { spawn } from 'node:child_process';
 import path from 'path';
-import { ensureCloudConfig, loadConfig } from '#utils/config.js';
-import { startServer } from '#lib/server/index.js';
+import { loadConfig } from '#utils/config.js';
 import { logger } from '#utils/logger.js';
-import { ConfigError, ValidationError, ServerError } from '#utils/errors.js';
+import { ConfigError, ServerError, ValidationError } from '#utils/errors.js';
 import { COPY } from '#constants/command-text.js';
 import { findAvailablePort, findAvailablePortBlock, isPortAvailable } from '#utils/port.js';
 import { writeServerInfo, removeServerInfo, getServerStatus, isProcessRunning } from '#utils/pid.js';
@@ -40,6 +38,13 @@ export function registerServe(program: Command) {
     .option('--dev', '开发模式（启用热更新）')
     .addHelpText('after', COPY.serveHelpAfter)
     .action(async (options) => {
+      // 懒加载：仅在执行 serve 命令时引入重型依赖
+      const [{ ensureCloudConfig }, { startServer }] = await Promise.all([
+        import('#utils/config.js'),
+        import('#lib/server/index.js'),
+      ])
+      const { spawn } = await import('node:child_process')
+
       // 加载项目配置
       const config = await loadConfig();
       if (!config) {
@@ -55,6 +60,7 @@ export function registerServe(program: Command) {
       const status = await getServerStatus(projectRoot);
       if (status.running && status.info) {
         logger.warn(`服务已在运行中 (PID: ${status.info.pid}, 端口: ${status.info.port})`);
+        logger.info(`访问地址: http://localhost:${status.info.port}`);
         logger.info('如需重启，请先停止现有服务');
         return;
       }

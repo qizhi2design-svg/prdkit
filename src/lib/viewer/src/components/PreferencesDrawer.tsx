@@ -55,15 +55,15 @@ export default function PreferencesDrawer({ open, onClose }: PreferencesDrawerPr
           />
         </Form.Item>
 
-        <Form.Item label="默认视图模式" help="打开页面时的默认视图">
+        <Form.Item label="默认工具态" help="打开页面时默认启用的工具">
           <Radio.Group
-            value={preferences.defaultViewMode}
+            value={preferences.defaultTool}
             onChange={(e) =>
-              updatePreferences({ defaultViewMode: e.target.value })
+              updatePreferences({ defaultTool: e.target.value })
             }
           >
-            <Radio.Button value="preview">预览</Radio.Button>
-            <Radio.Button value="inspect">检查</Radio.Button>
+            <Radio.Button value="none">纯预览</Radio.Button>
+            <Radio.Button value="inspect">编辑</Radio.Button>
             <Radio.Button value="mark">标记</Radio.Button>
           </Radio.Group>
         </Form.Item>

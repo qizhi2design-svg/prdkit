@@ -16,9 +16,18 @@ export type PrdkitCloudConfig = {
   lastPublishedAt?: string;
 };
 
+export type PerHostProjectMeta = {
+  projectId?: string;
+  projectSlug?: string;
+  projectName?: string;
+  lastReleaseId?: string;
+  lastPublishedAt?: string;
+};
+
 export type PrdkitGlobalConfig = {
   cloud?: {
     defaultHost?: string;
+    perHost?: Record<string, PerHostProjectMeta>;
   };
 };
 

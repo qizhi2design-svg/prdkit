@@ -1,6 +1,6 @@
 import type { RefObject, MutableRefObject } from 'react';
 import type {
-  ViewMode,
+  ActiveTool,
   Mark,
   MarkUpdatePatch,
   PendingMarkInfo,
@@ -15,7 +15,7 @@ export interface ViewerPreferences {
   autoSaveInterval: number; // 自动保存间隔（秒）
   showLineNumbers: boolean; // 是否显示行号
   enableHotReload: boolean; // 是否启用热重载
-  defaultViewMode: ViewMode; // 默认视图模式
+  defaultTool: ActiveTool; // 默认工具态
 }
 
 export interface ViewerStore {
@@ -74,11 +74,21 @@ export interface MarkPanelReturn {
   actions: MarkPanelActions;
 }
 
+export interface CanvasViewportSize {
+  width: number;
+  height: number;
+}
+
+export interface CanvasPanOffset {
+  x: number;
+  y: number;
+}
+
 // ==================== Data Hooks ====================
 
 export interface UseMarksOptions {
   prototypePath: string | null;
-  viewMode: ViewMode;
+  activeTool: ActiveTool;
   activeCheckpointPreview: ActiveCheckpointPreview | null;
 }
 

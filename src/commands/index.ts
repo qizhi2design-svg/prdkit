@@ -1,4 +1,5 @@
 export { registerAuth } from "./auth.js";
+export { registerCloud } from "./cloud.js";
 export { registerDoctor } from "./doctor.js";
 export { registerInfo } from "./info.js";
 export { registerInit } from "./init.js";

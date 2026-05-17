@@ -25,7 +25,7 @@ export const useViewerStore = create<ViewerStore>()(
         autoSaveInterval: 300,
         showLineNumbers: true,
         enableHotReload: true,
-        defaultViewMode: 'preview',
+        defaultTool: 'none',
       },
       updatePreferences: (newPreferences) =>
         set((state) => ({
@@ -34,6 +34,32 @@ export const useViewerStore = create<ViewerStore>()(
     }),
     {
       name: 'prdkit-viewer-storage', // localStorage key
+      migrate: (persistedState: any) => {
+        if (!persistedState || typeof persistedState !== 'object') return persistedState;
+
+        const preferences = persistedState.preferences && typeof persistedState.preferences === 'object'
+          ? persistedState.preferences
+          : {};
+
+        if ('defaultTool' in preferences) {
+          return persistedState;
+        }
+
+        const legacyDefaultViewMode = preferences.defaultViewMode;
+        const defaultTool = legacyDefaultViewMode === 'inspect'
+          ? 'inspect'
+          : legacyDefaultViewMode === 'mark'
+            ? 'mark'
+            : 'none';
+
+        return {
+          ...persistedState,
+          preferences: {
+            ...preferences,
+            defaultTool,
+          },
+        };
+      },
       partialize: (state) => ({
         // 只持久化这些字段
         theme: state.theme,

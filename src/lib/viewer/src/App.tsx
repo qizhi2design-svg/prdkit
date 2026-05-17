@@ -1,10 +1,8 @@
-import { DoubleRightOutlined } from '@ant-design/icons';
 import { App as AntdApp, Layout, message, ConfigProvider } from 'antd';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import FileTree from './components/FileTree';
 import Preview from './components/Preview';
 import Header from './components/Header';
-import MarkPanel from './components/MarkPanel';
 import PublishDrawer from './components/PublishDrawer';
 import HistoryDrawer from './components/HistoryDrawer';
 import PreferencesDrawer from './components/PreferencesDrawer';
@@ -13,6 +11,7 @@ import { useViewerStore } from './stores/useViewerStore';
 import { useTheme } from './hooks/ui/useTheme';
 import { useResizablePanel } from './hooks/layout/useResizablePanel';
 import { useMarkPanel } from './hooks/layout/useMarkPanel';
+import { useCanvasViewport } from './hooks/layout/useCanvasViewport';
 import { useMarks } from './hooks/data/useMarks';
 import { useCheckpoint } from './hooks/data/useCheckpoint';
 import { useFileNavigation } from './hooks/data/useFileNavigation';
@@ -20,12 +19,14 @@ import { useWebSocket } from './hooks/network/useWebSocket';
 import { usePublish } from './hooks/features/usePublish';
 import { DEFAULT_COPY_TERMINAL_GUIDE, DEFAULT_INSPECT_COPY_SKILL_COMMAND, DEFAULT_MARK_CREATE_SKILL_COMMAND, DEFAULT_MARK_UPDATE_SKILL_COMMAND, DEFAULT_PAGE_CREATE_SKILL_COMMAND } from './constants/clipboard';
 import { copySkillClipboardText } from './utils/clipboard';
-import type { PrototypeNode, ViewMode, ViewerConfigResponse } from './types';
+import type { ActiveTool, PrototypeNode, ViewerConfigResponse } from './types';
 import type { AppConfig } from './contexts/AppConfigContext';
+import type { CanvasViewportSize } from './types';
 import { antdTheme } from './theme/antd-theme';
 import './App.css';
 
 const { Sider, Content } = Layout;
+const DESKTOP_VIEWPORT_SIZE: CanvasViewportSize = { width: 1440, height: 900 };
 
 function App() {
   // ========== 全局配置 ==========
@@ -67,7 +68,13 @@ function App() {
   const markPanel = useMarkPanel(350);
 
   // ========== 视图模式（使用偏好设置的默认值）==========
-  const [viewMode, setViewMode] = useState<ViewMode>(preferences.defaultViewMode);
+  const [activeTool, setActiveTool] = useState<ActiveTool>(preferences.defaultTool);
+  const [previewStageSize, setPreviewStageSize] = useState<CanvasViewportSize>({ width: 0, height: 0 });
+  const [previewCanvasSize, setPreviewCanvasSize] = useState<CanvasViewportSize>(DESKTOP_VIEWPORT_SIZE);
+  const viewport = useCanvasViewport({
+    stageSize: previewStageSize,
+    canvasSize: previewCanvasSize,
+  });
 
   // ========== 文件导航 ==========
   const fileNav = useFileNavigation({ projectName: config?.projectName || 'PRDKit' });
@@ -78,7 +85,7 @@ function App() {
   // ========== 标记管理 ==========
   const marks = useMarks({
     prototypePath: fileNav.selectedFile,
-    viewMode,
+    activeTool,
     activeCheckpointPreview: checkpoint.activePreview,
   });
 
@@ -194,12 +201,92 @@ function App() {
     checkpoint.exitPreview();
   }, [fileNav.selectedFile, marks.selectMark, marks.cancelMark, checkpoint.exitPreview]);
 
-  // 创建/选择标记时自动展开面板
   useEffect(() => {
-    if ((marks.pendingMarkInfo || marks.selectedMarkId) && markPanel.state.collapsed) {
+    setActiveTool(preferences.defaultTool);
+  }, [preferences.defaultTool]);
+
+  useEffect(() => {
+    if (activeTool !== 'mark') {
+      marks.selectMark(null);
+      marks.cancelMark();
+      marks.cancelRelink();
+    }
+  }, [activeTool]);
+
+  const prevActiveToolRef = useRef<ActiveTool>(activeTool);
+  useEffect(() => {
+    const prevTool = prevActiveToolRef.current;
+    prevActiveToolRef.current = activeTool;
+
+    if (prevTool !== 'mark' && activeTool === 'mark' && markPanel.state.collapsed) {
       markPanel.actions.expand();
     }
-  }, [marks.pendingMarkInfo, marks.selectedMarkId, markPanel.state.collapsed, markPanel.actions.expand]);
+  }, [activeTool, markPanel.actions, markPanel.state.collapsed]);
+
+  const handleToolChange = (tool: ActiveTool) => {
+    setActiveTool((currentTool) => (currentTool === tool ? 'none' : tool));
+  };
+
+  // 创建/选择标记时自动展开面板（忽略用户手动折叠后的状态变化）
+  const prevSelectedRef = useRef<string | null>(null);
+  const prevPendingRef = useRef(false);
+  useEffect(() => {
+    const prevSelected = prevSelectedRef.current;
+    const prevPending = prevPendingRef.current;
+    prevSelectedRef.current = marks.selectedMarkId;
+    prevPendingRef.current = Boolean(marks.pendingMarkInfo);
+
+    // 只在标记真正切换时自动展开——当 selectedMarkId 或 pendingMarkInfo 从空变有值
+    const justSelected = marks.selectedMarkId && marks.selectedMarkId !== prevSelected;
+    const justPending = marks.pendingMarkInfo && !prevPending;
+
+    if ((justSelected || justPending) && markPanel.state.collapsed) {
+      markPanel.actions.expand();
+    }
+  }, [marks.pendingMarkInfo, marks.selectedMarkId]);
+
+  useEffect(() => {
+    const handleEditableTarget = (target: EventTarget | null) => {
+      const element = target as HTMLElement | null;
+      if (!element) return false;
+
+      return element.tagName === 'INPUT'
+        || element.tagName === 'TEXTAREA'
+        || element.tagName === 'SELECT'
+        || element.isContentEditable
+        || Boolean(element.closest('.ant-select'))
+        || Boolean(element.closest('.ant-select-dropdown'));
+    };
+
+    const handleViewportHotkeys = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey)) return;
+      if (handleEditableTarget(event.target)) return;
+
+      const isZoomInKey = event.key === '+' || event.key === '=' || event.code === 'NumpadAdd';
+      const isZoomOutKey = event.key === '-' || event.key === '_' || event.code === 'NumpadSubtract';
+      const isResetKey = event.key === '0' || event.code === 'Digit0' || event.code === 'Numpad0';
+
+      if (isZoomInKey) {
+        event.preventDefault();
+        viewport.zoomIn();
+        return;
+      }
+
+      if (isZoomOutKey) {
+        event.preventDefault();
+        viewport.zoomOut();
+        return;
+      }
+
+      if (isResetKey) {
+        event.preventDefault();
+        viewport.resetToFit();
+      }
+    };
+
+    window.addEventListener('keydown', handleViewportHotkeys, true);
+    return () => window.removeEventListener('keydown', handleViewportHotkeys, true);
+  }, [viewport]);
 
   // ========== 文件操作处理函数 ==========
   const handlePrototypeDelete = async (prototypePath: string) => {
@@ -446,11 +533,10 @@ function App() {
           <Header
             collapsed={siderCollapsed}
             onToggle={() => setSiderCollapsed(!siderCollapsed)}
+            projectName={config?.projectName || 'PRDKit'}
             currentFile={fileNav.selectedFile}
             currentIndex={fileNav.currentIndex}
             totalFiles={fileNav.fileList.length}
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
             onOpenPublish={publish.open}
             onOpenHistory={checkpoint.openHistory}
             onSaveVersion={checkpoint.saveVersion}
@@ -496,15 +582,12 @@ function App() {
               className="app-content"
               style={{
                 pointerEvents: sider.isResizing || markPanelResize.isResizing ? 'none' : 'auto',
-                marginRight: viewMode === 'mark'
-                  ? (markPanel.state.collapsed ? 40 : markPanel.state.width)
-                  : 0,
-                transition: markPanelResize.isResizing ? 'none' : 'margin-right 0.2s',
               }}
             >
               <Preview
                 filePath={fileNav.selectedFile}
-                viewMode={viewMode}
+                activeTool={activeTool}
+                onToolChange={handleToolChange}
                 projectName={config?.projectName || 'PRDKit'}
                 prototypesDir={config?.prototypesDir || ''}
                 wsConnected={ws.connected}
@@ -528,64 +611,42 @@ function App() {
                 onMarkVisibilityChange={marks.setHiddenMarkIds}
                 onToggleMarkPanel={markPanel.actions.toggle}
                 markPanelCollapsed={markPanel.state.collapsed}
+                markPanelWidth={markPanel.state.width}
+                markPanelResizing={markPanelResize.isResizing}
+                onMarkPanelResizeStart={markPanelResize.handleMouseDown}
+                onMarkPanelCollapsedChange={(collapsed) => collapsed ? markPanel.actions.collapse() : markPanel.actions.expand()}
+                onMarkCreate={marks.createMark}
+                onMarkUpdate={marks.updateMark}
+                onMarkDelete={marks.deleteMark}
+                onMarkRelinkStart={marks.startRelink}
+                onMarkRelinkCancel={marks.cancelRelink}
+                onMarkRefresh={marks.loadMarks}
+                missingMarkIds={marks.missingMarkIds}
+                hiddenMarkIds={marks.hiddenMarkIds}
+                viewportSize={DESKTOP_VIEWPORT_SIZE}
+                canvasScale={viewport.canvasScale}
+                canvasWidth={viewport.canvasWidth}
+                canvasHeight={viewport.canvasHeight}
+                panOffset={viewport.panOffset}
+                isPannable={viewport.isPannable}
+                isDraggingCanvas={viewport.isDraggingCanvas}
+                onStageSizeChange={setPreviewStageSize}
+                onCanvasContentSizeChange={setPreviewCanvasSize}
+                onCanvasPanStart={viewport.startPan}
+                onCanvasPanMove={viewport.updatePan}
+                onCanvasPanEnd={viewport.endPan}
+                onZoomReset={viewport.resetToFit}
+                zoomPercent={viewport.zoomPercent}
+                zoomOptions={viewport.zoomOptions}
+                canZoomIn={viewport.canZoomIn}
+                canZoomOut={viewport.canZoomOut}
+                onZoomIn={viewport.zoomIn}
+                onZoomOut={viewport.zoomOut}
+                onZoomChange={viewport.setZoomPercent}
                 previewUrlOverride={checkpoint.activePreview?.prototypePath === fileNav.selectedFile ? checkpoint.activePreview.previewUrl : null}
                 previewReadonly={Boolean(checkpoint.activePreview && checkpoint.activePreview.prototypePath === fileNav.selectedFile)}
               />
             </Content>
-            {viewMode === 'mark' && (
-              <div
-                ref={markPanelResize.panelRef}
-                className={`mark-panel-container ${markPanel.state.collapsed ? 'collapsed' : ''}`}
-                style={{ width: markPanel.state.collapsed ? 40 : markPanel.state.width }}
-              >
-                {markPanel.state.collapsed ? (
-                  <button
-                    type="button"
-                    className="mark-panel-collapsed-trigger"
-                    aria-label="展开标记面板"
-                    onClick={markPanel.actions.expand}
-                  >
-                    <DoubleRightOutlined />
-                    <span>标记</span>
-                  </button>
-                ) : (
-                  <>
-                    <div
-                      onMouseDown={markPanelResize.handleMouseDown}
-                      className={`app-resize-handle mark-panel-resize ${markPanelResize.isResizing ? 'resizing' : ''}`}
-                    />
-                    <MarkPanel
-                      marks={marks.effectiveMarks}
-                      selectedMarkId={marks.selectedMarkId}
-                      pendingMarkInfo={marks.pendingMarkInfo}
-                      relinkingMarkId={marks.relinkingMarkId}
-                      missingMarkIds={marks.missingMarkIds}
-                      hiddenMarkIds={marks.hiddenMarkIds}
-                      viewerSkills={config?.viewerSkills || {
-                        pageCreateSkillCommand: DEFAULT_PAGE_CREATE_SKILL_COMMAND,
-                        inspectCopySkillCommand: DEFAULT_INSPECT_COPY_SKILL_COMMAND,
-                        markCreateSkillCommand: DEFAULT_MARK_CREATE_SKILL_COMMAND,
-                        markUpdateSkillCommand: DEFAULT_MARK_UPDATE_SKILL_COMMAND,
-                        copyTerminalGuide: DEFAULT_COPY_TERMINAL_GUIDE,
-                      }}
-                      onMarkSelect={marks.selectMark}
-                      onMarkCreate={marks.createMark}
-                      onMarkUpdate={marks.updateMark}
-                      onMarkDelete={marks.deleteMark}
-                      onMarkRelinkStart={marks.startRelink}
-                      onMarkRelinkCancel={marks.cancelRelink}
-                      onMarkCancel={marks.cancelMark}
-                      onRefresh={marks.loadMarks}
-                      collapsed={false}
-                      onCollapsedChange={(collapsed) => collapsed ? markPanel.actions.collapse() : markPanel.actions.expand()}
-                      projectName={config?.projectName || 'PRDKit'}
-                      filePath={fileNav.selectedFile}
-                      prototypesDir={config?.prototypesDir || ''}
-                    />
-                  </>
-                )}
-              </div>
-            )}
           </Layout>
           <PublishDrawer
             open={publish.drawerOpen}

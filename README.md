@@ -4,7 +4,7 @@
 
 **AI 时代产品工作新方式 · 为产品人而生**
 
-<img src="./assets/banner.png" alt="PRDKit Banner" width="100%">
+<img src="./assets/banner.jpg" alt="PRDKit Banner" width="100%">
 
 <p align="center">
   <a href="https://www.npmjs.com/package/@huangqz/prdkit-cli"><img src="https://img.shields.io/npm/v/@huangqz/prdkit-cli.svg" alt="npm version"></a>

@@ -16,6 +16,7 @@ interface PublishToCloudOptions {
   projectRoot: string;
   config: PrdkitConfig;
   cloudConfig: PrdkitCloudConfig;
+  hostOverride?: string;
   message?: string;
   entryFiles?: string[];
   dryRun?: boolean;
@@ -43,8 +44,8 @@ type SnapshotBundle = {
 };
 
 export async function publishToCloud(options: PublishToCloudOptions): Promise<PublishToCloudResult> {
-  const { projectRoot, config, cloudConfig, message, entryFiles, dryRun, project } = options;
-  const host = await requireCloudHost();
+  const { projectRoot, config, cloudConfig, hostOverride, message, entryFiles, dryRun, project } = options;
+  const host = await requireCloudHost(projectRoot, hostOverride);
   const client = await createCloudClient(host);
   await client.ensureValidAuth();
   const projectId = await resolvePublishProjectId(client, cloudConfig, project);

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Button, Input, List, Empty, Avatar, Tag, message, Popconfirm } from 'antd';
-import { DeleteOutlined, EditOutlined, ArrowLeftOutlined, UpOutlined, DownOutlined, DoubleRightOutlined, DoubleLeftOutlined, SearchOutlined, CopyOutlined, CheckOutlined, CloseOutlined, NodeIndexOutlined, DisconnectOutlined } from '@ant-design/icons';
+import { Button, Input, Empty, Avatar, Tag, message, Popconfirm, Modal } from 'antd';
+import { DeleteOutlined, EditOutlined, ArrowLeftOutlined, UpOutlined, DownOutlined, DoubleRightOutlined, DoubleLeftOutlined, SearchOutlined, CopyOutlined, CheckOutlined, CloseOutlined, NodeIndexOutlined, DisconnectOutlined, FullscreenOutlined, FullscreenExitOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { markdownComponents } from './MarkdownComponents';
 import { copySkillClipboardText } from '../utils/clipboard';
 import type { Mark, MarkUpdatePatch, PendingMarkInfo, ViewerSkillConfig } from '../types';
 import DomPathBreadcrumb from './DomPathBreadcrumb';
@@ -20,7 +21,7 @@ interface MarkPanelProps {
   missingMarkIds: string[];
   hiddenMarkIds: string[];
   viewerSkills: ViewerSkillConfig;
-  onMarkSelect: (markId: string) => void;
+  onMarkSelect: (markId: string | null) => void;
   onMarkCreate: (title: string, description: string) => void;
   onMarkUpdate: (markId: string, patch: MarkUpdatePatch) => void;
   onMarkDelete: (markId: string) => void;
@@ -62,6 +63,7 @@ export default function MarkPanel({
   const [newMarkTitle, setNewMarkTitle] = useState('');
   const [newMarkDescription, setNewMarkDescription] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
+  const [fullscreenOpen, setFullscreenOpen] = useState(false);
 
   // 复制 DOM 信息
   const copyDomInfo = async () => {
@@ -219,7 +221,7 @@ DOM 路径: ${domPath}`;
       setIsEditing(false);
       setEditTitle('');
       setEditContent('');
-      onMarkSelect('');
+      onMarkSelect(null);
     }
   };
 
@@ -313,6 +315,53 @@ DOM 路径: ${domPath}`;
     onMarkSelect(marks[newIndex].id);
   };
 
+  const renderPanelHeaderActions = ({
+    showNavigate = false,
+    showCollapse = true,
+  }: {
+    showNavigate?: boolean;
+    showCollapse?: boolean;
+  }) => (
+    <div className="mark-header-actions">
+      {showNavigate ? (
+        <>
+          <Button
+            type="text"
+            size="small"
+            icon={<UpOutlined />}
+            onClick={() => handleNavigateMark('prev')}
+            disabled={marks.length <= 1}
+            title="上一个 (↑)"
+          />
+          <Button
+            type="text"
+            size="small"
+            icon={<DownOutlined />}
+            onClick={() => handleNavigateMark('next')}
+            disabled={marks.length <= 1}
+            title="下一个 (↓)"
+          />
+        </>
+      ) : null}
+      <Button
+        type="text"
+        size="small"
+        icon={fullscreenOpen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
+        onClick={() => setFullscreenOpen((value) => !value)}
+        title={fullscreenOpen ? '退出全屏' : '全屏查看'}
+      />
+      {!fullscreenOpen && showCollapse ? (
+        <Button
+          type="text"
+          size="small"
+          icon={<DoubleLeftOutlined />}
+          onClick={() => onCollapsedChange?.(true)}
+          title="折叠面板 (H)"
+        />
+      ) : null}
+    </div>
+  );
+
   // 列表视图
   const renderListView = () => {
     const filteredMarks = marks.filter(mark =>
@@ -322,19 +371,13 @@ DOM 路径: ${domPath}`;
     return (
       <>
         <div className="mark-panel-header">
-          <h3>标记列表</h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div>
+            <h3>标记列表</h3>
             <span className="mark-panel-count">{marks.length} 个标记</span>
-            <Button
-              type="text"
-              size="small"
-              icon={<DoubleLeftOutlined />}
-              onClick={() => onCollapsedChange?.(true)}
-              title="折叠面板"
-            />
           </div>
+          {renderPanelHeaderActions({ showCollapse: true })}
         </div>
-        <div style={{ padding: '8px 16px' }}>
+        <div className="mark-panel-search-wrap">
           <Input
             placeholder="搜索标记标题..."
             prefix={<SearchOutlined />}
@@ -342,11 +385,6 @@ DOM 路径: ${domPath}`;
             onChange={(e) => setSearchKeyword(e.target.value)}
             allowClear
           />
-          {hiddenMarkIdSet.size > 0 && (
-            <div className="mark-list-hidden-notice">
-              部分标记位于隐藏区域，相关标记已标注「隐藏」
-            </div>
-          )}
         </div>
         <div className="mark-panel-content">
           {filteredMarks.length === 0 ? (
@@ -355,55 +393,40 @@ DOM 路径: ${domPath}`;
               image={Empty.PRESENTED_IMAGE_SIMPLE}
             />
           ) : (
-            <List
-              dataSource={filteredMarks}
-              renderItem={(mark) => (
-                <List.Item
+            <>
+              {hiddenMarkIdSet.size > 0 && (
+                <div className="mark-panel-hidden-notice">
+                  提示：{hiddenMarkIdSet.size} 个标记在当前页面状态下不可见
+                </div>
+              )}
+              {filteredMarks.map((mark) => (
+                <div
                   key={mark.id}
-                  className="mark-list-item"
+                  role="button"
+                  tabIndex={0}
+                  className={`mark-list-item ${selectedMarkId === mark.id ? 'selected' : ''}`}
                   onClick={() => onMarkSelect(mark.id)}
-                  actions={[
-                    <Popconfirm
-                      key="delete"
-                      title="删除标记"
-                      description="将删除当前标记文件，确认继续？"
-                      okText="删除"
-                      cancelText="取消"
-                      okButtonProps={{ danger: true }}
-                      onConfirm={(e) => {
-                        e?.stopPropagation();
-                        onMarkDelete(mark.id);
-                      }}
-                    >
-                      <Button
-                        type="text"
-                        danger
-                        size="small"
-                        icon={<DeleteOutlined />}
-                        className="mark-list-delete-button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                        }}
-                      />
-                    </Popconfirm>
-                  ]}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onMarkSelect(mark.id); } }}
                 >
-                  <List.Item.Meta
-                    avatar={
-                      <Avatar size="small">
-                        {marks.indexOf(mark) + 1}
-                      </Avatar>
-                    }
-                    title={
-                      <div className="mark-list-title-row">
-                        <span className="mark-list-title-text" title={mark.title}>
-                          {mark.title}
-                        </span>
-                      </div>
-                    }
-                    description={missingMarkIdSet.has(mark.id) ? (
+                  <div>
+                    <Avatar size="small">
+                      {marks.indexOf(mark) + 1}
+                    </Avatar>
+                  </div>
+                  <div className="mark-list-item-main">
+                    <div className="mark-list-title-row">
+                      <span className="mark-list-title-text" title={mark.title}>
+                        {mark.title}
+                      </span>
+                      {hiddenMarkIdSet.has(mark.id) && (
+                        <Tag className="mark-status-tag mark-hidden-status">隐藏</Tag>
+                      )}
+                      {missingMarkIdSet.has(mark.id) && (
+                        <Tag className="mark-status-tag mark-missing-status">缺失</Tag>
+                      )}
+                    </div>
+                    {missingMarkIdSet.has(mark.id) && (
                       <div className="mark-list-missing-row">
-                        <Tag color="error" className="mark-missing-tag">缺失</Tag>
                         <Button
                           type="link"
                           size="small"
@@ -418,13 +441,34 @@ DOM 路径: ${domPath}`;
                           重新绑定
                         </Button>
                       </div>
-                    ) : hiddenMarkIdSet.has(mark.id) ? (
-                      <Tag color="warning" className="mark-hidden-tag">隐藏</Tag>
-                    ) : null}
-                  />
-                </List.Item>
-              )}
-            />
+                    )}
+                  </div>
+                  <Popconfirm
+                    key="delete"
+                    title="删除标记"
+                    description="将删除当前标记文件，确认继续？"
+                    okText="删除"
+                    cancelText="取消"
+                    okButtonProps={{ danger: true }}
+                    onConfirm={(e) => {
+                      e?.stopPropagation();
+                      onMarkDelete(mark.id);
+                    }}
+                  >
+                    <Button
+                      type="text"
+                      danger
+                      size="small"
+                      icon={<DeleteOutlined />}
+                      className="mark-list-delete-button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                      }}
+                    />
+                  </Popconfirm>
+                </div>
+              ))}
+            </>
           )}
         </div>
       </>
@@ -433,20 +477,22 @@ DOM 路径: ${domPath}`;
 
   // 创建视图
   const renderCreateView = () => (
-    <>
-      <div className="mark-panel-header">
-        <Button
-          type="text"
-          icon={<ArrowLeftOutlined />}
-          onClick={handleBackToList}
-        >
-          创建新标记
-        </Button>
-      </div>
-      <div className="mark-panel-view">
-        <DomPathBreadcrumb domPath={pendingMarkInfo?.domPath || pendingMarkInfo?.selector || ''} />
-        <div className="mark-panel-editor">
-          <div className="mark-editor-card">
+      <>
+        <div className="mark-panel-header">
+          <div className="mark-panel-header-left">
+            <Button
+              type="text"
+              icon={<ArrowLeftOutlined />}
+              onClick={handleBackToList}
+              className="mark-panel-back-btn"
+            />
+            <span className="mark-panel-label">创建标记</span>
+          </div>
+        </div>
+        <div className="mark-panel-view">
+          <DomPathBreadcrumb domPath={pendingMarkInfo?.domPath || pendingMarkInfo?.selector || ''} />
+          <div className="mark-panel-editor">
+            <div className="mark-editor-card">
             <div className="mark-create-header">
               <Input
                 value={newMarkTitle}
@@ -535,31 +581,16 @@ DOM 路径: ${domPath}`;
     return (
       <>
         <div className="mark-panel-header">
-          <Button
-            type="text"
-            icon={<ArrowLeftOutlined />}
-            onClick={handleBackToList}
-          >
-            标记详情
-          </Button>
-          <div className="mark-navigation">
+          <div className="mark-panel-header-left">
             <Button
               type="text"
-              size="small"
-              icon={<UpOutlined />}
-              onClick={() => handleNavigateMark('prev')}
-              disabled={marks.length <= 1}
-              title="上一个标记"
+              icon={<ArrowLeftOutlined />}
+              onClick={handleBackToList}
+              className="mark-panel-back-btn"
             />
-            <Button
-              type="text"
-              size="small"
-              icon={<DownOutlined />}
-              onClick={() => handleNavigateMark('next')}
-              disabled={marks.length <= 1}
-              title="下一个标记"
-            />
+            <span className="mark-panel-label">标记详情</span>
           </div>
+          {renderPanelHeaderActions({ showNavigate: true, showCollapse: true })}
         </div>
         <div className="mark-panel-view">
           {!missingMarkIdSet.has(selectedMark.id) ? (
@@ -645,31 +676,34 @@ DOM 路径: ${domPath}`;
             ) : (
               <div className="mark-editor-card">
                 <div className="mark-detail-header">
-                  <div className="mark-detail-title">{selectedMark.title}</div>
-                  <div className="mark-detail-header-actions">
-                    <Button
-                      type="text"
-                      size="small"
-                      icon={<EditOutlined />}
-                      onClick={handleStartEdit}
-                      title="编辑"
-                      className="mark-detail-icon-button"
-                    />
-                    <Button
-                      type="text"
-                      size="small"
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={handleDeleteMark}
-                      title="删除"
-                      className="mark-detail-icon-button"
-                    />
+                  <span className="mark-detail-kicker">标记详情</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%' }}>
+                    <div className="mark-detail-title">{selectedMark.title}</div>
+                    <div className="mark-detail-header-actions">
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<EditOutlined />}
+                        onClick={handleStartEdit}
+                        title="编辑"
+                        className="mark-detail-icon-button"
+                      />
+                      <Button
+                        type="text"
+                        size="small"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={handleDeleteMark}
+                        title="删除"
+                        className="mark-detail-icon-button"
+                      />
+                    </div>
                   </div>
                 </div>
                 <div className="mark-editor-divider" />
                 <div className="mark-preview-content">
                   {displayDescription ? (
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayDescription}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{displayDescription}</ReactMarkdown>
                   ) : (
                     <span className="mark-item-empty">暂无描述</span>
                   )}
@@ -720,6 +754,21 @@ DOM 路径: ${domPath}`;
           {viewMode === 'detail' && renderDetailView()}
         </>
       )}
+      <Modal
+        open={fullscreenOpen}
+        onCancel={() => setFullscreenOpen(false)}
+        footer={null}
+        width="80vw"
+        className="mark-modal-fullscreen"
+        closable={false}
+        destroyOnHidden
+      >
+        <div className="mark-modal-inner">
+          {viewMode === 'list' && renderListView()}
+          {viewMode === 'create' && renderCreateView()}
+          {viewMode === 'detail' && renderDetailView()}
+        </div>
+      </Modal>
     </div>
   );
 }
