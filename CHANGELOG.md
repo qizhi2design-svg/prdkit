@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.0] - 2026-05-19
+
+### Added
+
+- **clone 命令**: `prdkit clone <project>` 从云端克隆完整 prdkit 项目，支持指定版本和自定义输出目录
+- **update-notifier**: CLI 启动时自动检查 npm 版本更新并提示
+- **CloudClient 扩展**: 新增 `getProject()` 和 `downloadProjectArchive()` 方法，支持项目下载
+
 ## [2.0.2] - 2026-05-17
 
 ### Added
