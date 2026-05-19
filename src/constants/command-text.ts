@@ -2,6 +2,7 @@ export const COPY = {
   rootDescription: "产品经理项目工具套件",
   rootHelpAfter: `
 常用流程
+  0. prdkit clone demo-project
   1. prdkit init ./my-product --name "My Product" --author "Alice"
   2. prdkit prd create "支付流程优化"
   3. prdkit prd check "支付流程优化"
@@ -9,6 +10,18 @@ export const COPY = {
   5. prdkit mark list --prototype dashboard
 `,
   initDescription: "初始化产品项目",
+  cloneDescription: "从云端克隆完整 prdkit 项目",
+  cloneHelpAfter: `
+示例：
+  prdkit clone demo-project
+  prdkit clone demo-project ./demo-project
+  prdkit clone demo-project --version 12
+  prdkit clone demo-project --host http://localhost:3000
+
+说明：
+  默认从当前云端服务器拉取项目最新版本，并生成完整的 prdkit 项目骨架。
+  使用 --version 可拉取指定历史版本，clone 后可直接继续使用 serve、prototype、cloud 等命令。
+`,
   initHelpAfter: `
 示例：
   prdkit init

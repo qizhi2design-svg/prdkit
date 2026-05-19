@@ -61,6 +61,16 @@ export type CloudProjectSummary = {
   prototypeCount?: number;
 };
 
+export type CloudCloneManifest = {
+  version: 1;
+  projectSlug: string;
+  versionNumber: number | null;
+  entries: Array<{
+    archiveDir: string;
+    prototypePath: string;
+  }>;
+};
+
 export type ReleaseItemStatus = "changed" | "unchanged" | "failed" | "removed";
 
 export type ReleasePreparePrototype = {

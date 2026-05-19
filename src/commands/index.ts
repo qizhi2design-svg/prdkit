@@ -1,3 +1,4 @@
+export { registerClone } from "./clone.js";
 export { registerAuth } from "./auth.js";
 export { registerCloud } from "./cloud.js";
 export { registerDoctor } from "./doctor.js";

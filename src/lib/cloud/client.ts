@@ -1,6 +1,8 @@
+import { strFromU8, unzipSync } from "fflate";
 import type {
   AuthHostRecord,
   AuthenticatedUser,
+  CloudCloneManifest,
   CloudProjectSummary,
   ReleaseCommitPayload,
   ReleaseCommitResult,
@@ -157,6 +159,45 @@ export class CloudClient {
       description: typeof response.project.description === "string" ? response.project.description : null,
       updatedAt: typeof response.project.updatedAt === "string" ? response.project.updatedAt : undefined,
       prototypeCount: typeof response.project._count?.prototypes === "number" ? response.project._count.prototypes : undefined,
+    };
+  }
+
+  async getProject(projectId: string): Promise<CloudProjectSummary> {
+    const response = await this.requestJson<{ project: any }>(`/api/projects/${encodeURIComponent(projectId)}`);
+    return {
+      id: String(response.project.id),
+      name: String(response.project.name),
+      slug: String(response.project.slug),
+      description: typeof response.project.description === "string" ? response.project.description : null,
+      updatedAt: typeof response.project.updatedAt === "string" ? response.project.updatedAt : undefined,
+      prototypeCount: Array.isArray(response.project.prototypes) ? response.project.prototypes.length : undefined,
+    };
+  }
+
+  async downloadProjectArchive(projectId: string, versionNumber?: number): Promise<{
+    fileName: string;
+    buffer: Buffer;
+    manifest: CloudCloneManifest;
+  }> {
+    const params = new URLSearchParams();
+    if (versionNumber != null) {
+      params.set("version", String(versionNumber));
+    }
+    const pathname = `/api/projects/${encodeURIComponent(projectId)}/download${params.size > 0 ? `?${params.toString()}` : ""}`;
+    const response = await this.request(pathname, {
+      method: "GET",
+    });
+    const arrayBuffer = await response.arrayBuffer();
+    const contentDisposition = response.headers.get("content-disposition") || "";
+    const fileNameMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/);
+    const fileName = fileNameMatch?.[1] ? decodeURIComponent(fileNameMatch[1]) : `${projectId}.zip`;
+    const buffer = Buffer.from(arrayBuffer);
+    const manifest = extractCloneManifest(buffer);
+
+    return {
+      fileName,
+      buffer,
+      manifest,
     };
   }
 
@@ -331,4 +372,15 @@ export async function createCloudClient(host: string): Promise<CloudClient> {
     persistAuth: async (record) => setAuthRecord(normalizedHost, record),
     clearAuth: async () => clearAuthRecord(normalizedHost),
   });
+}
+
+function extractCloneManifest(zipBuffer: Buffer): CloudCloneManifest {
+  const entries = unzipSync(new Uint8Array(zipBuffer));
+  const manifestEntry = entries[".prdkit-clone-manifest.json"];
+
+  if (!manifestEntry) {
+    throw new Error("下载产物缺少 .prdkit-clone-manifest.json，无法执行 clone");
+  }
+
+  return JSON.parse(strFromU8(manifestEntry)) as CloudCloneManifest;
 }
