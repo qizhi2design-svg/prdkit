@@ -2,12 +2,14 @@ import path from "node:path";
 import type {
   PrdkitCloudConfig,
   PrdkitConfig,
+  ReleaseIterationMeta,
   ReleaseCommitPayload,
   ReleaseCommitResult,
   ReleasePrepareResult
 } from "#types/index.js";
 import { requireCloudHost } from "#utils/config.js";
 import { logger } from "#utils/logger.js";
+import { findIterationBySessionId, getCheckpointSession } from "../checkpoints/prototype/store.js";
 import { readBlobSource, collectPrototypeSnapshot } from "../checkpoints/prototype/snapshot.js";
 import { flattenPrototypes, scanPrototypes } from "../server/scanner.js";
 import { createCloudClient } from "./client.js";
@@ -64,9 +66,11 @@ export async function publishToCloud(options: PublishToCloudOptions): Promise<Pu
       snapshot,
     };
   });
+  const iteration = resolvePublishIteration(projectRoot);
 
   const prepare = await client.prepareRelease(projectId, {
     message,
+    iteration,
     prototypes: snapshots.map((item) => ({
       path: item.path,
       name: item.name,
@@ -210,6 +214,7 @@ function buildCommitPayload(
 
   return {
     message,
+    iteration: prepare.iteration ?? undefined,
     prototypes: snapshots.map((item) => ({
       path: item.path,
       name: item.name,
@@ -226,5 +231,23 @@ function buildCommitPayload(
       ],
       baseVersionId: stateMap.get(item.path)?.latestVersionId ?? null,
     })),
+  };
+}
+
+function resolvePublishIteration(projectRoot: string): ReleaseIterationMeta | undefined {
+  const session = getCheckpointSession(projectRoot);
+  if (!session) {
+    return undefined;
+  }
+
+  const iteration = findIterationBySessionId(projectRoot, session.id);
+  if (!iteration) {
+    return undefined;
+  }
+
+  return {
+    iterationId: iteration.id,
+    iterationName: iteration.name,
+    sessionId: session.id,
   };
 }

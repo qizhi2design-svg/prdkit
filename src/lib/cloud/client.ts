@@ -4,6 +4,7 @@ import type {
   AuthenticatedUser,
   CloudCloneManifest,
   CloudProjectSummary,
+  ReleaseIterationMeta,
   ReleaseCommitPayload,
   ReleaseCommitResult,
   ReleasePreparePrototype,
@@ -218,7 +219,7 @@ export class CloudClient {
 
   async prepareRelease(
     projectId: string,
-    payload: { message?: string; prototypes: ReleasePreparePrototype[] }
+    payload: { message?: string; iteration?: ReleaseIterationMeta | null; prototypes: ReleasePreparePrototype[] }
   ): Promise<ReleasePrepareResult> {
     return this.requestJson<ReleasePrepareResult>(`/api/projects/${projectId}/releases/prepare`, {
       method: "POST",

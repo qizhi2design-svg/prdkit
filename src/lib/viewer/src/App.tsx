@@ -1,5 +1,5 @@
 import { App as AntdApp, Layout, message, ConfigProvider } from 'antd';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import FileTree from './components/FileTree';
 import Preview from './components/Preview';
 import Header from './components/Header';
@@ -81,6 +81,21 @@ function App() {
 
   // ========== 版本历史 ==========
   const checkpoint = useCheckpoint({ prototypePath: fileNav.selectedFile });
+  const visibleFileList = useMemo(
+    () => checkpoint.activeHistoryFiles.length > 0 ? checkpoint.activeHistoryFiles : fileNav.fileList,
+    [checkpoint.activeHistoryFiles, fileNav.fileList],
+  );
+  const activePreviewPrototypePath = checkpoint.activePreview?.prototypePath ?? null;
+  const previewIdentity = checkpoint.activePreview
+    ? `checkpoint:${checkpoint.activePreview.checkpointId}`
+    : `file:${fileNav.selectedFile ?? 'none'}`;
+  const renderedPreviewFilePath = activePreviewPrototypePath ?? fileNav.selectedFile;
+  const effectivePrototypeRoot = checkpoint.activePreview?.previewFsPath ?? config?.prototypesDir ?? '';
+  const visibleCurrentIndex = useMemo(() => {
+    if (!fileNav.selectedFile) return 0;
+    const index = visibleFileList.indexOf(fileNav.selectedFile);
+    return index >= 0 ? index + 1 : 0;
+  }, [fileNav.selectedFile, visibleFileList]);
 
   // ========== 标记管理 ==========
   const marks = useMarks({
@@ -198,8 +213,34 @@ function App() {
   useEffect(() => {
     marks.selectMark(null);
     marks.cancelMark();
-    checkpoint.exitPreview();
-  }, [fileNav.selectedFile, marks.selectMark, marks.cancelMark, checkpoint.exitPreview]);
+  }, [
+    fileNav.selectedFile,
+    marks.selectMark,
+    marks.cancelMark,
+  ]);
+
+  useEffect(() => {
+    if (checkpoint.activeIterationId) return;
+    if (!activePreviewPrototypePath) return;
+    if (fileNav.selectedFile === activePreviewPrototypePath) return;
+
+    fileNav.selectFile(activePreviewPrototypePath);
+  }, [
+    checkpoint.activeIterationId,
+    activePreviewPrototypePath,
+    fileNav.selectedFile,
+    fileNav.selectFile,
+  ]);
+
+  useEffect(() => {
+    if (!checkpoint.historyViewActive) return;
+
+    const activeFiles = checkpoint.activeHistoryFiles;
+    if (activeFiles.length === 0) return;
+    if (fileNav.selectedFile && activeFiles.includes(fileNav.selectedFile)) return;
+
+    fileNav.selectFile(activeFiles[0] || null);
+  }, [checkpoint.activeHistoryFiles, checkpoint.historyViewActive, fileNav.selectedFile, fileNav.selectFile]);
 
   useEffect(() => {
     setActiveTool(preferences.defaultTool);
@@ -212,6 +253,14 @@ function App() {
       marks.cancelRelink();
     }
   }, [activeTool]);
+
+  const handleRestoreCheckpoint = useCallback(async (detail: Parameters<typeof checkpoint.restore>[0], versionLabel: string) => {
+    await checkpoint.restore(detail, versionLabel);
+    fileNav.selectFile(detail.checkpoint.prototypePath);
+    fileNav.refreshPrototypes();
+    await marks.loadMarks();
+    setReloadVersion((prev) => prev + 1);
+  }, [checkpoint, fileNav, marks]);
 
   const prevActiveToolRef = useRef<ActiveTool>(activeTool);
   useEffect(() => {
@@ -290,7 +339,7 @@ function App() {
 
   // ========== 文件操作处理函数 ==========
   const handlePrototypeDelete = async (prototypePath: string) => {
-    if (checkpoint.activePreview) {
+    if (checkpoint.historyViewActive) {
       message.info('历史版本预览中不可删除页面，请先退出预览');
       return;
     }
@@ -323,7 +372,7 @@ function App() {
   };
 
   const handlePrototypeDuplicate = async (prototypePath: string) => {
-    if (checkpoint.activePreview) {
+    if (checkpoint.historyViewActive) {
       message.info('历史版本预览中不可复制页面，请先退出预览');
       return;
     }
@@ -354,7 +403,7 @@ function App() {
   };
 
   const handleFolderDelete = async (folderPath: string) => {
-    if (checkpoint.activePreview) {
+    if (checkpoint.historyViewActive) {
       message.info('历史版本预览中不可删除文件夹，请先退出预览');
       return;
     }
@@ -382,7 +431,7 @@ function App() {
   };
 
   const handleCreateFolder = async (folderName: string) => {
-    if (checkpoint.activePreview) {
+    if (checkpoint.historyViewActive) {
       message.info('历史版本预览中不可新建文件夹，请先退出预览');
       return;
     }
@@ -403,7 +452,7 @@ function App() {
   };
 
   const handleRenameNode = async (sourcePath: string, targetName: string) => {
-    if (checkpoint.activePreview) {
+    if (checkpoint.historyViewActive) {
       message.info('历史版本预览中不可重命名，请先退出预览');
       return;
     }
@@ -433,7 +482,7 @@ function App() {
   };
 
   const handleMovePrototype = async (prototypePath: string, targetFolderPath: string) => {
-    if (checkpoint.activePreview) {
+    if (checkpoint.historyViewActive) {
       message.info('历史版本预览中不可移动页面，请先退出预览');
       return;
     }
@@ -535,13 +584,13 @@ function App() {
             onToggle={() => setSiderCollapsed(!siderCollapsed)}
             projectName={config?.projectName || 'PRDKit'}
             currentFile={fileNav.selectedFile}
-            currentIndex={fileNav.currentIndex}
-            totalFiles={fileNav.fileList.length}
+            currentIndex={visibleCurrentIndex}
+            totalFiles={visibleFileList.length}
             onOpenPublish={publish.open}
             onOpenHistory={checkpoint.openHistory}
             onSaveVersion={checkpoint.saveVersion}
-            historyDisabled={!fileNav.selectedFile}
-            saveDisabled={!fileNav.selectedFile || !checkpoint.status?.hasChanges || Boolean(checkpoint.activePreview)}
+            historyDisabled={visibleFileList.length === 0}
+            saveDisabled={!checkpoint.status?.hasChanges || checkpoint.historyViewActive}
             saveHasChanges={Boolean(checkpoint.status?.hasChanges)}
             saveSubmitting={checkpoint.saveSubmitting}
             saveChangeCount={checkpoint.status?.hasChanges ? checkpoint.status.changeCount : 0}
@@ -559,7 +608,16 @@ function App() {
               <FileTree
                 onSelect={fileNav.selectFile}
                 selectedFile={fileNav.selectedFile}
-                onNavigate={(direction) => direction === 'prev' ? fileNav.navigatePrev() : fileNav.navigateNext()}
+                onNavigate={(direction) => {
+                  const currentFiles = visibleFileList;
+                  if (currentFiles.length === 0) return;
+
+                  const currentIdx = fileNav.selectedFile ? currentFiles.indexOf(fileNav.selectedFile) : -1;
+                  const nextIndex = direction === 'prev'
+                    ? (currentIdx <= 0 ? currentFiles.length - 1 : currentIdx - 1)
+                    : (currentIdx >= currentFiles.length - 1 ? 0 : currentIdx + 1);
+                  fileNav.selectFile(currentFiles[nextIndex] || null);
+                }}
                 onDeletePrototype={handlePrototypeDelete}
                 onDeleteFolder={handleFolderDelete}
                 onDuplicatePrototype={handlePrototypeDuplicate}
@@ -585,13 +643,13 @@ function App() {
               }}
             >
               <Preview
-                filePath={fileNav.selectedFile}
-                fileList={fileNav.fileList}
+                key={previewIdentity}
+                filePath={renderedPreviewFilePath}
                 onLinkNavigation={(path) => fileNav.selectFile(path)}
                 activeTool={activeTool}
                 onToolChange={handleToolChange}
                 projectName={config?.projectName || 'PRDKit'}
-                prototypesDir={config?.prototypesDir || ''}
+                prototypesDir={effectivePrototypeRoot}
                 wsConnected={ws.connected}
                 reloadVersion={reloadVersion}
                 viewerSkills={config?.viewerSkills || {
@@ -645,8 +703,9 @@ function App() {
                 onZoomIn={viewport.zoomIn}
                 onZoomOut={viewport.zoomOut}
                 onZoomChange={viewport.setZoomPercent}
-                previewUrlOverride={checkpoint.activePreview?.prototypePath === fileNav.selectedFile ? checkpoint.activePreview.previewUrl : null}
-                previewReadonly={Boolean(checkpoint.activePreview && checkpoint.activePreview.prototypePath === fileNav.selectedFile)}
+                previewUrlOverride={checkpoint.activePreview?.previewUrl ?? null}
+                previewReadonly={Boolean(checkpoint.activePreview)}
+                fileList={visibleFileList}
               />
             </Content>
           </Layout>
@@ -670,9 +729,14 @@ function App() {
             prototypePath={fileNav.selectedFile}
             refreshVersion={checkpoint.historyRefreshVersion}
             focusCheckpointId={checkpoint.historyTargetCheckpointId}
+            iterations={checkpoint.iterations}
+            activeIterationId={checkpoint.activeIterationId}
+            onIterationChange={checkpoint.selectIteration}
+            onIterationsRefresh={checkpoint.loadIterations}
             onClose={checkpoint.closeHistory}
             onPreview={checkpoint.preview}
-            onRestore={checkpoint.restore}
+            onPreviewGroup={checkpoint.previewGroup}
+            onRestore={handleRestoreCheckpoint}
           />
           <PreferencesDrawer open={preferencesOpen} onClose={() => setPreferencesOpen(false)} />
           </Layout>

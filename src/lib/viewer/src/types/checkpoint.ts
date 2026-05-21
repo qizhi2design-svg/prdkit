@@ -9,9 +9,26 @@ export interface CheckpointRecord {
   message?: string;
   createdAt: string;
   baseCheckpointId?: string;
+  sessionId?: string;
+  iterationId?: string;
   fileCount: number;
   markCount: number;
   contentHash: string;
+}
+
+export interface IterationRecord {
+  id: string;
+  name: string;
+  sessionId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IterationSummary extends IterationRecord {
+  checkpointCount: number;
+  pageCount: number;
+  pages: string[];
+  checkpointsByPage: Record<string, CheckpointRecord>;
 }
 
 export interface CheckpointSummary {
@@ -29,6 +46,7 @@ export interface CheckpointDetail {
   checkpoint: CheckpointRecord;
   summary: CheckpointSummary;
   previewUrl?: string;
+  previewFsPath?: string;
   marks?: Mark[];
   files?: Array<{ relativePath: string; blobHash: string; size: number }>;
 }
@@ -37,14 +55,17 @@ export interface ActiveCheckpointPreview {
   checkpointId: string;
   prototypePath: string;
   previewUrl: string;
+  previewFsPath?: string;
   marks: Mark[];
   message?: string;
+  iterationId?: string;
 }
 
 export interface CheckpointStatus {
-  prototypePath: string;
+  prototypePath: string | null;
   latestCheckpointId: string | null;
   hasChanges: boolean;
   changeCount: number;
-  summary: CheckpointSummary;
+  summary: CheckpointSummary | null;
+  changedPrototypePaths?: string[];
 }

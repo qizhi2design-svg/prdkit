@@ -140,3 +140,46 @@ export function diffCurrentAgainstLatest(
     hasChanges
   };
 }
+
+export function diffProjectAgainstLatest(
+  projectRoot: string,
+  prototypesDir: string,
+  prototypePaths: string[],
+): {
+  hasChanges: boolean;
+  changeCount: number;
+  changedPrototypePaths: string[];
+  statuses: Array<{
+    prototypePath: string;
+    latestCheckpointId?: string;
+    summary: CheckpointDiffSummary;
+    hasChanges: boolean;
+  }>;
+} {
+  const statuses = prototypePaths.map((prototypePath) => ({
+    prototypePath,
+    ...diffCurrentAgainstLatest(projectRoot, prototypesDir, prototypePath),
+  }));
+
+  const changedPrototypePaths = statuses
+    .filter((item) => item.hasChanges)
+    .map((item) => item.prototypePath);
+
+  const changeCount = statuses.reduce((sum, item) => {
+    const summary = item.summary;
+    return sum
+      + summary.addedFiles.length
+      + summary.modifiedFiles.length
+      + summary.deletedFiles.length
+      + summary.markAdded.length
+      + summary.markUpdated.length
+      + summary.markDeleted.length;
+  }, 0);
+
+  return {
+    hasChanges: changedPrototypePaths.length > 0,
+    changeCount,
+    changedPrototypePaths,
+    statuses,
+  };
+}

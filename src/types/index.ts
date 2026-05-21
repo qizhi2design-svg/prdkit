@@ -73,6 +73,12 @@ export type CloudCloneManifest = {
 
 export type ReleaseItemStatus = "changed" | "unchanged" | "failed" | "removed";
 
+export type ReleaseIterationMeta = {
+  iterationId?: string | null;
+  iterationName?: string | null;
+  sessionId?: string | null;
+};
+
 export type ReleasePreparePrototype = {
   path: string;
   name: string;
@@ -90,6 +96,7 @@ export type ReleasePrepareResult = {
   webUrl: string;
   releaseUrl: string;
   missingBlobHashes: string[];
+  iteration?: ReleaseIterationMeta | null;
   prototypes: Array<{
     path: string;
     name: string;
@@ -102,6 +109,7 @@ export type ReleasePrepareResult = {
 
 export type ReleaseCommitPayload = {
   message?: string;
+  iteration?: ReleaseIterationMeta | null;
   prototypes: Array<{
     path: string;
     name: string;
@@ -138,7 +146,7 @@ export type ReleaseCommitResult = {
     createdAt: string;
     webUrl: string;
     releaseUrl: string;
-  };
+  } & ReleaseIterationMeta;
   results: Array<{
     prototypePath: string;
     prototypeId: string;

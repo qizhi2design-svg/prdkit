@@ -770,7 +770,8 @@ export default function Preview({
           return;
         }
 
-        const info = getElementInfo(target, currentProjectName, currentPrototypesDir, filePath);
+        const currentFilePath = filePathRef.current;
+        const info = getElementInfo(target, currentProjectName, currentPrototypesDir, currentFilePath);
 
         if (!wantsMultiSelect) {
           try {

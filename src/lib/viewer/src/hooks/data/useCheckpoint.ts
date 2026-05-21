@@ -1,13 +1,34 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { message } from 'antd';
 import type { UseCheckpointOptions, UseCheckpointReturn } from '../../types/hooks';
-import type { CheckpointStatus, ActiveCheckpointPreview, CheckpointDetail } from '../../types';
+import type { ActiveCheckpointPreview, CheckpointDetail, CheckpointStatus, IterationSummary } from '../../types';
+
+function toActivePreview(detail: CheckpointDetail): ActiveCheckpointPreview | null {
+  if (!detail.previewUrl) {
+    return null;
+  }
+
+  return {
+    checkpointId: detail.checkpoint.id,
+    prototypePath: detail.checkpoint.prototypePath,
+    previewUrl: detail.previewUrl,
+    previewFsPath: detail.previewFsPath,
+    marks: detail.marks || [],
+    message: detail.checkpoint.message,
+    iterationId: detail.checkpoint.iterationId,
+  };
+}
 
 export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointReturn {
   const { prototypePath } = options;
 
   const [status, setStatus] = useState<CheckpointStatus | null>(null);
-  const [activePreview, setActivePreview] = useState<ActiveCheckpointPreview | null>(null);
+  const [manualPreview, setManualPreview] = useState<ActiveCheckpointPreview | null>(null);
+  const [groupPreviewMap, setGroupPreviewMap] = useState<Record<string, ActiveCheckpointPreview> | null>(null);
+  const [groupPreviewPages, setGroupPreviewPages] = useState<string[]>([]);
+  const [detailCache, setDetailCache] = useState<Record<string, CheckpointDetail>>({});
+  const [iterations, setIterations] = useState<IterationSummary[]>([]);
+  const [activeIterationId, setActiveIterationId] = useState<string | null>(null);
   const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
   const [saveSubmitting, setSaveSubmitting] = useState(false);
   const [historyRefreshVersion, setHistoryRefreshVersion] = useState(0);
@@ -15,18 +36,65 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
 
   const loadStatusRef = useRef<() => void>(() => {});
 
-  // 加载版本状态
-  const loadStatus = useCallback(async () => {
-    if (!prototypePath) {
-      setStatus(null);
-      return;
+  const activeIteration = useMemo(
+    () => iterations.find((item) => item.id === activeIterationId) ?? null,
+    [activeIterationId, iterations],
+  );
+  const activeIterationFiles = useMemo(
+    () => activeIteration?.pages || [],
+    [activeIteration],
+  );
+  const activeIterationCheckpoint = useMemo(() => {
+    if (!activeIteration || !prototypePath) return null;
+    return activeIteration.checkpointsByPage[prototypePath] ?? null;
+  }, [activeIteration, prototypePath]);
+
+  const activeIterationPreview = useMemo(() => {
+    if (!activeIterationCheckpoint) return null;
+    const detail = detailCache[activeIterationCheckpoint.id];
+    return detail ? toActivePreview(detail) : null;
+  }, [activeIterationCheckpoint, detailCache]);
+
+  const activeGroupPreview = useMemo(() => {
+    if (!groupPreviewMap) return null;
+    if (prototypePath && groupPreviewMap[prototypePath]) {
+      return groupPreviewMap[prototypePath];
+    }
+    const fallbackPath = groupPreviewPages[0];
+    return fallbackPath ? groupPreviewMap[fallbackPath] ?? null : null;
+  }, [groupPreviewMap, groupPreviewPages, prototypePath]);
+
+  const activeHistoryFiles = useMemo(() => {
+    if (activeIterationId) {
+      return activeIterationFiles;
+    }
+    return groupPreviewPages;
+  }, [activeIterationFiles, activeIterationId, groupPreviewPages]);
+
+  const activePreview = activeIterationId
+    ? activeIterationPreview
+    : activeGroupPreview ?? manualPreview;
+  const historyViewActive = Boolean(activeIterationId || groupPreviewMap || manualPreview);
+
+  const loadDetail = useCallback(async (checkpointId: string): Promise<CheckpointDetail> => {
+    const cached = detailCache[checkpointId];
+    if (cached) return cached;
+
+    const response = await fetch(`/api/checkpoints/${encodeURIComponent(checkpointId)}?t=${Date.now()}`, {
+      cache: 'no-store',
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || data.error || '读取历史详情失败');
     }
 
+    setDetailCache((prev) => ({ ...prev, [checkpointId]: data as CheckpointDetail }));
+    return data as CheckpointDetail;
+  }, [detailCache]);
+
+  const loadStatus = useCallback(async () => {
     try {
-      const response = await fetch(
-        `/api/checkpoints/status?prototypePath=${encodeURIComponent(prototypePath)}&t=${Date.now()}`,
-        { cache: 'no-store' }
-      );
+      const response = await fetch(`/api/checkpoints/status?t=${Date.now()}`, { cache: 'no-store' });
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.message || data.error || '读取版本状态失败');
@@ -38,21 +106,52 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
     }
   }, [prototypePath]);
 
-  // 更新 loadStatusRef
+  const loadIterations = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/checkpoints/iterations?t=${Date.now()}`, {
+        cache: 'no-store',
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || data.error || '读取迭代列表失败');
+      }
+      setIterations((data.iterations || []) as IterationSummary[]);
+    } catch (error) {
+      console.error('读取迭代列表失败:', error);
+      setIterations([]);
+    }
+  }, []);
+
   useEffect(() => {
     loadStatusRef.current = () => {
       void loadStatus();
     };
   }, [loadStatus]);
 
-  // 加载版本状态
   useEffect(() => {
     void loadStatus();
   }, [loadStatus]);
 
-  // 保存版本
+  useEffect(() => {
+    void loadIterations();
+  }, [historyRefreshVersion, loadIterations]);
+
+  useEffect(() => {
+    if (!activeIterationCheckpoint) return;
+    if (detailCache[activeIterationCheckpoint.id]) return;
+    void loadDetail(activeIterationCheckpoint.id).catch((error) => {
+      console.error('加载迭代预览失败:', error);
+    });
+  }, [activeIterationCheckpoint, detailCache, loadDetail]);
+
+  useEffect(() => {
+    if (!activeIterationId) return;
+    if (iterations.some((item) => item.id === activeIterationId)) return;
+    setActiveIterationId(null);
+  }, [activeIterationId, iterations]);
+
   const saveVersion = useCallback(async () => {
-    if (!prototypePath || !status?.hasChanges || activePreview) {
+    if (!status?.hasChanges || historyViewActive) {
       return;
     }
 
@@ -61,7 +160,7 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
       const response = await fetch('/api/checkpoints', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prototypePath }),
+        body: JSON.stringify({}),
       });
       const data = await response.json();
 
@@ -69,18 +168,15 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
         throw new Error(data.message || data.error || '保存版本失败');
       }
 
-      const targetCheckpointId =
-        typeof data.duplicateOf === 'string' && data.duplicateOf
-          ? data.duplicateOf
-          : typeof data.record?.id === 'string' && data.record.id
-            ? data.record.id
-            : null;
+      const targetCheckpointId = typeof data.record?.id === 'string' && data.record.id
+        ? data.record.id
+        : null;
 
       setHistoryTargetCheckpointId(targetCheckpointId);
-      setHistoryRefreshVersion((prev) => prev + 1);
-      await loadStatus();
-      message.success(
-        data.created ? `已保存 ${data.versionLabel}` : `没有检测到新变更，当前仍是${data.versionLabel}`
+    setHistoryRefreshVersion((prev) => prev + 1);
+    await Promise.all([loadStatus(), loadIterations()]);
+    message.success(
+        data.created ? `已保存 ${data.versionLabel}` : `没有检测到新变更，当前仍是${data.versionLabel}`,
       );
     } catch (error) {
       console.error('保存版本失败:', error);
@@ -88,25 +184,53 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
     } finally {
       setSaveSubmitting(false);
     }
-  }, [prototypePath, status, activePreview, loadStatus]);
+  }, [historyViewActive, loadIterations, loadStatus, status]);
 
-  // 预览版本
   const preview = useCallback((detail: CheckpointDetail) => {
-    if (!detail.previewUrl) {
+    const nextPreview = toActivePreview(detail);
+    if (!nextPreview) {
       message.error('该 checkpoint 暂时无法预览');
       return;
     }
 
-    setActivePreview({
-      checkpointId: detail.checkpoint.id,
-      prototypePath: detail.checkpoint.prototypePath,
-      previewUrl: detail.previewUrl,
-      marks: detail.marks || [],
-      message: detail.checkpoint.message,
-    });
+    setActiveIterationId(null);
+    setGroupPreviewMap(null);
+    setGroupPreviewPages([]);
+    setManualPreview(nextPreview);
+    setDetailCache((prev) => ({ ...prev, [detail.checkpoint.id]: detail }));
   }, []);
 
-  // 还原版本
+  const previewGroup = useCallback((details: CheckpointDetail[]) => {
+    const previews = details
+      .map((detail) => toActivePreview(detail))
+      .filter((preview): preview is ActiveCheckpointPreview => Boolean(preview));
+
+    if (previews.length === 0) {
+      message.error('该版本暂时无法预览');
+      return;
+    }
+
+    const nextGroupMap = previews.reduce<Record<string, ActiveCheckpointPreview>>((acc, preview) => {
+      acc[preview.prototypePath] = preview;
+      return acc;
+    }, {});
+    const nextGroupPages = previews
+      .map((preview) => preview.prototypePath)
+      .sort((a, b) => a.localeCompare(b, 'zh-CN'));
+
+    setActiveIterationId(null);
+    setManualPreview(null);
+    setGroupPreviewMap(nextGroupMap);
+    setGroupPreviewPages(nextGroupPages);
+    setDetailCache((prev) => ({
+      ...prev,
+      ...details.reduce<Record<string, CheckpointDetail>>((acc, detail) => {
+        acc[detail.checkpoint.id] = detail;
+        return acc;
+      }, {}),
+    }));
+  }, []);
+
   const restore = useCallback(
     async (detail: CheckpointDetail, versionLabel: string) => {
       try {
@@ -116,7 +240,7 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ force: true }),
-          }
+          },
         );
         const data = await response.json();
 
@@ -124,47 +248,65 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
           throw new Error(data.message || data.error || '还原失败');
         }
 
-        setActivePreview(null);
+        setManualPreview(null);
+        setGroupPreviewMap(null);
+        setGroupPreviewPages([]);
+        setActiveIterationId(null);
         setHistoryTargetCheckpointId(detail.checkpoint.id);
         setHistoryRefreshVersion((prev) => prev + 1);
-        await loadStatus();
+        await Promise.all([loadStatus(), loadIterations()]);
         message.success(`已还原 ${versionLabel}`);
       } catch (error) {
         console.error('还原 checkpoint 失败:', error);
         message.error(error instanceof Error ? error.message : '还原 checkpoint 失败');
       }
     },
-    [loadStatus]
+    [loadIterations, loadStatus],
   );
 
-  // 退出预览
   const exitPreview = useCallback(() => {
-    setActivePreview(null);
+    setManualPreview(null);
+    setGroupPreviewMap(null);
+    setGroupPreviewPages([]);
+    setActiveIterationId(null);
   }, []);
 
-  // 打开历史抽屉
+  const selectIteration = useCallback((iterationId: string | null) => {
+    setManualPreview(null);
+    setGroupPreviewMap(null);
+    setGroupPreviewPages([]);
+    setActiveIterationId(iterationId);
+  }, []);
+
   const openHistory = useCallback(() => {
     setHistoryDrawerOpen(true);
   }, []);
 
-  // 关闭历史抽屉
   const closeHistory = useCallback(() => {
     setHistoryDrawerOpen(false);
-    setActivePreview(null);
+    setManualPreview(null);
   }, []);
 
   return {
     status,
     activePreview,
+    activeIterationId,
+    iterations,
     historyDrawerOpen,
     saveSubmitting,
     historyRefreshVersion,
     historyTargetCheckpointId,
+    activeHistoryFiles,
+    activeIterationFiles,
+    historyViewActive,
     loadStatus,
+    loadIterations,
     saveVersion,
     preview,
+    previewGroup,
     restore,
     exitPreview,
+    selectIteration,
     openHistory,
     closeHistory,
     loadStatusRef,

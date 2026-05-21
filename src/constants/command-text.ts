@@ -154,15 +154,15 @@ export const COPY = {
   使用 --host 可临时发布到其他服务器（不修改 cloud.json）。
 `,
   checkpointDescription: "checkpoint 存储、对比与恢复",
-  checkpointCreateDescription: "为指定原型创建 checkpoint",
+  checkpointCreateDescription: "为整套页面创建 checkpoint",
   checkpointCreateHelpAfter: `
 示例：
-  prdkit checkpoint create dashboard
-  prdkit checkpoint create dashboard -m "首页导航改版"
+  prdkit checkpoint create
+  prdkit checkpoint create -m "首页导航改版"
 
 说明：
-  手动创建一个 checkpoint。
-  如果内容与最近一次 checkpoint 完全一致，则不会重复创建。
+  手动创建整套页面版本。
+  只要任意页面有变化，就会将整棵页面树一起保存到同一版本组中。
 `,
   checkpointSessionDescription: "管理手动 checkpoint session",
   checkpointSessionStartDescription: "启动一个手动 session",
@@ -236,7 +236,7 @@ export const COPY = {
 
 说明：
   默认遇到未归档变更会停止。
-  使用 --force 时会先创建 pre-restore checkpoint 再恢复。
+  使用 --force 时会先创建整套页面的 pre-restore checkpoint，再恢复目标版本组。
 `,
   checkpointStatusDescription: "查看工作区相对最近 checkpoint 的状态",
   checkpointStatusHelpAfter: `

@@ -232,7 +232,9 @@ export default function FileTree({
             setRootDropActive(false);
           }}
         >
-          <h2 className="file-tree-project-title">页面</h2>
+          <div className="file-tree-project-heading">
+            <h2 className="file-tree-project-title">页面</h2>
+          </div>
           <div className="file-tree-project-actions">
             <Tooltip title="新建文件夹" getPopupContainer={() => document.body}>
               <Button

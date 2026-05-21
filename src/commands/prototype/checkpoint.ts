@@ -6,12 +6,13 @@ import { flattenPrototypes, scanPrototypes } from "#lib/server/scanner.js";
 import {
   diffCheckpoints,
   diffCurrentAgainstLatest,
+  diffProjectAgainstLatest,
 } from "#lib/checkpoints/prototype/diff.js";
 import { materializeCheckpointPreview } from "#lib/checkpoints/prototype/preview.js";
 import { pruneAutoCheckpoints } from "#lib/checkpoints/prototype/retention.js";
 import { restoreCheckpoint } from "#lib/checkpoints/prototype/restore.js";
 import {
-  createCheckpoint,
+  createCheckpointBatch,
   endCheckpointSession,
   getCheckpointSession,
   getLatestCheckpointRecord,
@@ -27,7 +28,6 @@ import {
   RestoreOptions,
   SessionStartOptions,
   resolveCheckpointContext,
-  ensurePrototypeExists,
   outputJson,
   formatRecord,
   formatSummary,
@@ -62,34 +62,52 @@ export function registerPrototypeCheckpoint(prototype: Command): void {
 
   checkpoint
     .command("create")
-    .argument("<prototype-path>", "原型路径，例如 dashboard 或 foo/bar")
     .description(COPY.checkpointCreateDescription)
     .option("-m, --message <text>", "checkpoint 说明")
     .option("-j, --json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointCreateHelpAfter}`)
-    .action(async (prototypePath: string, options: CreateOptions) => {
+    .action(async (options: CreateOptions) => {
       const { projectRoot, prototypesDir } = await resolveCheckpointContext();
-      ensurePrototypeExists(prototypesDir, prototypePath);
-      const result = await createCheckpoint({
+      const prototypePaths = flattenPrototypes(scanPrototypes(prototypesDir));
+      const diff = diffProjectAgainstLatest(projectRoot, prototypesDir, prototypePaths);
+      if (!diff.hasChanges) {
+        if (options.json) {
+          outputJson({
+            created: false,
+            sessionId: null,
+            createdRecords: [],
+            duplicateRecords: [],
+            skippedPrototypePaths: [],
+            changedPrototypePaths: [],
+          });
+          return;
+        }
+
+        logger.warn("没有检测到整套页面的新变更");
+        return;
+      }
+
+      const result = await createCheckpointBatch({
         projectRoot,
         prototypesDir,
-        prototypePath,
+        prototypePaths,
         kind: "manual",
-        message: options.message,
+        message: options.message || "更新版本",
+        allowDuplicate: true,
       });
 
       if (options.json) {
-        outputJson(result);
+        outputJson({
+          ...result,
+          changedPrototypePaths: diff.changedPrototypePaths,
+        });
         return;
       }
 
-      if (!result.created) {
-        logger.warn(`没有检测到新变更，最近 checkpoint：${result.record.id}`);
-        return;
+      logger.success(`已创建整套页面版本，涉及 ${result.createdRecords.length} 个页面`);
+      if (result.skippedPrototypePaths.length > 0) {
+        logger.warn(`以下页面保存失败：${result.skippedPrototypePaths.join(", ")}`);
       }
-
-      logger.success(`已创建 checkpoint：${result.record.id}`);
-      logger.info(`原型：${prototypePath}`);
     });
 
   const session = checkpoint.command("session").description(COPY.checkpointSessionDescription);
@@ -238,7 +256,7 @@ export function registerPrototypeCheckpoint(prototype: Command): void {
     .command("restore")
     .argument("<checkpoint-id>", "checkpoint ID")
     .description(COPY.checkpointRestoreDescription)
-    .option("-f, --force", "存在未归档变更时先创建 pre-restore checkpoint 再恢复")
+    .option("-f, --force", "存在未归档变更时先创建还原前备份 checkpoint 再恢复")
     .option("-j, --json", "以 JSON 输出")
     .addHelpText("after", `\n${COPY.checkpointRestoreHelpAfter}`)
     .action(async (checkpointId: string, options: RestoreOptions) => {
@@ -256,8 +274,9 @@ export function registerPrototypeCheckpoint(prototype: Command): void {
       }
 
       logger.success(`已恢复到 checkpoint：${checkpointId}`);
-      logger.info(`原型：${result.target.prototypePath}`);
-      logger.info(`pre-restore：${result.preRestore.id}`);
+      logger.info(`页面数：${result.restoredPrototypePaths.length}`);
+      logger.info(`页面：${result.restoredPrototypePaths.join(", ")}`);
+      logger.info("已创建还原前备份");
     });
 
   checkpoint

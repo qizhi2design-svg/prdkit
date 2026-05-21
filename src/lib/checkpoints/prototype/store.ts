@@ -17,11 +17,15 @@ import type {
   CheckpointData,
   CheckpointEvent,
   CheckpointIndex,
+  IterationIndex,
+  IterationRecord,
+  IterationSummary,
   CheckpointManifest,
   CheckpointRecord,
   CheckpointSessionState,
   CreateCheckpointOptions,
-  CreateCheckpointResult
+  CreateCheckpointResult,
+  CreateCheckpointBatchResult,
 } from "./types.js";
 
 export const DEFAULT_AUTO_CHECKPOINT_LIMIT = 20;
@@ -29,6 +33,7 @@ export const DEFAULT_CHECKPOINT_SILENCE_MS = 10_000;
 const CHECKPOINT_VERSION = 1;
 const RESTORE_SUPPRESSION_FILE = "restore-state.json";
 const SESSION_STATE_FILE = "session.json";
+const ITERATION_INDEX_FILE = "iterations.json";
 
 function sha256(value: Buffer | string): string {
   return createHash("sha256").update(value).digest("hex");
@@ -62,10 +67,21 @@ function checkpointSessionPath(projectRoot: string): string {
   return path.join(checkpointRoot(projectRoot), SESSION_STATE_FILE);
 }
 
+function iterationIndexPath(projectRoot: string): string {
+  return path.join(checkpointRoot(projectRoot), ITERATION_INDEX_FILE);
+}
+
 function normalizeIndex(value: Partial<CheckpointIndex> | undefined): CheckpointIndex {
   return {
     version: CHECKPOINT_VERSION,
     checkpoints: Array.isArray(value?.checkpoints) ? value.checkpoints : []
+  };
+}
+
+function normalizeIterationIndex(value: Partial<IterationIndex> | undefined): IterationIndex {
+  return {
+    version: CHECKPOINT_VERSION,
+    iterations: Array.isArray(value?.iterations) ? value.iterations : [],
   };
 }
 
@@ -79,11 +95,19 @@ function checkpointSessionId(): string {
   return `session-${stamp}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function iterationId(): string {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  return `iteration-${stamp}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export function ensureCheckpointStore(projectRoot: string): void {
   mkdirSync(path.join(checkpointRoot(projectRoot), "checkpoints"), { recursive: true });
   mkdirSync(blobsDir(projectRoot), { recursive: true });
   if (!existsSync(checkpointIndexPath(projectRoot))) {
     writeFileSync(checkpointIndexPath(projectRoot), `${JSON.stringify({ version: CHECKPOINT_VERSION, checkpoints: [] }, null, 2)}\n`, "utf8");
+  }
+  if (!existsSync(iterationIndexPath(projectRoot))) {
+    writeFileSync(iterationIndexPath(projectRoot), `${JSON.stringify({ version: CHECKPOINT_VERSION, iterations: [] }, null, 2)}\n`, "utf8");
   }
 }
 
@@ -147,11 +171,49 @@ export async function saveCheckpointIndex(projectRoot: string, index: Checkpoint
   await writeFile(checkpointIndexPath(projectRoot), `${JSON.stringify(index, null, 2)}\n`, "utf8");
 }
 
+export function loadIterationIndex(projectRoot: string): IterationIndex {
+  ensureCheckpointStore(projectRoot);
+  return normalizeIterationIndex(JSON.parse(readFileSync(iterationIndexPath(projectRoot), "utf8")) as Partial<IterationIndex>);
+}
+
+export async function saveIterationIndex(projectRoot: string, index: IterationIndex): Promise<void> {
+  ensureCheckpointStore(projectRoot);
+  await writeFile(iterationIndexPath(projectRoot), `${JSON.stringify(index, null, 2)}\n`, "utf8");
+}
+
 export function listCheckpointRecords(projectRoot: string, prototypePath?: string): CheckpointRecord[] {
   const index = loadCheckpointIndex(projectRoot);
   return index.checkpoints
     .filter((record) => !prototypePath || record.prototypePath === prototypePath)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt, "en"));
+}
+
+export function listCheckpointGroupRecords(projectRoot: string, checkpointIdValue: string): CheckpointRecord[] {
+  const target = findCheckpointRecord(projectRoot, checkpointIdValue);
+  if (!target) {
+    return [];
+  }
+
+  const scopedRecords = listCheckpointRecords(projectRoot).filter((record) => {
+    if (target.iterationId) {
+      return record.iterationId === target.iterationId;
+    }
+    if (target.sessionId) {
+      return !record.iterationId && record.sessionId === target.sessionId;
+    }
+    return record.id === target.id;
+  });
+
+  const recordsByPage = new Map<string, CheckpointRecord>();
+  for (const record of scopedRecords) {
+    const existing = recordsByPage.get(record.prototypePath);
+    if (!existing || existing.createdAt.localeCompare(record.createdAt, "en") < 0) {
+      recordsByPage.set(record.prototypePath, record);
+    }
+  }
+
+  return Array.from(recordsByPage.values())
+    .sort((a, b) => a.prototypePath.localeCompare(b.prototypePath, "zh-CN"));
 }
 
 export function findCheckpointRecord(projectRoot: string, checkpointIdValue: string): CheckpointRecord | undefined {
@@ -161,6 +223,51 @@ export function findCheckpointRecord(projectRoot: string, checkpointIdValue: str
 export function getLatestCheckpointRecord(projectRoot: string, prototypePath: string): CheckpointRecord | undefined {
   const records = listCheckpointRecords(projectRoot, prototypePath);
   return records.at(-1);
+}
+
+export function findIterationRecord(projectRoot: string, iterationIdValue: string): IterationRecord | undefined {
+  return loadIterationIndex(projectRoot).iterations.find((record) => record.id === iterationIdValue);
+}
+
+export function findIterationBySessionId(projectRoot: string, sessionId: string): IterationRecord | undefined {
+  return loadIterationIndex(projectRoot).iterations.find((record) => record.sessionId === sessionId);
+}
+
+export function listIterationRecords(projectRoot: string): IterationRecord[] {
+  return loadIterationIndex(projectRoot).iterations
+    .slice()
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt, "en"));
+}
+
+export function buildIterationSummaries(projectRoot: string): IterationSummary[] {
+  const iterations = listIterationRecords(projectRoot);
+  const checkpoints = loadCheckpointIndex(projectRoot).checkpoints;
+
+  return iterations.map((iteration) => {
+    const scopedRecords = checkpoints
+      .filter((record) => record.iterationId === iteration.id)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt, "en"));
+    const checkpointsByPage = scopedRecords.reduce<Record<string, CheckpointRecord>>((acc, record) => {
+      const existing = acc[record.prototypePath];
+      if (!existing || existing.createdAt.localeCompare(record.createdAt, "en") < 0) {
+        acc[record.prototypePath] = record;
+      }
+      return acc;
+    }, {});
+    const pages = Object.keys(checkpointsByPage).sort((a, b) => a.localeCompare(b, "zh-CN"));
+
+    return {
+      ...iteration,
+      checkpointCount: scopedRecords.length,
+      pageCount: pages.length,
+      pages,
+      checkpointsByPage,
+    };
+  });
+}
+
+function getNextIterationName(projectRoot: string): string {
+  return `迭代 ${listIterationRecords(projectRoot).length + 1}`;
 }
 
 async function ensureBlob(projectRoot: string, hash: string, content: Buffer): Promise<void> {
@@ -196,6 +303,8 @@ export async function createCheckpoint(
   const snapshot = collectPrototypeSnapshot(prototypesDir, prototypePath);
   const index = loadCheckpointIndex(projectRoot);
   const latest = getLatestCheckpointRecord(projectRoot, prototypePath);
+  const activeSession = getCheckpointSession(projectRoot);
+  const activeIteration = activeSession ? findIterationBySessionId(projectRoot, activeSession.id) : undefined;
 
   if (!allowDuplicate && latest && latest.contentHash === snapshot.contentHash) {
     return {
@@ -214,6 +323,8 @@ export async function createCheckpoint(
     message,
     createdAt: new Date().toISOString(),
     baseCheckpointId: latest?.id,
+    sessionId: activeSession?.id,
+    iterationId: activeIteration?.id,
     fileCount: snapshot.fileCount,
     markCount: snapshot.markCount,
     contentHash: snapshot.contentHash
@@ -268,6 +379,83 @@ export async function createCheckpoint(
   };
 }
 
+export async function createCheckpointBatch(options: {
+  projectRoot: string;
+  prototypesDir: string;
+  prototypePaths: string[];
+  kind: CheckpointRecord["kind"];
+  message?: string;
+  allowDuplicate?: boolean;
+}): Promise<CreateCheckpointBatchResult> {
+  const {
+    projectRoot,
+    prototypesDir,
+    prototypePaths,
+    kind,
+    message,
+    allowDuplicate = false,
+  } = options;
+
+  const normalizedPaths = Array.from(new Set(prototypePaths.map((item) => item.trim()).filter(Boolean)));
+  if (normalizedPaths.length === 0) {
+    return {
+      created: false,
+      sessionId: null,
+      createdRecords: [],
+      duplicateRecords: [],
+      skippedPrototypePaths: [],
+    };
+  }
+
+  const existingSession = getCheckpointSession(projectRoot);
+  let session = existingSession;
+  let createdTemporarySession = false;
+
+  if (!session) {
+    session = await startCheckpointSession(projectRoot);
+    createdTemporarySession = true;
+  }
+
+  const createdRecords: CheckpointRecord[] = [];
+  const duplicateRecords: CheckpointRecord[] = [];
+  const skippedPrototypePaths: string[] = [];
+
+  try {
+    for (const prototypePath of normalizedPaths) {
+      try {
+        const result = await createCheckpoint({
+          projectRoot,
+          prototypesDir,
+          prototypePath,
+          kind,
+          message,
+          allowDuplicate,
+        });
+
+        if (result.created) {
+          createdRecords.push(result.record);
+        } else {
+          duplicateRecords.push(result.record);
+        }
+      } catch {
+        skippedPrototypePaths.push(prototypePath);
+      }
+    }
+  } finally {
+    if (createdTemporarySession) {
+      await endCheckpointSession(projectRoot);
+    }
+  }
+
+  return {
+    created: createdRecords.length > 0,
+    sessionId: session?.id ?? null,
+    createdRecords,
+    duplicateRecords,
+    skippedPrototypePaths,
+  };
+}
+
 export function readCheckpointData(projectRoot: string, checkpointIdValue: string): CheckpointData {
   const dir = checkpointDir(projectRoot, checkpointIdValue);
   const manifestPath = path.join(dir, "manifest.json");
@@ -295,6 +483,93 @@ export async function deleteCheckpointRecord(projectRoot: string, checkpointIdVa
   await saveCheckpointIndex(projectRoot, index);
   rmSync(checkpointDir(projectRoot, checkpointIdValue), { recursive: true, force: true });
   return target;
+}
+
+async function rewriteCheckpointManifest(projectRoot: string, record: CheckpointRecord): Promise<void> {
+  const dir = checkpointDir(projectRoot, record.id);
+  const manifestPath = path.join(dir, "manifest.json");
+  if (!existsSync(manifestPath)) return;
+
+  const existing = JSON.parse(readFileSync(manifestPath, "utf8")) as CheckpointManifest;
+  const nextManifest: CheckpointManifest = {
+    ...existing,
+    ...record,
+  };
+  await writeJsonFile(manifestPath, nextManifest);
+}
+
+export async function assignIterationToSession(
+  projectRoot: string,
+  sessionId: string,
+  name?: string,
+): Promise<IterationRecord> {
+  const index = loadCheckpointIndex(projectRoot);
+  const affectedRecords = index.checkpoints.filter((record) => record.sessionId === sessionId);
+  if (affectedRecords.length === 0) {
+    throw new Error(`未找到 session ${sessionId} 关联的 checkpoint`);
+  }
+
+  const iterationIndex = loadIterationIndex(projectRoot);
+  const now = new Date().toISOString();
+  let iteration = iterationIndex.iterations.find((record) => record.sessionId === sessionId);
+
+  if (iteration) {
+    iteration = {
+      ...iteration,
+      name: name?.trim() || iteration.name,
+      updatedAt: now,
+    };
+    iterationIndex.iterations = iterationIndex.iterations.map((record) => (
+      record.id === iteration!.id ? iteration! : record
+    ));
+  } else {
+    iteration = {
+      id: iterationId(),
+      name: name?.trim() || getNextIterationName(projectRoot),
+      sessionId,
+      createdAt: now,
+      updatedAt: now,
+    };
+    iterationIndex.iterations.push(iteration);
+    iterationIndex.iterations.sort((a, b) => a.createdAt.localeCompare(b.createdAt, "en"));
+  }
+
+  index.checkpoints = index.checkpoints.map((record) => (
+    record.sessionId === sessionId
+      ? { ...record, iterationId: iteration!.id }
+      : record
+  ));
+
+  await Promise.all(index.checkpoints
+    .filter((record) => record.sessionId === sessionId)
+    .map((record) => rewriteCheckpointManifest(projectRoot, record)));
+  await saveCheckpointIndex(projectRoot, index);
+  await saveIterationIndex(projectRoot, iterationIndex);
+  return iteration;
+}
+
+export async function renameIteration(projectRoot: string, iterationIdValue: string, name: string): Promise<IterationRecord> {
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    throw new Error("迭代名称不能为空");
+  }
+
+  const iterationIndex = loadIterationIndex(projectRoot);
+  const target = iterationIndex.iterations.find((record) => record.id === iterationIdValue);
+  if (!target) {
+    throw new Error(`未找到迭代：${iterationIdValue}`);
+  }
+
+  const nextIteration: IterationRecord = {
+    ...target,
+    name: trimmedName,
+    updatedAt: new Date().toISOString(),
+  };
+  iterationIndex.iterations = iterationIndex.iterations.map((record) => (
+    record.id === iterationIdValue ? nextIteration : record
+  ));
+  await saveIterationIndex(projectRoot, iterationIndex);
+  return nextIteration;
 }
 
 export async function writeRestoreSuppression(

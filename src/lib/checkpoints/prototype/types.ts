@@ -7,6 +7,8 @@ export interface CheckpointRecord {
   message?: string;
   createdAt: string;
   baseCheckpointId?: string;
+  sessionId?: string;
+  iterationId?: string;
   fileCount: number;
   markCount: number;
   contentHash: string;
@@ -15,6 +17,19 @@ export interface CheckpointRecord {
 export interface CheckpointIndex {
   version: 1;
   checkpoints: CheckpointRecord[];
+}
+
+export interface IterationRecord {
+  id: string;
+  name: string;
+  sessionId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IterationIndex {
+  version: 1;
+  iterations: IterationRecord[];
 }
 
 export interface CheckpointFileEntry {
@@ -81,6 +96,13 @@ export interface CheckpointSessionState {
   updatedAt: string;
 }
 
+export interface IterationSummary extends IterationRecord {
+  checkpointCount: number;
+  pageCount: number;
+  pages: string[];
+  checkpointsByPage: Record<string, CheckpointRecord>;
+}
+
 export interface CreateCheckpointOptions {
   projectRoot: string;
   prototypesDir: string;
@@ -96,4 +118,12 @@ export interface CreateCheckpointResult {
   record: CheckpointRecord;
   duplicateOf?: CheckpointRecord;
   snapshot: CheckpointSnapshot;
+}
+
+export interface CreateCheckpointBatchResult {
+  created: boolean;
+  sessionId: string | null;
+  createdRecords: CheckpointRecord[];
+  duplicateRecords: CheckpointRecord[];
+  skippedPrototypePaths: string[];
 }

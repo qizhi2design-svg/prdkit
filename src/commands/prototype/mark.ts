@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import chalk from "chalk";
 import { COPY } from "#constants/command-text.js";
+import { flattenPrototypes, scanPrototypes } from "#lib/server/scanner.js";
 import { resolveProjectRoot } from "#utils/config.js";
 import {
   createMarkSync,
@@ -14,7 +15,8 @@ import {
 } from "#lib/server/marks.js";
 import { logger } from "#utils/logger.js";
 import { ConfigError, PrototypeError, ValidationError } from "#utils/errors.js";
-import { createCheckpoint } from "#lib/checkpoints/prototype/store.js";
+import { diffProjectAgainstLatest } from "#lib/checkpoints/prototype/diff.js";
+import { createCheckpointBatch } from "#lib/checkpoints/prototype/store.js";
 
 interface MarkCommonOptions {
   prototype: string;
@@ -132,20 +134,26 @@ async function resolvePrototypesDir(prototypePath: string): Promise<{ projectRoo
 async function autoCreateCheckpoint(
   projectRoot: string,
   prototypesDir: string,
-  prototypePath: string,
   message: string
 ): Promise<void> {
   try {
-    const result = await createCheckpoint({
+    const prototypePaths = flattenPrototypes(scanPrototypes(prototypesDir));
+    const diff = diffProjectAgainstLatest(projectRoot, prototypesDir, prototypePaths);
+    if (!diff.hasChanges) {
+      return;
+    }
+
+    const result = await createCheckpointBatch({
       projectRoot,
       prototypesDir,
-      prototypePath,
+      prototypePaths,
       kind: "auto",
       message,
+      allowDuplicate: true,
     });
 
     if (result.created) {
-      logger.info(`已创建 checkpoint：${result.record.id}`);
+      logger.info(`已创建整套页面 checkpoint：${result.createdRecords.length} 页`);
     }
   } catch (error) {
     // 静默失败，不影响 mark 操作
@@ -246,7 +254,7 @@ export function registerPrototypeMark(prototype: Command): void {
       logger.info(`文件：${path.join("workspace", "prototypes", options.prototype, "marks", created.fileName)}`);
 
       // 自动创建 checkpoint
-      await autoCreateCheckpoint(projectRoot, prototypesDir, options.prototype, `创建标记：${created.title}`);
+      await autoCreateCheckpoint(projectRoot, prototypesDir, `创建标记：${created.title}`);
     });
 
   mark
@@ -283,7 +291,7 @@ export function registerPrototypeMark(prototype: Command): void {
       logger.info(`原型：${options.prototype}`);
 
       // 自动创建 checkpoint
-      await autoCreateCheckpoint(projectRoot, prototypesDir, options.prototype, `更新标记：${updated.title}`);
+      await autoCreateCheckpoint(projectRoot, prototypesDir, `更新标记：${updated.title}`);
     });
 
   mark
@@ -306,6 +314,6 @@ export function registerPrototypeMark(prototype: Command): void {
       logger.info(`原型：${options.prototype}`);
 
       // 自动创建 checkpoint
-      await autoCreateCheckpoint(projectRoot, prototypesDir, options.prototype, `删除标记：${markId}`);
+      await autoCreateCheckpoint(projectRoot, prototypesDir, `删除标记：${markId}`);
     });
 }

@@ -3,16 +3,21 @@ import {
   buildInitialCheckpointSummary,
   diffCheckpoints,
   diffCurrentAgainstLatest,
+  diffProjectAgainstLatest,
 } from '../../checkpoints/prototype/diff.js';
 import {
-  createCheckpoint,
+  assignIterationToSession,
+  buildIterationSummaries,
+  createCheckpointBatch,
   findCheckpointRecord,
   listCheckpointRecords,
+  renameIteration,
   readCheckpointData,
 } from '../../checkpoints/prototype/store.js';
 import { materializeCheckpointPreview } from '../../checkpoints/prototype/preview.js';
 import { restoreCheckpoint } from '../../checkpoints/prototype/restore.js';
 import type { ApiHelpers } from './helpers.js';
+import { flattenPrototypes, scanPrototypes } from '../scanner.js';
 
 export function createCheckpointsRouter(helpers: ApiHelpers): Router {
   const router = Router();
@@ -37,13 +42,37 @@ export function createCheckpointsRouter(helpers: ApiHelpers): Router {
     }
   });
 
+  router.get('/checkpoints/iterations', (_req: Request, res: Response) => {
+    try {
+      res.json({
+        iterations: buildIterationSummaries(projectRoot),
+      });
+    } catch (error) {
+      console.error('读取迭代列表失败:', error);
+      res.status(500).json({
+        error: '读取迭代列表失败',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
   router.get('/checkpoints/status', (req: Request, res: Response) => {
     try {
       const prototypePathRaw = req.query.prototypePath;
       const prototypePath = Array.isArray(prototypePathRaw) ? prototypePathRaw[0] : prototypePathRaw;
 
       if (!prototypePath || typeof prototypePath !== 'string') {
-        return res.status(400).json({ error: '缺少 prototypePath' });
+        const prototypePaths = flattenPrototypes(scanPrototypes(prototypesDir));
+        const diff = diffProjectAgainstLatest(projectRoot, prototypesDir, prototypePaths);
+
+        return res.json({
+          prototypePath: null,
+          latestCheckpointId: null,
+          hasChanges: diff.hasChanges,
+          changeCount: diff.changeCount,
+          changedPrototypePaths: diff.changedPrototypePaths,
+          summary: null,
+        });
       }
 
       const diff = diffCurrentAgainstLatest(projectRoot, prototypesDir, prototypePath);
@@ -97,36 +126,127 @@ export function createCheckpointsRouter(helpers: ApiHelpers): Router {
 
   router.post('/checkpoints', async (req: Request, res: Response) => {
     try {
-      const { prototypePath, message } = req.body as { prototypePath?: string; message?: string };
+      const { prototypePaths, message } = req.body as {
+        prototypePaths?: string[];
+        message?: string;
+      };
 
-      if (!prototypePath || typeof prototypePath !== 'string') {
-        return res.status(400).json({ error: '缺少 prototypePath' });
+      const normalizedPrototypePaths = Array.isArray(prototypePaths)
+        ? prototypePaths.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+        : [];
+      const allPrototypePaths = normalizedPrototypePaths.length > 0
+        ? normalizedPrototypePaths
+        : flattenPrototypes(scanPrototypes(prototypesDir));
+      const diff = diffProjectAgainstLatest(projectRoot, prototypesDir, allPrototypePaths);
+      const changedPrototypePaths = diff.changedPrototypePaths;
+
+      if (changedPrototypePaths.length === 0) {
+        return res.json({
+          success: true,
+          created: false,
+          record: null,
+          duplicateOf: null,
+          records: [],
+          versionLabel: '版本',
+          changedPrototypePaths: [],
+          sessionId: null,
+        });
       }
 
-      const result = await createCheckpoint({
+      const result = await createCheckpointBatch({
         projectRoot,
         prototypesDir,
-        prototypePath,
+        prototypePaths: allPrototypePaths,
         kind: 'manual',
-        message: typeof message === 'string' && message.trim() ? message.trim() : '保存版本',
+        message: typeof message === 'string' && message.trim() ? message.trim() : '更新版本',
+        allowDuplicate: true,
       });
 
-      const records = listCheckpointRecords(projectRoot, prototypePath)
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-      const versionIndex = records.findIndex((item) => item.id === result.record.id);
-      const versionLabel = versionIndex === -1 ? '版本' : `版本${records.length - versionIndex}`;
+      const records = listCheckpointRecords(projectRoot)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .filter((item) => result.createdRecords.some((record) => record.id === item.id));
+      const newestRecord = records[0] ?? result.createdRecords[0] ?? null;
+      const versionGroups = buildIterationSummaries(projectRoot);
+      const matchedIteration = result.sessionId
+        ? versionGroups.find((item) => item.sessionId === result.sessionId)
+        : undefined;
+      const versionLabel = matchedIteration
+        ? matchedIteration.name
+        : newestRecord
+          ? `版本${listCheckpointRecords(projectRoot).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).findIndex((item) => item.id === newestRecord.id) + 1}`
+          : '版本';
 
-      res.json({
+      return res.json({
         success: true,
         created: result.created,
-        record: result.record,
-        duplicateOf: result.duplicateOf ?? null,
+        record: newestRecord,
+        duplicateOf: null,
+        records: result.createdRecords,
         versionLabel,
+        changedPrototypePaths,
+        sessionId: result.sessionId,
       });
     } catch (error) {
       console.error('创建 checkpoint 失败:', error);
       res.status(500).json({
         error: '创建 checkpoint 失败',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  router.post('/checkpoints/iterations', async (req: Request, res: Response) => {
+    try {
+      const { checkpointId, name } = req.body as { checkpointId?: string; name?: string };
+      if (!checkpointId || typeof checkpointId !== 'string') {
+        return res.status(400).json({ error: '缺少 checkpointId' });
+      }
+
+      const checkpoint = findCheckpointRecord(projectRoot, checkpointId);
+      if (!checkpoint) {
+        return res.status(404).json({ error: 'checkpoint 不存在' });
+      }
+      if (!checkpoint.sessionId) {
+        return res.status(409).json({ error: '该 checkpoint 没有关联 session，无法标记迭代' });
+      }
+
+      const iteration = await assignIterationToSession(
+        projectRoot,
+        checkpoint.sessionId,
+        typeof name === 'string' ? name : undefined,
+      );
+
+      res.json({
+        success: true,
+        iteration,
+      });
+    } catch (error) {
+      console.error('标记迭代失败:', error);
+      res.status(500).json({
+        error: '标记迭代失败',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  router.patch('/checkpoints/iterations/:iterationId', async (req: Request, res: Response) => {
+    try {
+      const iterationId = Array.isArray(req.params.iterationId) ? req.params.iterationId[0] : req.params.iterationId;
+      const { name } = req.body as { name?: string };
+
+      if (!name || typeof name !== 'string') {
+        return res.status(400).json({ error: '缺少迭代名称' });
+      }
+
+      const iteration = await renameIteration(projectRoot, iterationId, name);
+      res.json({
+        success: true,
+        iteration,
+      });
+    } catch (error) {
+      console.error('更新迭代名称失败:', error);
+      res.status(500).json({
+        error: '更新迭代名称失败',
         message: error instanceof Error ? error.message : String(error),
       });
     }
@@ -144,7 +264,7 @@ export function createCheckpointsRouter(helpers: ApiHelpers): Router {
       const summary = record.baseCheckpointId
         ? diffCheckpoints(projectRoot, record.baseCheckpointId, checkpointId)
         : buildInitialCheckpointSummary(checkpointId, data.files, data.marks);
-      await materializeCheckpointPreview(projectRoot, checkpointId);
+      const preview = await materializeCheckpointPreview(projectRoot, checkpointId);
 
       res.json({
         checkpoint: data.manifest,
@@ -152,6 +272,7 @@ export function createCheckpointsRouter(helpers: ApiHelpers): Router {
         marks: data.marks,
         summary,
         previewUrl: `/checkpoint-preview/${encodeURIComponent(checkpointId)}/index.html`,
+        previewFsPath: preview.previewDir,
       });
     } catch (error) {
       console.error('读取 checkpoint 详情失败:', error);

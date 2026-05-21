@@ -7,6 +7,7 @@ import type {
   ActiveCheckpointPreview,
   CheckpointDetail,
   CheckpointStatus,
+  IterationSummary,
 } from '../types';
 
 // ==================== Zustand Store ====================
@@ -128,17 +129,25 @@ export interface UseCheckpointReturn {
   // 状态
   status: CheckpointStatus | null;
   activePreview: ActiveCheckpointPreview | null;
+  activeIterationId: string | null;
+  iterations: IterationSummary[];
   historyDrawerOpen: boolean;
   saveSubmitting: boolean;
   historyRefreshVersion: number;
   historyTargetCheckpointId: string | null;
+  activeHistoryFiles: string[];
+  activeIterationFiles: string[];
+  historyViewActive: boolean;
 
   // 操作方法
   loadStatus: () => Promise<void>;
+  loadIterations: () => Promise<void>;
   saveVersion: () => Promise<void>;
   preview: (detail: CheckpointDetail) => void;
+  previewGroup: (details: CheckpointDetail[]) => void;
   restore: (detail: CheckpointDetail, versionLabel: string) => Promise<void>;
   exitPreview: () => void;
+  selectIteration: (iterationId: string | null) => void;
   openHistory: () => void;
   closeHistory: () => void;
 
