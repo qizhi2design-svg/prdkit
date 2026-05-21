@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { message } from 'antd';
 import type { UseCheckpointOptions, UseCheckpointReturn } from '../../types/hooks';
-import type { ActiveCheckpointPreview, CheckpointDetail, CheckpointStatus, IterationSummary } from '../../types';
+import type { ActiveCheckpointPreview, CheckpointDetail, CheckpointRecord, CheckpointStatus, IterationSummary } from '../../types';
 
 function toActivePreview(detail: CheckpointDetail): ActiveCheckpointPreview | null {
   if (!detail.previewUrl) {
@@ -17,6 +17,28 @@ function toActivePreview(detail: CheckpointDetail): ActiveCheckpointPreview | nu
     message: detail.checkpoint.message,
     iterationId: detail.checkpoint.iterationId,
   };
+}
+
+function groupCheckpointRecords(records: CheckpointRecord[]): CheckpointRecord[][] {
+  const groups = new Map<string, CheckpointRecord[]>();
+
+  records.forEach((record) => {
+    const groupKey = record.iterationId
+      ? `iteration:${record.iterationId}`
+      : record.sessionId
+        ? `session:${record.sessionId}`
+        : `checkpoint:${record.id}`;
+    const current = groups.get(groupKey);
+    if (current) {
+      current.push(record);
+      return;
+    }
+    groups.set(groupKey, [record]);
+  });
+
+  return Array.from(groups.values())
+    .map((group) => group.sort((a, b) => b.createdAt.localeCompare(a.createdAt, 'en')))
+    .sort((a, b) => b[0].createdAt.localeCompare(a[0].createdAt, 'en'));
 }
 
 export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointReturn {
@@ -150,42 +172,6 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
     setActiveIterationId(null);
   }, [activeIterationId, iterations]);
 
-  const saveVersion = useCallback(async () => {
-    if (!status?.hasChanges || historyViewActive) {
-      return;
-    }
-
-    try {
-      setSaveSubmitting(true);
-      const response = await fetch('/api/checkpoints', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || data.error || '保存版本失败');
-      }
-
-      const targetCheckpointId = typeof data.record?.id === 'string' && data.record.id
-        ? data.record.id
-        : null;
-
-      setHistoryTargetCheckpointId(targetCheckpointId);
-    setHistoryRefreshVersion((prev) => prev + 1);
-    await Promise.all([loadStatus(), loadIterations()]);
-    message.success(
-        data.created ? `已保存 ${data.versionLabel}` : `没有检测到新变更，当前仍是${data.versionLabel}`,
-      );
-    } catch (error) {
-      console.error('保存版本失败:', error);
-      message.error(error instanceof Error ? error.message : '保存版本失败');
-    } finally {
-      setSaveSubmitting(false);
-    }
-  }, [historyViewActive, loadIterations, loadStatus, status]);
-
   const preview = useCallback((detail: CheckpointDetail) => {
     const nextPreview = toActivePreview(detail);
     if (!nextPreview) {
@@ -230,6 +216,84 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
       }, {}),
     }));
   }, []);
+
+  const activateVersionGroup = useCallback(async (checkpointId?: string | null) => {
+    const response = await fetch(`/api/checkpoints?t=${Date.now()}`, {
+      cache: 'no-store',
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || data.error || '读取历史记录失败');
+    }
+
+    const records = ((data.checkpoints || []) as CheckpointRecord[])
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt, 'en'));
+    const groups = groupCheckpointRecords(records);
+    const targetGroup = checkpointId
+      ? groups.find((group) => group.some((record) => record.id === checkpointId))
+      : groups[0];
+
+    if (!targetGroup || targetGroup.length === 0) {
+      return;
+    }
+
+    const details = await Promise.all(targetGroup.map((record) => loadDetail(record.id)));
+    setHistoryTargetCheckpointId(targetGroup[0]?.id ?? null);
+    previewGroup(details);
+    await Promise.all([loadStatus(), loadIterations()]);
+  }, [loadDetail, loadIterations, loadStatus, previewGroup]);
+
+  const saveVersion = useCallback(async () => {
+    if (!status?.hasChanges || historyViewActive) {
+      return;
+    }
+
+    try {
+      setSaveSubmitting(true);
+      const response = await fetch('/api/checkpoints', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error || '保存版本失败');
+      }
+
+      const targetCheckpointId = typeof data.record?.id === 'string' && data.record.id
+        ? data.record.id
+        : null;
+      const createdRecords = Array.isArray(data.records)
+        ? (data.records as CheckpointDetail['checkpoint'][])
+        : [];
+
+      setHistoryTargetCheckpointId(targetCheckpointId);
+      setHistoryRefreshVersion((prev) => prev + 1);
+      await Promise.all([loadStatus(), loadIterations()]);
+
+      if (data.created) {
+        if (createdRecords.length > 0) {
+          const details = await Promise.all(
+            createdRecords.map((record) => loadDetail(record.id)),
+          );
+          previewGroup(details);
+        } else if (targetCheckpointId) {
+          const detail = await loadDetail(targetCheckpointId);
+          preview(detail);
+        }
+      }
+
+      message.success(
+        data.created ? `已保存 ${data.versionLabel}` : `没有检测到新变更，当前仍是${data.versionLabel}`,
+      );
+    } catch (error) {
+      console.error('保存版本失败:', error);
+      message.error(error instanceof Error ? error.message : '保存版本失败');
+    } finally {
+      setSaveSubmitting(false);
+    }
+  }, [historyViewActive, loadDetail, loadIterations, loadStatus, preview, previewGroup, status]);
 
   const restore = useCallback(
     async (detail: CheckpointDetail, versionLabel: string) => {
@@ -301,6 +365,7 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
     historyViewActive,
     loadStatus,
     loadIterations,
+    activateVersionGroup,
     saveVersion,
     preview,
     previewGroup,

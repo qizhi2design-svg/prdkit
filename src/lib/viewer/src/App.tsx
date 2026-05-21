@@ -123,6 +123,15 @@ function App() {
         setReloadVersion((prev) => prev + 1);
         marks.loadMarksRef.current();
         checkpoint.loadStatusRef.current();
+        return;
+      }
+
+      if (message.type === 'checkpoint-created') {
+        void checkpoint.activateVersionGroup(
+          typeof message.checkpointId === 'string' ? message.checkpointId : null,
+        ).catch((error) => {
+          console.error('切换到新创建版本失败:', error);
+        });
       }
     },
     reconnect: true,

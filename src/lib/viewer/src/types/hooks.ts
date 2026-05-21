@@ -142,6 +142,7 @@ export interface UseCheckpointReturn {
   // 操作方法
   loadStatus: () => Promise<void>;
   loadIterations: () => Promise<void>;
+  activateVersionGroup: (checkpointId?: string | null) => Promise<void>;
   saveVersion: () => Promise<void>;
   preview: (detail: CheckpointDetail) => void;
   previewGroup: (details: CheckpointDetail[]) => void;

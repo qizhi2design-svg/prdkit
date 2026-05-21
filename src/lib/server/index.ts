@@ -4,7 +4,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import path from 'path';
 import chalk from 'chalk';
 import { createApiRouter } from './api/index.js';
-import { createWatcher, broadcastReload } from './watcher.js';
+import { createWatcher, broadcastCheckpointCreated, broadcastReload } from './watcher.js';
 import { checkpointStoreRoot } from '../checkpoints/prototype/store.js';
 
 export interface ServerOptions {
@@ -112,7 +112,13 @@ export async function startServer(options: ServerOptions) {
     prototypesDir,
     onReload: () => {
       broadcastReload(clients);
-    }
+    },
+    checkpointEventsFile: path.join(checkpointStoreRoot(projectRoot), 'events.jsonl'),
+    checkpointRootDir: checkpointStoreRoot(projectRoot),
+    onCheckpointEvent: (event) => {
+      if (event.type !== 'create') return;
+      broadcastCheckpointCreated(clients, event.checkpointId);
+    },
   });
 
   // 启动服务器（返回 Promise，resolve 时服务器已就绪）

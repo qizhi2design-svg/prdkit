@@ -4,10 +4,14 @@ import chalk from 'chalk';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import type { CheckpointEvent } from '../checkpoints/prototype/types.js';
 
 export interface WatcherOptions {
   prototypesDir: string;
   onReload: () => void;
+  checkpointEventsFile?: string;
+  checkpointRootDir?: string;
+  onCheckpointEvent?: (event: CheckpointEvent) => void;
 }
 
 function sha256(value: Buffer): string {
@@ -98,7 +102,13 @@ export function resolvePrototypePathFromWatchEvent(prototypesDir: string, target
 }
 
 export function createWatcher(options: WatcherOptions) {
-  const { prototypesDir, onReload } = options;
+  const {
+    prototypesDir,
+    onReload,
+    checkpointEventsFile,
+    checkpointRootDir,
+    onCheckpointEvent,
+  } = options;
   const contentTracker = new WatchContentTracker(prototypesDir);
 
   const watcher = chokidar.watch(prototypesDir, {
@@ -106,6 +116,8 @@ export function createWatcher(options: WatcherOptions) {
     persistent: true,
     ignoreInitial: true,
   });
+  let checkpointEventTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastBroadcastCheckpointId: string | null = null;
 
   const handleChange = (changedPath: string) => {
     if (shouldIgnoreWatchPath(changedPath)) return;
@@ -139,6 +151,54 @@ export function createWatcher(options: WatcherOptions) {
       handleChange(path);
     });
 
+  if (checkpointEventsFile || checkpointRootDir) {
+    const checkpointWatcherTargets = [
+      checkpointEventsFile,
+      checkpointRootDir,
+    ].filter((value): value is string => Boolean(value));
+    const checkpointWatcher = chokidar.watch(checkpointWatcherTargets, {
+      persistent: true,
+      ignoreInitial: true,
+    });
+
+    const emitLatestCheckpointEvent = () => {
+      if (!checkpointEventsFile) return;
+      if (checkpointEventTimer) {
+        clearTimeout(checkpointEventTimer);
+      }
+
+      checkpointEventTimer = setTimeout(() => {
+        const event = readLatestCheckpointEvent(checkpointEventsFile);
+        if (!event) return;
+        if (event.checkpointId && event.checkpointId === lastBroadcastCheckpointId) {
+          return;
+        }
+        if (event.checkpointId) {
+          lastBroadcastCheckpointId = event.checkpointId;
+        }
+        if (event.type === 'create') {
+          console.log(chalk.cyan('  ⟳ checkpoint 已创建:'), chalk.gray(event.checkpointId || '-'));
+        }
+        onCheckpointEvent?.(event);
+      }, 120);
+    };
+
+    checkpointWatcher
+      .on('add', emitLatestCheckpointEvent)
+      .on('addDir', emitLatestCheckpointEvent)
+      .on('change', emitLatestCheckpointEvent);
+
+    const originalClose = watcher.close.bind(watcher);
+    watcher.close = async () => {
+      if (checkpointEventTimer) {
+        clearTimeout(checkpointEventTimer);
+        checkpointEventTimer = null;
+      }
+      await checkpointWatcher.close();
+      return originalClose();
+    };
+  }
+
   return watcher;
 }
 
@@ -148,4 +208,26 @@ export function broadcastReload(clients: Set<WebSocket>) {
       client.send(JSON.stringify({ type: 'reload' }));
     }
   });
+}
+
+export function broadcastCheckpointCreated(clients: Set<WebSocket>, checkpointId?: string) {
+  clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify({ type: 'checkpoint-created', checkpointId: checkpointId || null }));
+    }
+  });
+}
+
+function readLatestCheckpointEvent(filePath: string): CheckpointEvent | null {
+  try {
+    if (!fs.existsSync(filePath)) return null;
+    const content = fs.readFileSync(filePath, 'utf8').trim();
+    if (!content) return null;
+    const lastLine = content.split('\n').filter(Boolean).at(-1);
+    if (!lastLine) return null;
+    return JSON.parse(lastLine) as CheckpointEvent;
+  } catch (error) {
+    console.error(chalk.red('读取 checkpoint 事件失败:'), error);
+    return null;
+  }
 }
