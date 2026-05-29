@@ -18,6 +18,7 @@ type DragPoint = {
 type UseCanvasViewportOptions = {
   stageSize: CanvasViewportSize;
   canvasSize: CanvasViewportSize;
+  fitSize?: CanvasViewportSize;
   defaultZoomPercent?: number;
   zoomOptions?: number[];
 };
@@ -32,12 +33,15 @@ export function clampNumber(value: number, min: number, max: number) {
 export function getCanvasViewportMetrics(
   stageSize: CanvasViewportSize,
   canvasSize: CanvasViewportSize,
+  fitSize: CanvasViewportSize,
   zoomPercent: number
 ) {
   const availableWidth = Math.max(stageSize.width, 0);
   const availableHeight = Math.max(stageSize.height, 0);
-  const fitScale = stageSize.width > 0 && stageSize.height > 0
-    ? Math.min(availableWidth / canvasSize.width, availableHeight / canvasSize.height)
+  const fitWidth = Math.max(fitSize.width, 0);
+  const fitHeight = Math.max(fitSize.height, 0);
+  const fitScale = stageSize.width > 0 && stageSize.height > 0 && fitWidth > 0 && fitHeight > 0
+    ? Math.min(availableWidth / fitWidth, availableHeight / fitHeight)
     : 1;
   const minZoom = Math.min(fitScale * 100, 50);
   const maxZoom = 200;
@@ -81,6 +85,7 @@ export function clampPanOffset(
 export function useCanvasViewport({
   stageSize,
   canvasSize,
+  fitSize,
   defaultZoomPercent = 100,
   zoomOptions = DEFAULT_ZOOM_OPTIONS,
 }: UseCanvasViewportOptions) {
@@ -96,11 +101,13 @@ export function useCanvasViewport({
   const stageHeight = stageSize.height;
   const canvasWidth = canvasSize.width;
   const canvasHeight = canvasSize.height;
+  const fitWidth = fitSize?.width ?? canvasWidth;
+  const fitHeight = fitSize?.height ?? canvasHeight;
   useEffect(() => {
-    if (stageWidth > 0 && stageHeight > 0 && canvasWidth > 0 && canvasHeight > 0) {
+    if (stageWidth > 0 && stageHeight > 0 && fitWidth > 0 && fitHeight > 0) {
       if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
       fitTimerRef.current = setTimeout(() => {
-        const fitScale = Math.min(stageWidth / canvasWidth, stageHeight / canvasHeight);
+        const fitScale = Math.min(stageWidth / fitWidth, stageHeight / fitHeight);
         setZoomPercentState(Math.round(fitScale * 100));
         setPanOffset({ x: 0, y: 0 });
       }, 150);
@@ -108,10 +115,10 @@ export function useCanvasViewport({
     return () => {
       if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
     };
-  }, [stageWidth, stageHeight, canvasWidth, canvasHeight]);
+  }, [fitHeight, fitWidth, stageHeight, stageWidth]);
   const fitMetrics = useMemo(
-    () => getCanvasViewportMetrics(stageSize, canvasSize, defaultZoomPercent),
-    [canvasSize, defaultZoomPercent, stageSize]
+    () => getCanvasViewportMetrics(stageSize, canvasSize, fitSize ?? canvasSize, defaultZoomPercent),
+    [canvasSize, defaultZoomPercent, fitSize, stageSize]
   );
   const zoomPercent = clampNumber(
     zoomPercentState,
@@ -120,8 +127,8 @@ export function useCanvasViewport({
   );
 
   const metrics = useMemo(
-    () => getCanvasViewportMetrics(stageSize, canvasSize, zoomPercent),
-    [canvasSize, stageSize, zoomPercent]
+    () => getCanvasViewportMetrics(stageSize, canvasSize, fitSize ?? canvasSize, zoomPercent),
+    [canvasSize, fitSize, stageSize, zoomPercent]
   );
   const normalizedPanOffset = useMemo(() => (
     metrics.isPannable

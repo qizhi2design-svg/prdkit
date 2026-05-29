@@ -74,6 +74,7 @@ function App() {
   const viewport = useCanvasViewport({
     stageSize: previewStageSize,
     canvasSize: previewCanvasSize,
+    fitSize: DESKTOP_VIEWPORT_SIZE,
   });
 
   // ========== 文件导航 ==========
