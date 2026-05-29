@@ -588,7 +588,6 @@ function App() {
             collapsed={siderCollapsed}
             onToggle={() => setSiderCollapsed(!siderCollapsed)}
             projectName={config?.projectName || 'PRDKit'}
-            currentFile={fileNav.selectedFile}
             onOpenPublish={publish.open}
             onOpenHistory={checkpoint.openHistory}
             onSaveVersion={checkpoint.saveVersion}

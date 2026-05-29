@@ -1,12 +1,11 @@
 import { MenuFoldOutlined, MenuUnfoldOutlined, CaretRightOutlined, HistoryOutlined } from '@ant-design/icons';
-import { Badge, Button, Tooltip } from 'antd';
+import { Badge, Button } from 'antd';
 import './Header.css';
 
 interface HeaderProps {
   collapsed: boolean;
   onToggle: () => void;
   projectName: string;
-  currentFile: string | null;
   onOpenPublish: () => void;
   onOpenHistory: () => void;
   onSaveVersion: () => void;
@@ -21,7 +20,6 @@ export default function Header({
   collapsed,
   onToggle,
   projectName,
-  currentFile,
   onOpenPublish,
   onOpenHistory,
   onSaveVersion,
@@ -31,14 +29,6 @@ export default function Header({
   saveSubmitting = false,
   saveChangeCount = 0,
 }: HeaderProps) {
-  // 从路径中提取文件名（去掉父级目录）
-  const getFileName = (path: string | null) => {
-    if (!path) return null;
-    const parts = path.split('/');
-    return parts[parts.length - 1];
-  };
-
-  const fileName = getFileName(currentFile);
   const displaySaveChangeCount = saveHasChanges && saveChangeCount > 0 ? saveChangeCount : 0;
   const saveButton = (
     <Button
@@ -65,16 +55,6 @@ export default function Header({
       <div className="header-content">
         <div className="header-project-meta">
           <span className="header-project-title">{projectName}</span>
-          {fileName ? (
-            <div className="header-file-meta">
-              <span className="header-project-divider">/</span>
-              <Tooltip title={currentFile}>
-                <span className="header-file-name">
-                  {fileName}
-                </span>
-              </Tooltip>
-            </div>
-          ) : null}
         </div>
       </div>
 
