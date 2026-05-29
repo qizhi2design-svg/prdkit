@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
-import { listPrdCheckpointRecords, readPrdCheckpointData, readPrdBlob } from '../../checkpoints/prd/store.js';
+import { createPrdCheckpoint, listPrdCheckpointRecords, readPrdCheckpointData, readPrdBlob } from '../../checkpoints/prd/store.js';
 import type { ApiHelpers } from './helpers.js';
 
 export function createPrdsRouter(helpers: ApiHelpers): Router {
@@ -18,6 +18,10 @@ export function createPrdsRouter(helpers: ApiHelpers): Router {
       fs.mkdirSync(dir, { recursive: true });
     }
     return dir;
+  }
+
+  function getRouteParam(value: string | string[] | undefined): string {
+    return Array.isArray(value) ? value[0] || '' : value || '';
   }
 
   /** 列出 workspace/prds/ 下所有 PRD 文件 */
@@ -69,11 +73,101 @@ export function createPrdsRouter(helpers: ApiHelpers): Router {
     }
   });
 
+  /** 获取 PRD 版本历史列表 */
+  router.get(/^\/prds\/(.+)\/checkpoints$/, (req: Request, res: Response) => {
+    try {
+      const fileName = getRouteParam(req.params[0]);
+      const safePath = path.normalize(fileName).replace(/^(\.\.[/\\])+/, '');
+      const prdPath = path.join('workspace', 'prds', safePath);
+
+      const records = listPrdCheckpointRecords(projectRoot, prdPath);
+
+      const list = records.map((record) => ({
+        id: record.id,
+        message: record.message || null,
+        kind: record.kind,
+        createdAt: record.createdAt,
+        title: record.title,
+        size: record.size,
+        lineCount: record.lineCount,
+      }));
+
+      res.json(list);
+    } catch (error) {
+      console.error('读取 PRD 版本历史失败:', error);
+      res.status(500).json({
+        error: '读取 PRD 版本历史失败',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  /** 创建 PRD checkpoint */
+  router.post(/^\/prds\/(.+)\/checkpoints$/, async (req: Request, res: Response) => {
+    try {
+      const fileName = getRouteParam(req.params[0]);
+      const safePath = path.normalize(fileName).replace(/^(\.\.[/\\])+/, '');
+      const prdPath = path.join('workspace', 'prds', safePath);
+
+      const kind = req.body?.kind === 'auto' ? 'auto' : 'manual';
+      const message = typeof req.body?.message === 'string' ? req.body.message.trim() : undefined;
+
+      const result = await createPrdCheckpoint({
+        projectRoot,
+        prdPath,
+        kind,
+        message,
+      });
+
+      res.json({
+        created: result.created,
+        checkpointId: result.record.id,
+        message: result.record.message || null,
+        kind: result.record.kind,
+        createdAt: result.record.createdAt,
+        title: result.record.title,
+        duplicateOf: result.duplicateOf?.id ?? null,
+      });
+    } catch (error) {
+      console.error('创建 PRD checkpoint 失败:', error);
+      res.status(500).json({
+        error: '创建 PRD 版本失败',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  /** 获取特定 checkpoint 版本的 PRD 内容 */
+  router.get(/^\/prds\/(.+)\/checkpoints\/([^/]+)$/, async (req: Request, res: Response) => {
+    try {
+      const checkpointId = getRouteParam(req.params[1]);
+
+      const data = readPrdCheckpointData(projectRoot, checkpointId);
+      const blob = await readPrdBlob(projectRoot, data.document.blobHash);
+
+      res.json({
+        checkpointId,
+        fileName: data.document.fileName,
+        title: data.manifest.title,
+        kind: data.manifest.kind,
+        message: data.manifest.message || null,
+        createdAt: data.manifest.createdAt,
+        content: blob.toString('utf8'),
+      });
+    } catch (error) {
+      console.error('读取 PRD checkpoint 失败:', error);
+      res.status(500).json({
+        error: '读取 PRD 版本失败',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
   /** 读取单个 PRD 文件内容 */
-  router.get('/prds/:path(*)', (req: Request, res: Response) => {
+  router.get(/^\/prds\/(.+)$/, (req: Request, res: Response) => {
     try {
       const dir = ensurePrdsDir();
-      const fileName = String(req.params.path);
+      const fileName = getRouteParam(req.params[0]);
       // 确保路径安全，防止目录遍历
       const safePath = path.normalize(fileName).replace(/^(\.\.[/\\])+/, '');
       const filePath = path.join(dir, safePath);
@@ -105,61 +199,6 @@ export function createPrdsRouter(helpers: ApiHelpers): Router {
       console.error('读取 PRD 文件失败:', error);
       res.status(500).json({
         error: '读取 PRD 文件失败',
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  });
-
-  /** 获取 PRD 版本历史列表 */
-  router.get('/prds/:path(*)/checkpoints', (req: Request, res: Response) => {
-    try {
-      const fileName = String(req.params.path);
-      const safePath = path.normalize(fileName).replace(/^(\.\.[/\\])+/, '');
-      const prdPath = path.join('workspace', 'prds', safePath);
-
-      const records = listPrdCheckpointRecords(projectRoot, prdPath);
-
-      const list = records.map((record) => ({
-        id: record.id,
-        message: record.message || null,
-        kind: record.kind,
-        createdAt: record.createdAt,
-        title: record.title,
-        size: record.size,
-        lineCount: record.lineCount,
-      }));
-
-      res.json(list);
-    } catch (error) {
-      console.error('读取 PRD 版本历史失败:', error);
-      res.status(500).json({
-        error: '读取 PRD 版本历史失败',
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  });
-
-  /** 获取特定 checkpoint 版本的 PRD 内容 */
-  router.get('/prds/:path(*)/checkpoints/:checkpointId', async (req: Request, res: Response) => {
-    try {
-      const checkpointId = String(req.params.checkpointId);
-
-      const data = readPrdCheckpointData(projectRoot, checkpointId);
-      const blob = await readPrdBlob(projectRoot, data.document.blobHash);
-
-      res.json({
-        checkpointId,
-        fileName: data.document.fileName,
-        title: data.manifest.title,
-        kind: data.manifest.kind,
-        message: data.manifest.message || null,
-        createdAt: data.manifest.createdAt,
-        content: blob.toString('utf8'),
-      });
-    } catch (error) {
-      console.error('读取 PRD checkpoint 失败:', error);
-      res.status(500).json({
-        error: '读取 PRD 版本失败',
         message: error instanceof Error ? error.message : String(error),
       });
     }
