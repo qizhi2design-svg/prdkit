@@ -589,8 +589,6 @@ function App() {
             onToggle={() => setSiderCollapsed(!siderCollapsed)}
             projectName={config?.projectName || 'PRDKit'}
             currentFile={fileNav.selectedFile}
-            currentIndex={visibleCurrentIndex}
-            totalFiles={visibleFileList.length}
             onOpenPublish={publish.open}
             onOpenHistory={checkpoint.openHistory}
             onSaveVersion={checkpoint.saveVersion}
@@ -612,6 +610,8 @@ function App() {
             >
               <FileTree
                 onSelect={fileNav.selectFile}
+                currentIndex={visibleCurrentIndex}
+                totalFiles={visibleFileList.length}
                 selectedFile={fileNav.selectedFile}
                 onNavigate={(direction) => {
                   const currentFiles = visibleFileList;

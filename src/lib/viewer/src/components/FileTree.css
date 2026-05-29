@@ -110,6 +110,13 @@
   -moz-user-select: none;
 }
 
+.file-tree-file-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--color-text-tertiary, #999);
+  line-height: 1;
+}
+
 .file-tree-iteration-select {
   min-width: 110px;
 }

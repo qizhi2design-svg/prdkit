@@ -7,8 +7,6 @@ interface HeaderProps {
   onToggle: () => void;
   projectName: string;
   currentFile: string | null;
-  currentIndex: number;
-  totalFiles: number;
   onOpenPublish: () => void;
   onOpenHistory: () => void;
   onSaveVersion: () => void;
@@ -24,8 +22,6 @@ export default function Header({
   onToggle,
   projectName,
   currentFile,
-  currentIndex,
-  totalFiles,
   onOpenPublish,
   onOpenHistory,
   onSaveVersion,
@@ -77,9 +73,6 @@ export default function Header({
                   {fileName}
                 </span>
               </Tooltip>
-              <span className="header-file-count">
-                {currentIndex} / {totalFiles}
-              </span>
             </div>
           ) : null}
         </div>

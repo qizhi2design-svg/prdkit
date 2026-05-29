@@ -6,6 +6,8 @@ import './FileTree.css';
 interface FileTreeProps {
   onSelect: (path: string | null) => void;
   selectedFile: string | null;
+  currentIndex: number;
+  totalFiles: number;
   onNavigate: (direction: 'prev' | 'next') => void;
   onDeletePrototype: (path: string) => Promise<void> | void;
   onDeleteFolder: (path: string) => Promise<void> | void;
@@ -29,6 +31,8 @@ interface PrototypeNode {
 export default function FileTree({
   onSelect,
   selectedFile,
+  currentIndex,
+  totalFiles,
   onNavigate,
   onDeletePrototype,
   onDeleteFolder,
@@ -234,6 +238,7 @@ export default function FileTree({
         >
           <div className="file-tree-project-heading">
             <h2 className="file-tree-project-title">页面</h2>
+            <span className="file-tree-file-count">{currentIndex} / {totalFiles}</span>
           </div>
           <div className="file-tree-project-actions">
             <Tooltip title="新建文件夹" getPopupContainer={() => document.body}>
