@@ -91,11 +91,16 @@ export function useCanvasViewport({
   const fitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 当面板尺寸变化时重新适配视图（如打开/拖动标记列表、拖动页面列表）
+  // 使用原始数值作依赖，避免对象引用变化导致无限重渲染
+  const stageWidth = stageSize.width;
+  const stageHeight = stageSize.height;
+  const canvasWidth = canvasSize.width;
+  const canvasHeight = canvasSize.height;
   useEffect(() => {
-    if (stageSize.width > 0 && stageSize.height > 0 && canvasSize.width > 0 && canvasSize.height > 0) {
+    if (stageWidth > 0 && stageHeight > 0 && canvasWidth > 0 && canvasHeight > 0) {
       if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
       fitTimerRef.current = setTimeout(() => {
-        const fitScale = Math.min(stageSize.width / canvasSize.width, stageSize.height / canvasSize.height);
+        const fitScale = Math.min(stageWidth / canvasWidth, stageHeight / canvasHeight);
         setZoomPercentState(Math.round(fitScale * 100));
         setPanOffset({ x: 0, y: 0 });
       }, 150);
@@ -103,7 +108,7 @@ export function useCanvasViewport({
     return () => {
       if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
     };
-  }, [stageSize, canvasSize]);
+  }, [stageWidth, stageHeight, canvasWidth, canvasHeight]);
   const fitMetrics = useMemo(
     () => getCanvasViewportMetrics(stageSize, canvasSize, defaultZoomPercent),
     [canvasSize, defaultZoomPercent, stageSize]
