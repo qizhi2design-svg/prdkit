@@ -217,6 +217,31 @@ export class CloudClient {
     };
   }
 
+  async updateProject(
+    projectId: string,
+    input: { name?: string; description?: string | null }
+  ): Promise<CloudProjectSummary> {
+    const response = await this.requestJson<{ project: any }>(`/api/projects/${encodeURIComponent(projectId)}`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+      headers: { "Content-Type": "application/json" },
+    });
+    return {
+      id: String(response.project.id),
+      name: String(response.project.name),
+      slug: String(response.project.slug),
+      description: typeof response.project.description === "string" ? response.project.description : null,
+      updatedAt: typeof response.project.updatedAt === "string" ? response.project.updatedAt : undefined,
+      prototypeCount: Array.isArray(response.project.prototypes) ? response.project.prototypes.length : undefined,
+    };
+  }
+
+  async deleteProject(projectId: string): Promise<void> {
+    await this.requestJson(`/api/projects/${encodeURIComponent(projectId)}`, {
+      method: "DELETE",
+    });
+  }
+
   async prepareRelease(
     projectId: string,
     payload: { message?: string; iteration?: ReleaseIterationMeta | null; prototypes: ReleasePreparePrototype[] }

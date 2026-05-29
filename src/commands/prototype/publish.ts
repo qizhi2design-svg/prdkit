@@ -13,7 +13,6 @@ export interface PrototypePublishOptions {
   cloud?: boolean;
   host?: string;
   message?: string;
-  dryRun?: boolean;
   json?: boolean;
   project?: string;
   open?: boolean;
@@ -43,7 +42,6 @@ async function runPrototypePublish(options: PrototypePublishOptions): Promise<vo
       cloudConfig,
       hostOverride: options.host,
       message: options.message,
-      dryRun: options.dryRun,
       json: options.json,
       project: options.project,
     });
@@ -73,12 +71,6 @@ async function runPrototypePublish(options: PrototypePublishOptions): Promise<vo
       }).catch(() => undefined);
 
       console.log(JSON.stringify(result, null, 2));
-      return;
-    }
-
-    if (result.dryRun) {
-      logger.success(`预检完成，releaseId: ${result.releaseId}`);
-      logger.info(`查看地址: ${result.releaseUrl}`);
       return;
     }
 
@@ -141,7 +133,6 @@ export function registerPrototypePublish(parent: Command): void {
     .option("-c, --cloud", "发布到云端服务器")
     .option("-H, --host <url>", "指定云端服务器地址（临时覆盖 cloud.json）")
     .option("-m, --message <message>", "版本说明（云端发布时使用）")
-    .option("--dry-run", "仅执行云端预检，不提交发布")
     .option("--json", "输出 JSON 结果")
     .option("-p, --project <idOrSlug>", "指定云端项目 ID 或 slug")
     .option("--no-open", "发布成功后不自动打开结果页")

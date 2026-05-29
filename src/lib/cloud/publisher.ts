@@ -22,7 +22,6 @@ interface PublishToCloudOptions {
   hostOverride?: string;
   message?: string;
   entryFiles?: string[];
-  dryRun?: boolean;
   json?: boolean;
   project?: string;
   open?: boolean;
@@ -37,7 +36,6 @@ export type PublishToCloudResult = {
   results: ReleaseCommitResult["results"];
   releaseUrl: string;
   webUrl: string;
-  dryRun: boolean;
 };
 
 type SnapshotBundle = {
@@ -48,7 +46,7 @@ type SnapshotBundle = {
 };
 
 export async function publishToCloud(options: PublishToCloudOptions): Promise<PublishToCloudResult> {
-  const { projectRoot, config, cloudConfig, hostOverride, message, entryFiles, dryRun, project } = options;
+  const { projectRoot, config, cloudConfig, hostOverride, message, entryFiles, project } = options;
   const host = await requireCloudHost(projectRoot, hostOverride);
   const client = await createCloudClient(host);
   await client.ensureValidAuth();
@@ -100,26 +98,6 @@ export async function publishToCloud(options: PublishToCloudOptions): Promise<Pu
     logger.info(`远端缺失 blob：${prepare.missingBlobHashes.length} 个`);
   }
 
-  if (dryRun) {
-    return {
-      releaseId: prepare.releaseId,
-      projectId: prepare.projectId,
-      changedCount,
-      unchangedCount,
-      uploadedBlobCount: 0,
-      results: prepare.prototypes.map((item) => ({
-        prototypePath: item.path,
-        prototypeId: "",
-        status: item.status,
-        versionId: item.latestVersionId || undefined,
-        versionNumber: item.latestVersionNumber || undefined,
-      })),
-      releaseUrl: prepare.releaseUrl,
-      webUrl: prepare.webUrl,
-      dryRun: true,
-    };
-  }
-
   const missingBlobSet = new Set(prepare.missingBlobHashes);
   if (missingBlobSet.size > 0) {
     const blobs = collectMissingBlobs(prototypesDir, snapshots, missingBlobSet);
@@ -139,39 +117,55 @@ export async function publishToCloud(options: PublishToCloudOptions): Promise<Pu
     results: status.results,
     releaseUrl: status.release.releaseUrl,
     webUrl: status.release.webUrl,
-    dryRun: false,
   };
 }
 
-async function resolvePublishProjectId(
+export async function resolvePublishProjectId(
   client: Awaited<ReturnType<typeof createCloudClient>>,
   cloudConfig: PrdkitCloudConfig,
   project?: string
 ): Promise<string> {
-  if (!project?.trim()) {
-    if (!cloudConfig.projectId) {
-      throw new Error("未选择云端项目，请使用 `prdkit prototype publish --cloud --project <idOrSlug>` 或通过本地 viewer 选择项目");
-    }
-    return cloudConfig.projectId;
+  const explicitIdentifier = project?.trim() || undefined;
+  const cachedProjectId = cloudConfig.projectId?.trim() || undefined;
+  const cachedProjectSlug = cloudConfig.projectSlug?.trim() || undefined;
+
+  if (!explicitIdentifier && !cachedProjectId && !cachedProjectSlug) {
+    throw new Error("未选择云端项目，请使用 `prdkit prototype publish --cloud --project <idOrSlug>` 或通过本地 viewer 选择项目");
   }
 
-  const identifier = project.trim();
-  if (cloudConfig.projectId === identifier) {
-    return identifier;
-  }
+  const tryGetProject = async (projectId: string | undefined): Promise<string | undefined> => {
+    if (!projectId) return undefined;
+    const resolved = await client.getProject(projectId).catch(() => undefined);
+    return resolved?.id;
+  };
 
-  const projects = await client.listProjects();
-  const match = projects.find((item) => item.id === identifier || item.slug === identifier);
-  if (match) {
-    return match.id;
-  }
+  const listProjects = async () => client.listProjects().catch(() => []);
 
-  const resolved = await client.resolveProjectBySlug(identifier).catch(() => undefined);
-  if (resolved?.id) {
-    return resolved.id;
-  }
+  const tryMatchFromProjects = async (identifier: string | undefined): Promise<string | undefined> => {
+    if (!identifier) return undefined;
+    const projects = await listProjects();
+    const match = projects.find((item) => item.id === identifier || item.slug === identifier);
+    return match?.id;
+  };
 
-  throw new Error(`未找到云端项目：${identifier}`);
+  const tryResolveSlug = async (slug: string | undefined): Promise<string | undefined> => {
+    if (!slug) return undefined;
+    const resolved = await client.resolveProjectBySlug(slug).catch(() => undefined);
+    return resolved?.id;
+  };
+
+  const primaryIdentifier = explicitIdentifier ?? cachedProjectId ?? cachedProjectSlug;
+  const fallbackSlug = cachedProjectSlug && cachedProjectSlug !== primaryIdentifier ? cachedProjectSlug : undefined;
+
+  return (
+    await tryGetProject(primaryIdentifier)
+    ?? await tryMatchFromProjects(primaryIdentifier)
+    ?? await tryResolveSlug(fallbackSlug)
+    ?? await tryResolveSlug(primaryIdentifier)
+    ?? (() => {
+      throw new Error(`未找到云端项目：${primaryIdentifier}`);
+    })()
+  );
 }
 
 function resolveEntries(prototypesDir: string, entryFiles?: string[]): string[] {

@@ -366,8 +366,41 @@ export const COPY = {
 
   cloudDescription: "云端服务器管理",
   cloudListDescription: "查看当前服务器与所有已认证服务器",
+  cloudProjectDescription: "云端项目管理",
+  cloudProjectCreateDescription: "创建云端项目",
+  cloudProjectUpdateDescription: "修改云端项目信息",
+  cloudProjectDeleteDescription: "删除云端项目",
   cloudSwitchDescription: "切换到指定云端服务器并保留项目元数据",
   cloudLoginDescription: "登录到指定云端服务器（默认当前服务器）",
   cloudLogoutDescription: "从指定云端服务器注销（默认当前服务器）",
   cloudSetDefaultDescription: "设置全局默认云端服务器地址",
+  cloudProjectCreateHelpAfter: `
+示例：
+  prdkit cloud project create "需求管理后台"
+  prdkit cloud project create "需求管理后台" --slug requirement-admin
+  prdkit cloud project create "需求管理后台" --description "团队内部使用"
+
+说明：
+  创建成功后会输出项目 ID、slug 和名称。
+`,
+  cloudProjectUpdateHelpAfter: `
+示例：
+  prdkit cloud project update demo-project --name "新项目名"
+  prdkit cloud project update cmpxxxx --description "新的项目说明"
+  prdkit cloud project update demo-project --clear-description
+
+说明：
+  <idOrSlug> 支持传项目 ID 或 slug。
+  如修改的是当前项目绑定的云端项目，会同步更新本地 cloud.json。
+`,
+  cloudProjectDeleteHelpAfter: `
+示例：
+  prdkit cloud project delete demo-project --yes
+  prdkit cloud project delete cmpxxxx --yes
+
+说明：
+  <idOrSlug> 支持传项目 ID 或 slug。
+  删除操作默认需要确认，使用 --yes 可跳过确认。
+  如果删除的是当前项目绑定的云端项目，会自动清理本地 cloud.json 中的项目缓存。
+`,
 } as const;

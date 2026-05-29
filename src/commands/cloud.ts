@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { confirm } from "@inquirer/prompts";
 import { COPY } from "#constants/command-text.js";
 import { logger } from "#utils/logger.js";
 import {
@@ -11,9 +12,12 @@ import {
   saveGlobalConfig,
   loadGlobalConfig,
   normalizeHost,
+  resolveProjectRoot,
+  saveCloudConfig,
   DEFAULT_CLOUD_HOST,
 } from "#utils/config.js";
 import { findAvailablePort } from "#utils/port.js";
+import type { CloudProjectSummary, PrdkitCloudConfig } from "#types/index.js";
 
 const CALLBACK_PATH = "/auth/callback";
 
@@ -147,6 +151,166 @@ export function registerCloud(program: Command): void {
       });
       logger.success(`全局默认服务器已设置为: ${normalized}`);
     });
+
+  const project = cloud
+    .command("project")
+    .alias("projects")
+    .description(COPY.cloudProjectDescription);
+
+  project
+    .command("create <name>")
+    .description(COPY.cloudProjectCreateDescription)
+    .option("--slug <slug>", "指定项目 slug")
+    .option("-d, --description <description>", "项目说明")
+    .addHelpText("after", `\n${COPY.cloudProjectCreateHelpAfter}`)
+    .action(async (name: string, options: { slug?: string; description?: string }) => {
+      const { client } = await getAuthenticatedCloudClient();
+      const project = await client.createProject({
+        name: name.trim(),
+        slug: options.slug?.trim(),
+        description: options.description?.trim(),
+      });
+      logger.success(`已创建云端项目：${project.name}`);
+      logger.info(`项目 ID: ${project.id}`);
+      logger.info(`项目 slug: ${project.slug}`);
+    });
+
+  project
+    .command("update <idOrSlug>")
+    .description(COPY.cloudProjectUpdateDescription)
+    .option("--name <name>", "新的项目名称")
+    .option("-d, --description <description>", "新的项目说明")
+    .option("--clear-description", "清空项目说明")
+    .addHelpText("after", `\n${COPY.cloudProjectUpdateHelpAfter}`)
+    .action(async (idOrSlug: string, options: { name?: string; description?: string; clearDescription?: boolean }) => {
+      const trimmedName = options.name?.trim();
+      const hasDescription = typeof options.description === "string";
+      const hasClearDescription = Boolean(options.clearDescription);
+
+      if (!trimmedName && !hasDescription && !hasClearDescription) {
+        throw new Error("请至少提供 --name、--description 或 --clear-description 中的一项");
+      }
+      if (hasDescription && hasClearDescription) {
+        throw new Error("--description 与 --clear-description 不能同时使用");
+      }
+
+      const { client, projectRoot, cloudConfig } = await getAuthenticatedCloudClient();
+      const targetProject = await resolveCloudProject(client, idOrSlug);
+      const updated = await client.updateProject(targetProject.id, {
+        ...(trimmedName ? { name: trimmedName } : {}),
+        ...(hasClearDescription ? { description: null } : hasDescription ? { description: options.description ?? "" } : {}),
+      });
+
+      await syncLocalProjectMeta(projectRoot, cloudConfig, updated);
+      logger.success(`已更新云端项目：${updated.name}`);
+      logger.info(`项目 ID: ${updated.id}`);
+      logger.info(`项目 slug: ${updated.slug}`);
+    });
+
+  project
+    .command("delete <idOrSlug>")
+    .description(COPY.cloudProjectDeleteDescription)
+    .option("-y, --yes", "跳过删除确认")
+    .addHelpText("after", `\n${COPY.cloudProjectDeleteHelpAfter}`)
+    .action(async (idOrSlug: string, options: { yes?: boolean }) => {
+      const { client, projectRoot, cloudConfig } = await getAuthenticatedCloudClient();
+      const targetProject = await resolveCloudProject(client, idOrSlug);
+
+      if (!options.yes) {
+        const shouldDelete = await confirm({
+          message: `确认删除云端项目「${targetProject.name}」(${targetProject.slug}) 吗？此操作不可恢复`,
+          default: false,
+        });
+        if (!shouldDelete) {
+          logger.info("已取消删除");
+          return;
+        }
+      }
+
+      await client.deleteProject(targetProject.id);
+      await clearLocalProjectMetaIfMatches(projectRoot, cloudConfig, targetProject);
+      logger.success(`已删除云端项目：${targetProject.name}`);
+      logger.info(`项目 ID: ${targetProject.id}`);
+    });
+}
+
+async function getAuthenticatedCloudClient(): Promise<{
+  client: Awaited<ReturnType<typeof import("#lib/cloud/client.js").createCloudClient>>;
+  host: string;
+  projectRoot?: string;
+  cloudConfig?: PrdkitCloudConfig;
+}> {
+  const projectRoot = await resolveProjectRoot(process.cwd());
+  const cloudConfig = await loadCloudConfig(process.cwd()).catch(() => undefined);
+  const host = cloudConfig?.host
+    ? normalizeHost(cloudConfig.host)
+    : await requireCloudHost(process.cwd());
+  const { createCloudClient } = await import("#lib/cloud/client.js");
+  const client = await createCloudClient(host);
+  await client.ensureValidAuth();
+  return { client, host, projectRoot, cloudConfig };
+}
+
+async function resolveCloudProject(
+  client: Awaited<ReturnType<typeof import("#lib/cloud/client.js").createCloudClient>>,
+  idOrSlug: string
+): Promise<CloudProjectSummary> {
+  const identifier = idOrSlug.trim();
+  if (!identifier) {
+    throw new Error("缺少项目 ID 或 slug");
+  }
+
+  const byId = await client.getProject(identifier).catch(() => undefined);
+  if (byId) {
+    return byId;
+  }
+
+  const bySlug = await client.resolveProjectBySlug(identifier).catch(() => undefined);
+  if (bySlug) {
+    return bySlug;
+  }
+
+  throw new Error(`未找到云端项目：${identifier}`);
+}
+
+async function syncLocalProjectMeta(
+  projectRoot: string | undefined,
+  cloudConfig: PrdkitCloudConfig | undefined,
+  project: CloudProjectSummary
+): Promise<void> {
+  if (!projectRoot || !cloudConfig) {
+    return;
+  }
+  if (cloudConfig.projectId !== project.id && cloudConfig.projectSlug !== project.slug) {
+    return;
+  }
+
+  await saveCloudConfig({
+    ...cloudConfig,
+    projectId: project.id,
+    projectSlug: project.slug,
+    projectName: project.name,
+  }, projectRoot);
+}
+
+async function clearLocalProjectMetaIfMatches(
+  projectRoot: string | undefined,
+  cloudConfig: PrdkitCloudConfig | undefined,
+  project: CloudProjectSummary
+): Promise<void> {
+  if (!projectRoot || !cloudConfig) {
+    return;
+  }
+  if (cloudConfig.projectId !== project.id && cloudConfig.projectSlug !== project.slug) {
+    return;
+  }
+
+  await saveCloudConfig({
+    version: cloudConfig.version,
+    host: cloudConfig.host,
+    lastReleaseId: cloudConfig.lastReleaseId,
+    lastPublishedAt: cloudConfig.lastPublishedAt,
+  }, projectRoot);
 }
 
 async function performCloudLogin(host: string): Promise<void> {
