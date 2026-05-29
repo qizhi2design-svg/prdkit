@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 export type CanvasViewportSize = {
   width: number;
@@ -88,6 +88,22 @@ export function useCanvasViewport({
   const [panOffset, setPanOffset] = useState<CanvasPanOffset>({ x: 0, y: 0 });
   const [isDraggingCanvas, setIsDraggingCanvas] = useState(false);
   const dragStartRef = useRef<{ point: DragPoint; origin: CanvasPanOffset } | null>(null);
+  const fitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 当面板尺寸变化时重新适配视图（如打开/拖动标记列表、拖动页面列表）
+  useEffect(() => {
+    if (stageSize.width > 0 && stageSize.height > 0 && canvasSize.width > 0 && canvasSize.height > 0) {
+      if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
+      fitTimerRef.current = setTimeout(() => {
+        const fitScale = Math.min(stageSize.width / canvasSize.width, stageSize.height / canvasSize.height);
+        setZoomPercentState(Math.round(fitScale * 100));
+        setPanOffset({ x: 0, y: 0 });
+      }, 150);
+    }
+    return () => {
+      if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
+    };
+  }, [stageSize, canvasSize]);
   const fitMetrics = useMemo(
     () => getCanvasViewportMetrics(stageSize, canvasSize, defaultZoomPercent),
     [canvasSize, defaultZoomPercent, stageSize]
