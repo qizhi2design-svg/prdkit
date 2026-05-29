@@ -140,6 +140,7 @@ export const COPY = {
 
 说明：
   输出 workspace/prototypes 下的所有原型入口页面路径。
+  扫描结果会受目录树中的 .prdkitignore 规则影响。
 `,
   prototypePublishDescription: "发布原型到本地目录或云端",
   prototypePublishHelpAfter: `
@@ -150,6 +151,7 @@ export const COPY = {
 
 说明：
   默认导出标准只读数据协议目录，包含 manifest.json、marks.json 和 prototypes/。
+  默认扫描结果会受 workspace/prototypes 目录树中的 .prdkitignore 规则影响。
   使用 --cloud 时发布到云端项目；项目可通过 --project 指定，或先在本地 viewer 中选择。
   使用 --host 可临时发布到其他服务器（不修改 cloud.json）。
 `,

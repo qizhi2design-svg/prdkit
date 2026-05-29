@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { cp, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -6,6 +7,7 @@ import { dirname } from "node:path";
 import { sanitizeFileStem } from "#utils/files.js";
 import { flattenPrototypes, scanPrototypes, type PrototypeNode } from "./scanner.js";
 import { readPrototypeMarksSync, type MarkRecord } from "./marks.js";
+import { collectPrototypeSharedDependencies } from "./publish-shared.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -91,6 +93,7 @@ export async function publishArtifacts(options: PublishOptions): Promise<Publish
 
   await mkdir(outputDir, { recursive: true });
   await copyPrototypeDirectories(prototypesDir, outputDir, entryFiles);
+  await copySharedDependencies(prototypesDir, outputDir, entryFiles);
   await writePublishFiles(projectRoot, outputDir, manifest, marks);
 
   return { outputDir, manifest, marks };
@@ -178,6 +181,63 @@ async function copyPrototypeDirectories(
       }
     });
   }
+}
+
+async function copySharedDependencies(
+  prototypesDir: string,
+  outputDir: string,
+  entryFiles: string[],
+): Promise<void> {
+  const copied = new Set<string>();
+  const publishPrototypesDir = path.join(outputDir, "prototypes");
+
+  for (const entry of entryFiles) {
+    const sourceDir = path.join(prototypesDir, entry);
+    const indexPath = path.join(sourceDir, "index.html");
+    if (!existsSync(indexPath)) {
+      continue;
+    }
+
+    const snapshotLikeFiles = collectPrototypeFileList(sourceDir);
+    const dependencies = collectPrototypeSharedDependencies(prototypesDir, entry, snapshotLikeFiles);
+    for (const dependency of dependencies) {
+      if (copied.has(dependency.sourceRelativePath)) {
+        continue;
+      }
+      copied.add(dependency.sourceRelativePath);
+
+      const targetPath = path.join(publishPrototypesDir, dependency.sourceRelativePath);
+      await mkdir(path.dirname(targetPath), { recursive: true });
+      await cp(dependency.sourceAbsolutePath, targetPath);
+    }
+  }
+}
+
+function collectPrototypeFileList(sourceDir: string): Array<{ relativePath: string; blobHash: string; size: number }> {
+  const results: Array<{ relativePath: string; blobHash: string; size: number }> = [];
+
+  const walk = (dir: string) => {
+    const entries = readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.name === "marks" || entry.name.startsWith(".")) {
+        continue;
+      }
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(fullPath);
+        continue;
+      }
+      const content = readFileSync(fullPath);
+      results.push({
+        relativePath: path.relative(sourceDir, fullPath).replace(/\\/g, "/"),
+        blobHash: createHash("sha256").update(content).digest("hex"),
+        size: content.length,
+      });
+    }
+  };
+
+  walk(sourceDir);
+  return results.sort((a, b) => a.relativePath.localeCompare(b.relativePath, "zh-CN"));
 }
 
 async function writePublishFiles(

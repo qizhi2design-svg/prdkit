@@ -104,7 +104,10 @@ export function createPrototypesRouter(helpers: ApiHelpers): Router {
       }
 
       const { duplicatePath, duplicateDir, duplicateName } = buildDuplicatePrototypePath(prototypePath);
-      fs.cpSync(sourceDir, duplicateDir, { recursive: true });
+      fs.cpSync(sourceDir, duplicateDir, {
+        recursive: true,
+        filter: (src) => path.basename(src) !== '.prdkit',
+      });
 
       res.json({
         success: true,

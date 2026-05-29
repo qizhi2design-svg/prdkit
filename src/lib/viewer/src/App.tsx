@@ -127,10 +127,10 @@ function App() {
       }
 
       if (message.type === 'checkpoint-created') {
-        void checkpoint.activateVersionGroup(
+        void checkpoint.notifyCheckpointCreated(
           typeof message.checkpointId === 'string' ? message.checkpointId : null,
         ).catch((error) => {
-          console.error('切换到新创建版本失败:', error);
+          console.error('刷新新创建版本状态失败:', error);
         });
       }
     },
@@ -271,6 +271,15 @@ function App() {
     setReloadVersion((prev) => prev + 1);
   }, [checkpoint, fileNav, marks]);
 
+  const ensureEditableWorkspace = useCallback(() => {
+    if (!checkpoint.historyViewActive) {
+      return false;
+    }
+
+    checkpoint.exitPreview();
+    return true;
+  }, [checkpoint]);
+
   const prevActiveToolRef = useRef<ActiveTool>(activeTool);
   useEffect(() => {
     const prevTool = prevActiveToolRef.current;
@@ -348,9 +357,8 @@ function App() {
 
   // ========== 文件操作处理函数 ==========
   const handlePrototypeDelete = async (prototypePath: string) => {
-    if (checkpoint.historyViewActive) {
-      message.info('历史版本预览中不可删除页面，请先退出预览');
-      return;
+    if (ensureEditableWorkspace()) {
+      message.info('已自动退出历史预览，继续删除当前页面');
     }
 
     try {
@@ -381,9 +389,8 @@ function App() {
   };
 
   const handlePrototypeDuplicate = async (prototypePath: string) => {
-    if (checkpoint.historyViewActive) {
-      message.info('历史版本预览中不可复制页面，请先退出预览');
-      return;
+    if (ensureEditableWorkspace()) {
+      message.info('已自动退出历史预览，继续复制当前页面');
     }
 
     try {
@@ -412,9 +419,8 @@ function App() {
   };
 
   const handleFolderDelete = async (folderPath: string) => {
-    if (checkpoint.historyViewActive) {
-      message.info('历史版本预览中不可删除文件夹，请先退出预览');
-      return;
+    if (ensureEditableWorkspace()) {
+      message.info('已自动退出历史预览，继续删除当前文件夹');
     }
 
     try {
@@ -440,9 +446,8 @@ function App() {
   };
 
   const handleCreateFolder = async (folderName: string) => {
-    if (checkpoint.historyViewActive) {
-      message.info('历史版本预览中不可新建文件夹，请先退出预览');
-      return;
+    if (ensureEditableWorkspace()) {
+      message.info('已自动退出历史预览，继续创建文件夹');
     }
 
     const response = await fetch('/api/prototypes/folders', {
@@ -461,9 +466,8 @@ function App() {
   };
 
   const handleRenameNode = async (sourcePath: string, targetName: string) => {
-    if (checkpoint.historyViewActive) {
-      message.info('历史版本预览中不可重命名，请先退出预览');
-      return;
+    if (ensureEditableWorkspace()) {
+      message.info('已自动退出历史预览，继续重命名');
     }
 
     const response = await fetch('/api/prototypes/rename', {
@@ -491,9 +495,8 @@ function App() {
   };
 
   const handleMovePrototype = async (prototypePath: string, targetFolderPath: string) => {
-    if (checkpoint.historyViewActive) {
-      message.info('历史版本预览中不可移动页面，请先退出预览');
-      return;
+    if (ensureEditableWorkspace()) {
+      message.info('已自动退出历史预览，继续移动页面');
     }
 
     try {

@@ -12,6 +12,7 @@ import { logger } from "#utils/logger.js";
 import { findIterationBySessionId, getCheckpointSession } from "../checkpoints/prototype/store.js";
 import { readBlobSource, collectPrototypeSnapshot } from "../checkpoints/prototype/snapshot.js";
 import { flattenPrototypes, scanPrototypes } from "../server/scanner.js";
+import { collectPrototypeSharedDependencies, mergeSnapshotWithSharedDependencies } from "../server/publish-shared.js";
 import { createCloudClient } from "./client.js";
 
 interface PublishToCloudOptions {
@@ -43,6 +44,7 @@ type SnapshotBundle = {
   path: string;
   name: string;
   snapshot: ReturnType<typeof collectPrototypeSnapshot>;
+  virtualFileContents: Map<string, Buffer>;
 };
 
 export async function publishToCloud(options: PublishToCloudOptions): Promise<PublishToCloudResult> {
@@ -59,11 +61,14 @@ export async function publishToCloud(options: PublishToCloudOptions): Promise<Pu
   }
 
   const snapshots = entries.map((entry) => {
-    const snapshot = collectPrototypeSnapshot(prototypesDir, entry);
+    const baseSnapshot = collectPrototypeSnapshot(prototypesDir, entry);
+    const sharedDependencies = collectPrototypeSharedDependencies(prototypesDir, entry, baseSnapshot.files);
+    const snapshot = mergeSnapshotWithSharedDependencies(baseSnapshot, sharedDependencies);
     return {
       path: entry,
       name: entry.split("/").pop() || entry,
       snapshot,
+      virtualFileContents: new Map(sharedDependencies.map((dependency) => [dependency.cloudRelativePath, dependency.content])),
     };
   });
   const iteration = resolvePublishIteration(projectRoot);
@@ -191,7 +196,8 @@ function collectMissingBlobs(
       if (!missingBlobSet.has(file.blobHash) || blobs.has(file.blobHash)) {
         continue;
       }
-      blobs.set(file.blobHash, readBlobSource(prototypesDir, item.path, file.relativePath));
+      const virtualContent = item.virtualFileContents.get(file.relativePath);
+      blobs.set(file.blobHash, virtualContent ?? readBlobSource(prototypesDir, item.path, file.relativePath));
     }
 
     for (const mark of item.snapshot.marks) {

@@ -243,6 +243,12 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
     await Promise.all([loadStatus(), loadIterations()]);
   }, [loadDetail, loadIterations, loadStatus, previewGroup]);
 
+  const notifyCheckpointCreated = useCallback(async (checkpointId?: string | null) => {
+    setHistoryTargetCheckpointId(checkpointId ?? null);
+    setHistoryRefreshVersion((prev) => prev + 1);
+    await Promise.all([loadStatus(), loadIterations()]);
+  }, [loadIterations, loadStatus]);
+
   const saveVersion = useCallback(async () => {
     if (!status?.hasChanges || historyViewActive) {
       return;
@@ -264,25 +270,10 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
       const targetCheckpointId = typeof data.record?.id === 'string' && data.record.id
         ? data.record.id
         : null;
-      const createdRecords = Array.isArray(data.records)
-        ? (data.records as CheckpointDetail['checkpoint'][])
-        : [];
 
       setHistoryTargetCheckpointId(targetCheckpointId);
       setHistoryRefreshVersion((prev) => prev + 1);
       await Promise.all([loadStatus(), loadIterations()]);
-
-      if (data.created) {
-        if (createdRecords.length > 0) {
-          const details = await Promise.all(
-            createdRecords.map((record) => loadDetail(record.id)),
-          );
-          previewGroup(details);
-        } else if (targetCheckpointId) {
-          const detail = await loadDetail(targetCheckpointId);
-          preview(detail);
-        }
-      }
 
       message.success(
         data.created ? `已保存 ${data.versionLabel}` : `没有检测到新变更，当前仍是${data.versionLabel}`,
@@ -293,7 +284,7 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
     } finally {
       setSaveSubmitting(false);
     }
-  }, [historyViewActive, loadDetail, loadIterations, loadStatus, preview, previewGroup, status]);
+  }, [historyViewActive, loadIterations, loadStatus, status]);
 
   const restore = useCallback(
     async (detail: CheckpointDetail, versionLabel: string) => {
@@ -366,6 +357,7 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
     loadStatus,
     loadIterations,
     activateVersionGroup,
+    notifyCheckpointCreated,
     saveVersion,
     preview,
     previewGroup,

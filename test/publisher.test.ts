@@ -133,6 +133,33 @@ dashboard`
     expect(fs.existsSync(path.join(outputDir, "prototypes", "landing"))).toBe(false);
   });
 
+  it("omits .prdkitignore matches from the default publish manifest", async () => {
+    const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "prdkit-publish-"));
+    tempDirs.push(projectRoot);
+
+    const prototypesDir = path.join(projectRoot, "workspace", "prototypes");
+    writeText(path.join(prototypesDir, ".prdkitignore"), ["drafts", "group/hidden-page"].join("\n"));
+    writeText(path.join(prototypesDir, "visible-page", "index.html"), "<html>visible</html>");
+    writeText(path.join(prototypesDir, "drafts", "index.html"), "<html>draft</html>");
+    writeText(path.join(prototypesDir, "group", "hidden-page", "index.html"), "<html>hidden</html>");
+    writeText(path.join(prototypesDir, "group", "shown-page", "index.html"), "<html>shown</html>");
+
+    const outputDir = path.join(projectRoot, "dist", "publish", "ignore-filtered");
+    const result = await publishArtifacts({
+      projectRoot,
+      prototypesDir,
+      outputDir,
+      projectName: "Publish Demo"
+    });
+
+    expect(result.manifest.entryFiles).toEqual(["group/shown-page", "visible-page"]);
+    expect(result.manifest.prototypesTree.children?.map((node) => node.path)).toEqual(["group", "visible-page"]);
+    expect(fs.existsSync(path.join(outputDir, "prototypes", "visible-page", "index.html"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, "prototypes", "group", "shown-page", "index.html"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, "prototypes", "drafts"))).toBe(false);
+    expect(fs.existsSync(path.join(outputDir, "prototypes", "group", "hidden-page"))).toBe(false);
+  });
+
   it("builds the default publish directory name with prototype prefix", () => {
     const dirName = buildDefaultPublishDirName("Publish Demo", new Date("2026-04-29T10:11:12.345Z"));
     expect(dirName).toBe("prototype-Publish-Demo-2026-04-29T10-11-12-345Z");

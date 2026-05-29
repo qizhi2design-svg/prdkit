@@ -19,6 +19,20 @@ import { restoreCheckpoint } from '../../checkpoints/prototype/restore.js';
 import type { ApiHelpers } from './helpers.js';
 import { flattenPrototypes, scanPrototypes } from '../scanner.js';
 
+function getCheckpointVersionGroupKey(record: {
+  id: string;
+  iterationId?: string | null;
+  sessionId?: string | null;
+}): string {
+  if (record.iterationId) {
+    return `iteration:${record.iterationId}`;
+  }
+  if (record.sessionId) {
+    return `session:${record.sessionId}`;
+  }
+  return `checkpoint:${record.id}`;
+}
+
 export function createCheckpointsRouter(helpers: ApiHelpers): Router {
   const router = Router();
   const { projectRoot, prototypesDir, isMissingPrototypeError } = helpers;
@@ -170,10 +184,13 @@ export function createCheckpointsRouter(helpers: ApiHelpers): Router {
       const matchedIteration = result.sessionId
         ? versionGroups.find((item) => item.sessionId === result.sessionId)
         : undefined;
+      const groupedVersionCount = new Set(
+        listCheckpointRecords(projectRoot).map((item) => getCheckpointVersionGroupKey(item)),
+      ).size;
       const versionLabel = matchedIteration
         ? matchedIteration.name
         : newestRecord
-          ? `版本${listCheckpointRecords(projectRoot).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).findIndex((item) => item.id === newestRecord.id) + 1}`
+          ? `版本${groupedVersionCount}`
           : '版本';
 
       return res.json({

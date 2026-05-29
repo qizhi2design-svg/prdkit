@@ -172,4 +172,96 @@ describe("Checkpoint API", () => {
     expect(restoreRes.data.success).toBe(true);
     expect(fs.readFileSync(path.join(prototypesDir, "foo", "bar", "style.css"), "utf8")).toContain("red");
   });
+
+  it("increments versionLabel when creating new checkpoint versions", async () => {
+    const firstCreateRes = await new Promise<{ status: number; data: any }>((resolve, reject) => {
+      const server = app.listen(0, () => {
+        const addr = server.address();
+        if (!addr || typeof addr === "string") {
+          server.close();
+          return reject(new Error("Could not get server address"));
+        }
+
+        const body = JSON.stringify({});
+        const req = http.request(
+          {
+            hostname: "localhost",
+            port: addr.port,
+            path: "/api/checkpoints",
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Content-Length": Buffer.byteLength(body),
+            },
+          },
+          (res) => {
+            let data = "";
+            res.on("data", (chunk) => (data += chunk));
+            res.on("end", () => {
+              resolve({ status: res.statusCode || 0, data: JSON.parse(data) });
+              server.close();
+            });
+          }
+        );
+
+        req.on("error", (error) => {
+          server.close();
+          reject(error);
+        });
+
+        req.write(body);
+        req.end();
+      });
+    });
+
+    expect(firstCreateRes.status).toBe(200);
+    expect(firstCreateRes.data.created).toBe(true);
+    expect(firstCreateRes.data.versionLabel).toBe("版本1");
+
+    fs.writeFileSync(path.join(prototypesDir, "foo", "bar", "style.css"), "body { color: blue; }\n", "utf8");
+
+    const secondCreateRes = await new Promise<{ status: number; data: any }>((resolve, reject) => {
+      const server = app.listen(0, () => {
+        const addr = server.address();
+        if (!addr || typeof addr === "string") {
+          server.close();
+          return reject(new Error("Could not get server address"));
+        }
+
+        const body = JSON.stringify({});
+        const req = http.request(
+          {
+            hostname: "localhost",
+            port: addr.port,
+            path: "/api/checkpoints",
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Content-Length": Buffer.byteLength(body),
+            },
+          },
+          (res) => {
+            let data = "";
+            res.on("data", (chunk) => (data += chunk));
+            res.on("end", () => {
+              resolve({ status: res.statusCode || 0, data: JSON.parse(data) });
+              server.close();
+            });
+          }
+        );
+
+        req.on("error", (error) => {
+          server.close();
+          reject(error);
+        });
+
+        req.write(body);
+        req.end();
+      });
+    });
+
+    expect(secondCreateRes.status).toBe(200);
+    expect(secondCreateRes.data.created).toBe(true);
+    expect(secondCreateRes.data.versionLabel).toBe("版本2");
+  });
 });

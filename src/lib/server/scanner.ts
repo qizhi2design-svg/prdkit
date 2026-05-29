@@ -1,5 +1,11 @@
 import fs from 'fs';
 import path from 'path';
+import {
+  createPrototypeIgnoreContext,
+  enterPrototypeIgnoreDirectory,
+  shouldIgnorePrototypePath,
+  type PrototypeIgnoreContext
+} from "./prototype-ignore.js";
 
 export interface PrototypeNode {
   id: string;              // 唯一标识
@@ -29,7 +35,8 @@ export function scanPrototypes(rootDir: string): PrototypeNode {
     return root;
   }
 
-  root.children = scanDirectory(rootDir, rootDir);
+  const ignoreContext = enterPrototypeIgnoreDirectory(createPrototypeIgnoreContext(rootDir), rootDir);
+  root.children = scanDirectory(rootDir, rootDir, ignoreContext);
   return root;
 }
 
@@ -39,8 +46,15 @@ export function scanPrototypes(rootDir: string): PrototypeNode {
  * @param rootDir prototypes 目录的绝对路径
  * @returns 子节点数组
  */
-function scanDirectory(dirPath: string, rootDir: string): PrototypeNode[] {
+function scanDirectory(
+  dirPath: string,
+  rootDir: string,
+  inheritedIgnoreContext: PrototypeIgnoreContext
+): PrototypeNode[] {
   const nodes: PrototypeNode[] = [];
+  const ignoreContext = dirPath === rootDir
+    ? inheritedIgnoreContext
+    : enterPrototypeIgnoreDirectory(inheritedIgnoreContext, dirPath);
 
   try {
     const entries = fs.readdirSync(dirPath, { withFileTypes: true });
@@ -55,6 +69,10 @@ function scanDirectory(dirPath: string, rootDir: string): PrototypeNode[] {
       const relativePath = path.relative(rootDir, fullPath);
 
       if (entry.isDirectory()) {
+        if (shouldIgnorePrototypePath(ignoreContext, fullPath, true)) {
+          continue;
+        }
+
         // 检查是否是原型目录（包含 index.html）
         const indexPath = path.join(fullPath, 'index.html');
         const isPrototype = fs.existsSync(indexPath);
@@ -69,7 +87,7 @@ function scanDirectory(dirPath: string, rootDir: string): PrototypeNode[] {
           });
         } else {
           // 这是一个普通文件夹，递归扫描；空文件夹也需要显示
-          const children = scanDirectory(fullPath, rootDir);
+          const children = scanDirectory(fullPath, rootDir, ignoreContext);
           nodes.push({
             id: relativePath.replace(/\\/g, '/'),
             name: entry.name,

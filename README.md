@@ -282,6 +282,8 @@ prdkit prototype create "运营后台" --template admin
 prdkit prototype list
 ```
 
+扫描结果会受 `workspace/prototypes` 目录树中的 `.prdkitignore` 规则影响。
+
 #### `prdkit prototype publish`
 
 发布原型到本地目录或云端。
@@ -301,6 +303,8 @@ prdkit prototype publish
 prdkit prototype publish --output ./dist/publish/demo
 prdkit prototype publish --cloud --project demo-workspace -m "v1.2 首页改版"
 ```
+
+默认扫描结果会受 `workspace/prototypes` 目录树中的 `.prdkitignore` 规则影响；该规则仅控制默认展示与扫描结果，不会追溯修改已发布版本或底层存储内容。
 
 #### `prdkit prototype mark`
 
