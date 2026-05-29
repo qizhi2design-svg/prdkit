@@ -229,10 +229,15 @@ export default function PublishDrawer({
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
       });
       const data = await parseApiResponse(response);
 
       if (!response.ok) {
+        if (data.message?.includes('Unsupported method')) {
+          throw new Error('API 服务未启动或端口不匹配，请先执行 prdkit serve');
+        }
         throw new Error(data.message || data.error || '登录失败');
       }
       if (onRefreshConfig) {
