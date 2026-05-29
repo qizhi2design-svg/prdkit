@@ -136,3 +136,69 @@
   padding-left: 20px;
   margin: 8px 0;
 }
+
+/* ===== Diff 视图 ===== */
+.prd-diff-view {
+  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  border: 1px solid #e3e5e8;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.prd-diff-line {
+  display: flex;
+  padding: 0 12px;
+  min-height: 22px;
+}
+
+.prd-diff-marker {
+  width: 20px;
+  flex-shrink: 0;
+  text-align: center;
+  user-select: none;
+  color: #8c8f96;
+}
+
+.prd-diff-text {
+  flex: 1;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.prd-diff-added {
+  background: #f6ffed;
+}
+
+.prd-diff-added .prd-diff-marker {
+  color: #52c41a;
+}
+
+.prd-diff-removed {
+  background: #fff2f0;
+}
+
+.prd-diff-removed .prd-diff-marker {
+  color: #ff4d4f;
+}
+
+.prd-diff-unchanged {
+  background: #fff;
+}
+
+/* 历史版本 banner 中的 diff 统计 */
+.prd-preview-diff-summary {
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.diff-added-count {
+  color: #52c41a;
+}
+
+.diff-removed-count {
+  color: #ff4d4f;
+}

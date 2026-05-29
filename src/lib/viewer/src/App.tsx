@@ -21,6 +21,7 @@ import { usePublish } from './hooks/features/usePublish';
 import { DEFAULT_COPY_TERMINAL_GUIDE, DEFAULT_INSPECT_COPY_SKILL_COMMAND, DEFAULT_MARK_CREATE_SKILL_COMMAND, DEFAULT_MARK_UPDATE_SKILL_COMMAND, DEFAULT_PAGE_CREATE_SKILL_COMMAND } from './constants/clipboard';
 import { copySkillClipboardText } from './utils/clipboard';
 import type { ActiveTool, AppViewMode, PrdFileInfo, PrdCheckpointListItem, PrototypeNode, ViewerConfigResponse } from './types';
+import type { DiffLine } from './components/PrdPreview';
 import type { AppConfig } from './contexts/AppConfigContext';
 import type { CanvasViewportSize } from './types';
 import type { PrdContentResponse, PrdCheckpointContentResponse } from './types/prd';
@@ -150,6 +151,8 @@ function App() {
   const [prdViewingHistory, setPrdViewingHistory] = useState(false);
   const [prdCheckpoints, setPrdCheckpoints] = useState<PrdCheckpointListItem[]>([]);
   const [prdActiveCheckpointId, setPrdActiveCheckpointId] = useState<string | null>(null);
+  const [prdDiffLines, setPrdDiffLines] = useState<DiffLine[] | null>(null);
+  const [prdDiffSummary, setPrdDiffSummary] = useState<{ lineAdded: number; lineDeleted: number; changed: boolean } | null>(null);
 
   // 加载 PRD 文件列表
   const loadPrdFiles = useCallback(async () => {
@@ -174,6 +177,8 @@ function App() {
       setSelectedPrdFile(data.fileName);
       setPrdViewingHistory(false);
       setPrdActiveCheckpointId(null);
+      setPrdDiffLines(null);
+      setPrdDiffSummary(null);
     } catch (err) {
       console.error('加载 PRD 内容失败:', err);
     }
@@ -194,12 +199,21 @@ function App() {
   const loadPrdCheckpointContent = useCallback(async (checkpointId: string) => {
     if (!selectedPrdFile) return;
     try {
-      const res = await fetch(`/api/prds/${encodeURIComponent(selectedPrdFile)}/checkpoints/${checkpointId}`);
-      const data: PrdCheckpointContentResponse = await res.json();
+      const [contentRes, diffRes] = await Promise.all([
+        fetch(`/api/prds/${encodeURIComponent(selectedPrdFile)}/checkpoints/${checkpointId}`),
+        fetch(`/api/prds/${encodeURIComponent(selectedPrdFile)}/checkpoints/${checkpointId}/diff`),
+      ]);
+      const data: PrdCheckpointContentResponse = await contentRes.json();
       setPrdContent(data.content);
       setPrdFrontmatter({ title: data.title, kind: data.kind, message: data.message, createdAt: data.createdAt });
       setPrdActiveCheckpointId(checkpointId);
       setPrdViewingHistory(true);
+
+      if (diffRes.ok) {
+        const diffData = await diffRes.json();
+        setPrdDiffLines(diffData.diffLines);
+        setPrdDiffSummary(diffData.summary);
+      }
     } catch (err) {
       console.error('加载 PRD checkpoint 内容失败:', err);
     }
@@ -763,6 +777,8 @@ function App() {
                       fileName={selectedPrdFile || ''}
                       viewingHistory={prdViewingHistory}
                       onReturnToCurrent={handleReturnToCurrentPrdVersion}
+                      diffLines={prdDiffLines}
+                      diffSummary={prdDiffSummary}
                     />
                   ) : (
                     <div className="prd-preview-empty">

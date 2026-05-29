@@ -5,12 +5,16 @@ import type { Components } from 'react-markdown';
 import MermaidRenderer from './MermaidRenderer';
 import './PrdPreview.css';
 
+export type DiffLine = { type: 'added'; value: string } | { type: 'removed'; value: string } | { type: 'unchanged'; value: string };
+
 interface PrdPreviewProps {
   content: string;
   frontmatter?: Record<string, unknown>;
   fileName: string;
   viewingHistory?: boolean;
   onReturnToCurrent?: () => void;
+  diffLines?: DiffLine[];
+  diffSummary?: { lineAdded: number; lineDeleted: number; changed: boolean } | null;
 }
 
 /** react-markdown 自定义组件，拦截 mermaid 代码块 */
@@ -34,6 +38,8 @@ export default function PrdPreview({
   fileName,
   viewingHistory = false,
   onReturnToCurrent,
+  diffLines,
+  diffSummary,
 }: PrdPreviewProps) {
   const title = (frontmatter?.title as string) || fileName.replace(/\.md$/, '');
   const status = frontmatter?.status as string | undefined;
@@ -46,6 +52,12 @@ export default function PrdPreview({
       {viewingHistory && (
         <div className="prd-preview-history-banner">
           <span>正在查看历史版本</span>
+          {diffSummary && (
+            <span className="prd-preview-diff-summary">
+              {diffSummary.lineDeleted > 0 && <span className="diff-removed-count">-{diffSummary.lineDeleted}</span>}
+              {diffSummary.lineAdded > 0 && <span className="diff-added-count">+{diffSummary.lineAdded}</span>}
+            </span>
+          )}
           {onReturnToCurrent && (
             <button
               type="button"
@@ -69,12 +81,25 @@ export default function PrdPreview({
       </div>
 
       <div className="prd-preview-body">
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          components={markdownComponents}
-        >
-          {content}
-        </ReactMarkdown>
+        {viewingHistory && diffLines ? (
+          <div className="prd-diff-view">
+            {diffLines.map((line, i) => (
+              <div key={i} className={`prd-diff-line prd-diff-${line.type}`}>
+                <span className="prd-diff-marker">
+                  {line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' '}
+                </span>
+                <span className="prd-diff-text">{line.value}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={markdownComponents}
+          >
+            {content}
+          </ReactMarkdown>
+        )}
       </div>
     </div>
   );

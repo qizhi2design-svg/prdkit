@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
 import { createPrdCheckpoint, listPrdCheckpointRecords, readPrdCheckpointData, readPrdBlob } from '../../checkpoints/prd/store.js';
+import { diffPrdCheckpointAgainstCurrent } from '../../checkpoints/prd/diff.js';
 import type { ApiHelpers } from './helpers.js';
 
 export function createPrdsRouter(helpers: ApiHelpers): Router {
@@ -132,6 +133,36 @@ export function createPrdsRouter(helpers: ApiHelpers): Router {
       console.error('创建 PRD checkpoint 失败:', error);
       res.status(500).json({
         error: '创建 PRD 版本失败',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  /** 获取 checkpoint 版本与当前文件的 diff */
+  router.get(/^\/prds\/(.+)\/checkpoints\/([^/]+)\/diff$/, async (req: Request, res: Response) => {
+    try {
+      const checkpointId = getRouteParam(req.params[1]);
+      const fileName = getRouteParam(req.params[0]);
+      const safePath = path.normalize(fileName).replace(/^(\.\.[/\\])+/, '');
+      const prdPath = path.join('workspace', 'prds', safePath);
+
+      const { diffLines, summary } = await diffPrdCheckpointAgainstCurrent(projectRoot, checkpointId, prdPath);
+
+      res.json({
+        checkpointId,
+        diffLines,
+        summary: {
+          changed: summary.changed,
+          lineAdded: summary.lineAdded,
+          lineDeleted: summary.lineDeleted,
+          beforeLineCount: summary.beforeLineCount,
+          afterLineCount: summary.afterLineCount,
+        },
+      });
+    } catch (error) {
+      console.error('获取 PRD diff 失败:', error);
+      res.status(500).json({
+        error: '获取 PRD diff 失败',
         message: error instanceof Error ? error.message : String(error),
       });
     }

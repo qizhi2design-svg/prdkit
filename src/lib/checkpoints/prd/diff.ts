@@ -28,6 +28,39 @@ function calculateLineChanges(fromContent: string, toContent: string): { lineAdd
   };
 }
 
+export type DiffLine = { type: 'added'; value: string } | { type: 'removed'; value: string } | { type: 'unchanged'; value: string };
+
+/** 基于 LCS 表生成行级 diff */
+function computeLineDiff(fromLines: string[], toLines: string[]): DiffLine[] {
+  const rows = fromLines.length;
+  const cols = toLines.length;
+  const dp = Array.from({ length: rows + 1 }, () => Array<number>(cols + 1).fill(0));
+
+  for (let i = rows - 1; i >= 0; i -= 1) {
+    for (let j = cols - 1; j >= 0; j -= 1) {
+      dp[i][j] = fromLines[i] === toLines[j]
+        ? dp[i + 1][j + 1] + 1
+        : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+
+  const result: DiffLine[] = [];
+  let i = 0, j = 0;
+  while (i < rows || j < cols) {
+    if (i < rows && j < cols && fromLines[i] === toLines[j]) {
+      result.push({ type: 'unchanged', value: fromLines[i] });
+      i++; j++;
+    } else if (j < cols && (i >= rows || dp[i][j + 1] >= dp[i + 1][j])) {
+      result.push({ type: 'added', value: toLines[j] });
+      j++;
+    } else {
+      result.push({ type: 'removed', value: fromLines[i] });
+      i++;
+    }
+  }
+  return result;
+}
+
 function buildSummary(
   fromCheckpointId: string,
   toCheckpointId: string,
@@ -129,4 +162,31 @@ export async function diffCurrentPrdAgainstLatest(projectRoot: string, prdPath: 
       hasChanges: true,
     };
   }
+}
+
+/** 获取 checkpoint 版本与当前文件的逐行 diff */
+export async function diffPrdCheckpointAgainstCurrent(
+  projectRoot: string,
+  checkpointId: string,
+  prdPath: string
+): Promise<{ diffLines: DiffLine[]; summary: PrdCheckpointDiffSummary }> {
+  const data = readPrdCheckpointData(projectRoot, checkpointId);
+  const checkpointContent = await readPrdBlob(projectRoot, data.document.blobHash).then((buf) => buf.toString("utf8"));
+  const currentContent = readPrdBlobSource(projectRoot, prdPath).toString("utf8");
+
+  const fromLines = splitLines(checkpointContent);
+  const toLines = splitLines(currentContent);
+  const diffLines = computeLineDiff(fromLines, toLines);
+  const summary = buildSummary(
+    checkpointId,
+    "working-tree",
+    checkpointContent,
+    currentContent,
+    data.document.size,
+    Buffer.byteLength(currentContent),
+    data.document.lineCount,
+    splitLines(currentContent).length,
+  );
+
+  return { diffLines, summary };
 }
