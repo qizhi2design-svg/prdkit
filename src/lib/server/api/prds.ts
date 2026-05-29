@@ -73,7 +73,7 @@ export function createPrdsRouter(helpers: ApiHelpers): Router {
   router.get('/prds/:path(*)', (req: Request, res: Response) => {
     try {
       const dir = ensurePrdsDir();
-      const fileName = req.params.path;
+      const fileName = String(req.params.path);
       // 确保路径安全，防止目录遍历
       const safePath = path.normalize(fileName).replace(/^(\.\.[/\\])+/, '');
       const filePath = path.join(dir, safePath);
@@ -113,7 +113,7 @@ export function createPrdsRouter(helpers: ApiHelpers): Router {
   /** 获取 PRD 版本历史列表 */
   router.get('/prds/:path(*)/checkpoints', (req: Request, res: Response) => {
     try {
-      const fileName = req.params.path;
+      const fileName = String(req.params.path);
       const safePath = path.normalize(fileName).replace(/^(\.\.[/\\])+/, '');
       const prdPath = path.join('workspace', 'prds', safePath);
 
@@ -142,7 +142,7 @@ export function createPrdsRouter(helpers: ApiHelpers): Router {
   /** 获取特定 checkpoint 版本的 PRD 内容 */
   router.get('/prds/:path(*)/checkpoints/:checkpointId', async (req: Request, res: Response) => {
     try {
-      const { checkpointId } = req.params;
+      const checkpointId = String(req.params.checkpointId);
 
       const data = readPrdCheckpointData(projectRoot, checkpointId);
       const blob = await readPrdBlob(projectRoot, data.document.blobHash);
