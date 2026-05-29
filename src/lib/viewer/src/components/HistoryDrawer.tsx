@@ -16,21 +16,29 @@ import {
   TagsOutlined,
 } from '@ant-design/icons';
 import type { CheckpointDetail, CheckpointRecord, IterationSummary } from '../types';
+import type { PrdCheckpointListItem } from '../types/common';
 import './HistoryDrawer.css';
 
 interface HistoryDrawerProps {
   open: boolean;
-  prototypePath: string | null;
+  prototypePath?: string | null;
   refreshVersion?: number;
   focusCheckpointId?: string | null;
-  iterations: IterationSummary[];
+  iterations?: IterationSummary[];
   activeIterationId?: string | null;
-  onIterationChange: (iterationId: string | null) => void;
-  onIterationsRefresh: () => Promise<void>;
+  onIterationChange?: (iterationId: string | null) => void;
+  onIterationsRefresh?: () => Promise<void>;
   onClose: () => void;
-  onPreview: (detail: CheckpointDetail) => void;
-  onPreviewGroup: (details: CheckpointDetail[]) => void;
-  onRestore: (detail: CheckpointDetail, versionLabel: string) => Promise<void>;
+  onPreview?: (detail: CheckpointDetail) => void;
+  onPreviewGroup?: (details: CheckpointDetail[]) => void;
+  onRestore?: (detail: CheckpointDetail, versionLabel: string) => Promise<void>;
+  // PRD 模式 props
+  viewMode?: 'prototype' | 'prd';
+  prdCheckpoints?: PrdCheckpointListItem[];
+  prdActiveCheckpointId?: string | null;
+  onPreviewCheckpoint?: (checkpointId: string) => void;
+  onReturnToCurrent?: () => void;
+  viewingHistory?: boolean;
 }
 
 interface VersionEntry {
@@ -166,12 +174,12 @@ export default function HistoryDrawer({
   };
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || viewMode === 'prd') return;
     void loadHistory();
-  }, [activeIterationId, open, refreshVersion, pickRecordForEntry]);
+  }, [activeIterationId, open, refreshVersion, pickRecordForEntry, viewMode]);
 
   useEffect(() => {
-    if (!open || !focusCheckpointId) return;
+    if (!open || !focusCheckpointId || viewMode === 'prd') return;
     const focusKey = `${refreshVersion}:${focusCheckpointId}`;
     if (lastAppliedFocusKeyRef.current === focusKey) return;
     if (!checkpoints.some((item) => item.id === focusCheckpointId)) return;
@@ -272,21 +280,53 @@ export default function HistoryDrawer({
         placement="right"
         width={380}
         className="history-drawer compact"
-        extra={(
+        extra={viewMode !== 'prd' ? (
           <div className="history-drawer-extra">
             <Button
               type="text"
               icon={<ReloadOutlined />}
               onClick={() => {
-                void onIterationsRefresh();
+                void onIterationsRefresh?.();
                 void loadHistory();
               }}
               disabled={loading || !prototypePath}
             />
           </div>
-        )}
+        ) : undefined}
       >
-        {!prototypePath ? (
+        {viewMode === 'prd' ? (
+          <div className="history-list">
+            {prdCheckpoints && prdCheckpoints.length > 0 ? (
+              prdCheckpoints.map((cp) => (
+                <div
+                  key={cp.id}
+                  className={`version-timeline-item${prdActiveCheckpointId === cp.id ? ' active' : ''}`}
+                  onClick={() => onPreviewCheckpoint?.(cp.id)}
+                  style={{ cursor: 'pointer', padding: '12px 16px', borderBottom: '1px solid #edeef0' }}
+                >
+                  <div className="version-timeline-item-header">
+                    <span className="version-timeline-item-date">
+                      {new Date(cp.createdAt).toLocaleString('zh-CN')}
+                    </span>
+                    <Tag
+                      color={cp.kind === 'manual' ? 'blue' : cp.kind === 'auto' ? 'default' : 'orange'}
+                      className="history-iteration-tag"
+                    >
+                      {cp.kind === 'manual' ? '手动' : cp.kind === 'auto' ? '自动' : '预恢复'}
+                    </Tag>
+                  </div>
+                  {cp.message && (
+                    <div className="version-timeline-item-message">{cp.message}</div>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="history-empty" style={{ padding: '24px', textAlign: 'center', color: '#8c8f96' }}>
+                暂无版本记录
+              </div>
+            )}
+          </div>
+        ) : !prototypePath ? (
           <Empty description="请先选择一个原型页面" image={Empty.PRESENTED_IMAGE_SIMPLE} />
         ) : (
           <div className="history-drawer-compact-shell">

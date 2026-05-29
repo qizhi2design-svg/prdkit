@@ -5,6 +5,7 @@ import Preview from './components/Preview';
 import Header from './components/Header';
 import PublishDrawer from './components/PublishDrawer';
 import HistoryDrawer from './components/HistoryDrawer';
+import PrdPreview from './components/PrdPreview';
 import PreferencesDrawer from './components/PreferencesDrawer';
 import { AppConfigProvider } from './contexts/AppConfigContext';
 import { useViewerStore } from './stores/useViewerStore';
@@ -19,9 +20,10 @@ import { useWebSocket } from './hooks/network/useWebSocket';
 import { usePublish } from './hooks/features/usePublish';
 import { DEFAULT_COPY_TERMINAL_GUIDE, DEFAULT_INSPECT_COPY_SKILL_COMMAND, DEFAULT_MARK_CREATE_SKILL_COMMAND, DEFAULT_MARK_UPDATE_SKILL_COMMAND, DEFAULT_PAGE_CREATE_SKILL_COMMAND } from './constants/clipboard';
 import { copySkillClipboardText } from './utils/clipboard';
-import type { ActiveTool, PrototypeNode, ViewerConfigResponse } from './types';
+import type { ActiveTool, AppViewMode, PrdFileInfo, PrdCheckpointListItem, PrototypeNode, ViewerConfigResponse } from './types';
 import type { AppConfig } from './contexts/AppConfigContext';
 import type { CanvasViewportSize } from './types';
+import type { PrdContentResponse, PrdCheckpointContentResponse } from './types/prd';
 import { antdTheme } from './theme/antd-theme';
 import './App.css';
 
@@ -67,8 +69,9 @@ function App() {
 
   const markPanel = useMarkPanel(350);
 
-  // ========== 视图模式（使用偏好设置的默认值）==========
+  // ========== 视图模式 ==========
   const [activeTool, setActiveTool] = useState<ActiveTool>(preferences.defaultTool);
+  const [appViewMode, setAppViewMode] = useState<AppViewMode>('prototype');
   const [previewStageSize, setPreviewStageSize] = useState<CanvasViewportSize>({ width: 0, height: 0 });
   const [previewCanvasSize, setPreviewCanvasSize] = useState<CanvasViewportSize>(DESKTOP_VIEWPORT_SIZE);
   const viewport = useCanvasViewport({
@@ -137,6 +140,77 @@ function App() {
     },
     reconnect: true,
   });
+
+  // ========== PRD 预览 ==========
+  const [prdFiles, setPrdFiles] = useState<PrdFileInfo[]>([]);
+  const [selectedPrdFile, setSelectedPrdFile] = useState<string | null>(null);
+  const [prdContent, setPrdContent] = useState<string | null>(null);
+  const [prdFrontmatter, setPrdFrontmatter] = useState<Record<string, unknown>>({});
+  const [prdHistoryOpen, setPrdHistoryOpen] = useState(false);
+  const [prdViewingHistory, setPrdViewingHistory] = useState(false);
+  const [prdCheckpoints, setPrdCheckpoints] = useState<PrdCheckpointListItem[]>([]);
+  const [prdActiveCheckpointId, setPrdActiveCheckpointId] = useState<string | null>(null);
+
+  // 加载 PRD 文件列表
+  const loadPrdFiles = useCallback(async () => {
+    try {
+      const res = await fetch('/api/prds');
+      const data: PrdFileInfo[] = await res.json();
+      setPrdFiles(data);
+      return data;
+    } catch (err) {
+      console.error('加载 PRD 列表失败:', err);
+      return [];
+    }
+  }, []);
+
+  // 加载 PRD 内容
+  const loadPrdContent = useCallback(async (fileName: string) => {
+    try {
+      const res = await fetch(`/api/prds/${encodeURIComponent(fileName)}`);
+      const data: PrdContentResponse = await res.json();
+      setPrdContent(data.content);
+      setPrdFrontmatter(data.frontmatter);
+      setSelectedPrdFile(data.fileName);
+      setPrdViewingHistory(false);
+      setPrdActiveCheckpointId(null);
+    } catch (err) {
+      console.error('加载 PRD 内容失败:', err);
+    }
+  }, []);
+
+  // 加载 PRD checkpoint 列表
+  const loadPrdCheckpoints = useCallback(async (fileName: string) => {
+    try {
+      const res = await fetch(`/api/prds/${encodeURIComponent(fileName)}/checkpoints`);
+      const data: PrdCheckpointListItem[] = await res.json();
+      setPrdCheckpoints(data);
+    } catch (err) {
+      console.error('加载 PRD 版本历史失败:', err);
+    }
+  }, []);
+
+  // 加载 PRD checkpoint 版本内容
+  const loadPrdCheckpointContent = useCallback(async (checkpointId: string) => {
+    if (!selectedPrdFile) return;
+    try {
+      const res = await fetch(`/api/prds/${encodeURIComponent(selectedPrdFile)}/checkpoints/${checkpointId}`);
+      const data: PrdCheckpointContentResponse = await res.json();
+      setPrdContent(data.content);
+      setPrdFrontmatter({ title: data.title, kind: data.kind, message: data.message, createdAt: data.createdAt });
+      setPrdActiveCheckpointId(checkpointId);
+      setPrdViewingHistory(true);
+    } catch (err) {
+      console.error('加载 PRD checkpoint 内容失败:', err);
+    }
+  }, [selectedPrdFile]);
+
+  // 返回 PRD 当前版本
+  const handleReturnToCurrentPrdVersion = useCallback(() => {
+    if (selectedPrdFile) {
+      loadPrdContent(selectedPrdFile);
+    }
+  }, [selectedPrdFile, loadPrdContent]);
 
   // ========== 发布功能 ==========
   const publish = usePublish();
@@ -286,6 +360,28 @@ function App() {
   const handleToolChange = (tool: ActiveTool) => {
     setActiveTool((currentTool) => (currentTool === tool ? 'none' : tool));
   };
+
+  const handleViewModeChange = (mode: AppViewMode) => {
+    setAppViewMode(mode);
+    if (mode === 'prd') {
+      loadPrdFiles().then((files) => {
+        if (files.length > 0 && !selectedPrdFile) {
+          loadPrdContent(files[0].fileName);
+        }
+      });
+    }
+  };
+
+  // 初始化时加载 PRD 文件列表
+  useEffect(() => {
+    loadPrdFiles();
+  }, [loadPrdFiles]);
+
+  // PRD mode: 选中文件时自动加载内容和版本历史
+  useEffect(() => {
+    if (appViewMode !== 'prd' || !selectedPrdFile) return;
+    loadPrdCheckpoints(selectedPrdFile);
+  }, [appViewMode, selectedPrdFile, loadPrdCheckpoints]);
 
   // 创建/选择标记时自动展开面板（忽略用户手动折叠后的状态变化）
   const prevSelectedRef = useRef<string | null>(null);
@@ -588,10 +684,12 @@ function App() {
             collapsed={siderCollapsed}
             onToggle={() => setSiderCollapsed(!siderCollapsed)}
             projectName={config?.projectName || 'PRDKit'}
+            viewMode={appViewMode}
+            onViewModeChange={handleViewModeChange}
             onOpenPublish={publish.open}
-            onOpenHistory={checkpoint.openHistory}
+            onOpenHistory={appViewMode === 'prd' ? () => setPrdHistoryOpen(true) : checkpoint.openHistory}
             onSaveVersion={checkpoint.saveVersion}
-            historyDisabled={visibleFileList.length === 0}
+            historyDisabled={appViewMode === 'prd' ? prdFiles.length === 0 : visibleFileList.length === 0}
             saveDisabled={!checkpoint.status?.hasChanges || checkpoint.historyViewActive}
             saveHasChanges={Boolean(checkpoint.status?.hasChanges)}
             saveSubmitting={checkpoint.saveSubmitting}
@@ -608,11 +706,21 @@ function App() {
               trigger={null}
             >
               <FileTree
-                onSelect={fileNav.selectFile}
-                currentIndex={visibleCurrentIndex}
-                totalFiles={visibleFileList.length}
-                selectedFile={fileNav.selectedFile}
+                viewMode={appViewMode}
+                onSelect={appViewMode === 'prd' ? (path) => path && loadPrdContent(path) : fileNav.selectFile}
+                currentIndex={appViewMode === 'prd' ? prdFiles.findIndex((f) => f.fileName === selectedPrdFile) + 1 : visibleCurrentIndex}
+                totalFiles={appViewMode === 'prd' ? prdFiles.length : visibleFileList.length}
+                selectedFile={appViewMode === 'prd' ? selectedPrdFile : fileNav.selectedFile}
+                prdFiles={appViewMode === 'prd' ? prdFiles : undefined}
                 onNavigate={(direction) => {
+                  if (appViewMode === 'prd') {
+                    const currentIdx = selectedPrdFile ? prdFiles.findIndex((f) => f.fileName === selectedPrdFile) : -1;
+                    const nextIndex = direction === 'prev'
+                      ? (currentIdx <= 0 ? prdFiles.length - 1 : currentIdx - 1)
+                      : (currentIdx >= prdFiles.length - 1 ? 0 : currentIdx + 1);
+                    if (prdFiles[nextIndex]) loadPrdContent(prdFiles[nextIndex].fileName);
+                    return;
+                  }
                   const currentFiles = visibleFileList;
                   if (currentFiles.length === 0) return;
 
@@ -646,6 +754,23 @@ function App() {
                 pointerEvents: sider.isResizing || markPanelResize.isResizing ? 'none' : 'auto',
               }}
             >
+              {appViewMode === 'prd' ? (
+                <div className="prd-preview-container">
+                  {prdContent ? (
+                    <PrdPreview
+                      content={prdContent}
+                      frontmatter={prdFrontmatter}
+                      fileName={selectedPrdFile || ''}
+                      viewingHistory={prdViewingHistory}
+                      onReturnToCurrent={handleReturnToCurrentPrdVersion}
+                    />
+                  ) : (
+                    <div className="prd-preview-empty">
+                      {prdFiles.length > 0 ? '选择一个 PRD 文档开始预览' : '暂无 PRD 文档'}
+                    </div>
+                  )}
+                </div>
+              ) : (
               <Preview
                 key={previewIdentity}
                 filePath={renderedPreviewFilePath}
@@ -711,8 +836,21 @@ function App() {
                 previewReadonly={Boolean(checkpoint.activePreview)}
                 fileList={visibleFileList}
               />
+              )}
             </Content>
           </Layout>
+          {appViewMode === 'prd' ? (
+            <HistoryDrawer
+              open={prdHistoryOpen}
+              viewMode="prd"
+              prdCheckpoints={prdCheckpoints}
+              prdActiveCheckpointId={prdActiveCheckpointId}
+              onClose={() => setPrdHistoryOpen(false)}
+              onPreviewCheckpoint={(id) => loadPrdCheckpointContent(id)}
+              onReturnToCurrent={handleReturnToCurrentPrdVersion}
+              viewingHistory={prdViewingHistory}
+            />
+          ) : null}
           <PublishDrawer
             open={publish.drawerOpen}
             loading={publish.loading}

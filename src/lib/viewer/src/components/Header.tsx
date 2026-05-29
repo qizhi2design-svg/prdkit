@@ -6,6 +6,8 @@ interface HeaderProps {
   collapsed: boolean;
   onToggle: () => void;
   projectName: string;
+  viewMode?: 'prototype' | 'prd';
+  onViewModeChange?: (mode: 'prototype' | 'prd') => void;
   onOpenPublish: () => void;
   onOpenHistory: () => void;
   onSaveVersion: () => void;
@@ -20,6 +22,8 @@ export default function Header({
   collapsed,
   onToggle,
   projectName,
+  viewMode = 'prototype',
+  onViewModeChange,
   onOpenPublish,
   onOpenHistory,
   onSaveVersion,
@@ -55,6 +59,20 @@ export default function Header({
       <div className="header-content">
         <div className="header-project-meta">
           <span className="header-project-title">{projectName}</span>
+          <div className="header-view-mode-tabs">
+            <button
+              className={`header-view-mode-tab${viewMode === 'prototype' ? ' active' : ''}`}
+              onClick={() => onViewModeChange?.('prototype')}
+            >
+              原型
+            </button>
+            <button
+              className={`header-view-mode-tab${viewMode === 'prd' ? ' active' : ''}`}
+              onClick={() => onViewModeChange?.('prd')}
+            >
+              PRD
+            </button>
+          </div>
         </div>
       </div>
 

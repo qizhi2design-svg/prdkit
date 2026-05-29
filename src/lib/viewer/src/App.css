@@ -42,3 +42,18 @@
 .app-content {
   position: relative;
 }
+
+/* PRD 预览容器 */
+.prd-preview-container {
+  height: 100%;
+  overflow: hidden;
+}
+
+.prd-preview-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 14px;
+  color: #8c8f96;
+}

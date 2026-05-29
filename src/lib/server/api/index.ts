@@ -7,6 +7,7 @@ import { createPublishRouter } from './publish.js';
 import { createAuthRouter } from './auth.js';
 import { createConfigRouter } from './config.js';
 import { createSystemRouter } from './system.js';
+import { createPrdsRouter } from './prds.js';
 
 export function createApiRouter(prototypesDir: string): Router {
   const router = Router();
@@ -20,6 +21,7 @@ export function createApiRouter(prototypesDir: string): Router {
   router.use(createAuthRouter(helpers));
   router.use(createConfigRouter(helpers));
   router.use(createSystemRouter(helpers));
+  router.use(createPrdsRouter(helpers));
 
   return router;
 }

@@ -1,6 +1,7 @@
 import { CaretDownOutlined, CopyOutlined, DeleteOutlined, EditOutlined, FileAddOutlined, FileOutlined, FolderAddOutlined, FolderFilled, LeftOutlined, RightOutlined, SearchOutlined } from '@ant-design/icons';
 import { Input, Tooltip, Button, Popconfirm, Modal, message } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
+import type { PrdFileInfo } from '../types/common';
 import './FileTree.css';
 
 interface FileTreeProps {
@@ -8,6 +9,8 @@ interface FileTreeProps {
   selectedFile: string | null;
   currentIndex: number;
   totalFiles: number;
+  viewMode?: 'prototype' | 'prd';
+  prdFiles?: PrdFileInfo[];
   onNavigate: (direction: 'prev' | 'next') => void;
   onDeletePrototype: (path: string) => Promise<void> | void;
   onDeleteFolder: (path: string) => Promise<void> | void;
@@ -33,6 +36,8 @@ export default function FileTree({
   selectedFile,
   currentIndex,
   totalFiles,
+  viewMode = 'prototype',
+  prdFiles,
   onNavigate,
   onDeletePrototype,
   onDeleteFolder,
@@ -216,56 +221,70 @@ export default function FileTree({
           size="small"
           className="file-tree-search-input"
         />
-        <ButtonIcon icon={<LeftOutlined />} onClick={() => onNavigate('prev')} aria-label="上一个页面" />
-        <ButtonIcon icon={<RightOutlined />} onClick={() => onNavigate('next')} aria-label="下一个页面" />
+        {viewMode !== 'prd' && (
+          <>
+            <ButtonIcon icon={<LeftOutlined />} onClick={() => onNavigate('prev')} aria-label="上一个页面" />
+            <ButtonIcon icon={<RightOutlined />} onClick={() => onNavigate('next')} aria-label="下一个页面" />
+          </>
+        )}
       </div>
 
       <div className="file-tree-project-name">
-        <div
-          className={`file-tree-project-header ${rootDropActive ? 'root-drop-active' : ''}`}
-          onDragOver={(event) => {
-            if (!draggingPrototypePath) return;
-            event.preventDefault();
-            setRootDropActive(true);
-          }}
-          onDragLeave={() => setRootDropActive(false)}
-          onDrop={() => {
-            if (!draggingPrototypePath) return;
-            void onMovePrototype(draggingPrototypePath, '');
-            setDraggingPrototypePath(null);
-            setRootDropActive(false);
-          }}
-        >
+        <div className="file-tree-project-header">
           <div className="file-tree-project-heading">
-            <h2 className="file-tree-project-title">页面</h2>
+            <h2 className="file-tree-project-title">{viewMode === 'prd' ? 'PRD 文档' : '页面'}</h2>
             <span className="file-tree-file-count">{currentIndex} / {totalFiles}</span>
           </div>
-          <div className="file-tree-project-actions">
-            <Tooltip title="新建文件夹" getPopupContainer={() => document.body}>
-              <Button
-                type="text"
-                size="small"
-                icon={<FolderAddOutlined />}
-                className="file-tree-project-action"
-                onClick={() => setCreateFolderModalOpen(true)}
-              />
-            </Tooltip>
-            <Tooltip title="新建页面（复制给 AI）" getPopupContainer={() => document.body}>
-              <Button
-                type="text"
-                size="small"
-                icon={<FileAddOutlined />}
-                className="file-tree-project-action file-tree-project-action-ai"
-                onClick={() => setCreatePageModalOpen(true)}
-              />
-            </Tooltip>
-          </div>
+          {viewMode !== 'prd' && (
+            <div className="file-tree-project-actions">
+              <Tooltip title="新建文件夹" getPopupContainer={() => document.body}>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<FolderAddOutlined />}
+                  className="file-tree-project-action"
+                  onClick={() => setCreateFolderModalOpen(true)}
+                />
+              </Tooltip>
+              <Tooltip title="新建页面（复制给 AI）" getPopupContainer={() => document.body}>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<FileAddOutlined />}
+                  className="file-tree-project-action file-tree-project-action-ai"
+                  onClick={() => setCreatePageModalOpen(true)}
+                />
+              </Tooltip>
+            </div>
+          )}
         </div>
       </div>
 
       <div className="file-tree-content custom-scrollbar">
         <div className="file-tree-list" role="tree">
-          {visibleNodes.length === 0 ? (
+          {viewMode === 'prd' ? (
+            prdFiles && prdFiles.length === 0 ? (
+              <div className="file-tree-empty">暂无 PRD 文档</div>
+            ) : (
+              (prdFiles || []).map((prd) => (
+                <button
+                  key={prd.fileName}
+                  type="button"
+                  className={`file-tree-item file ${selectedFile === prd.fileName ? 'selected' : ''}`}
+                  style={{ paddingLeft: '12px' }}
+                  onClick={() => onSelect(prd.fileName)}
+                >
+                  <span className="file-tree-item-icon">
+                    <svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor">
+                      <path d="M854.6 288.6L639.4 73.4c-6-6-14.1-9.4-22.6-9.4H192c-17.7 0-32 14.3-32 32v832c0 17.7 14.3 32 32 32h640c17.7 0 32-14.3 32-32V311.3c0-8.5-3.4-16.7-9.4-22.7zM790.2 326H602V137.8L790.2 326zm1.8 562H232V136h302v216a42 42 0 0042 42h216v494z" />
+                    </svg>
+                  </span>
+                  <span className="file-tree-item-label">{prd.title || prd.fileName.replace(/\.md$/, '')}</span>
+                  {prd.status && <span className="file-tree-item-tag">{prd.status}</span>}
+                </button>
+              ))
+            )
+          ) : visibleNodes.length === 0 ? (
             <div className="file-tree-empty">未找到匹配页面</div>
           ) : (
             visibleNodes.map((node) => (
