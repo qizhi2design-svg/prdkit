@@ -255,14 +255,6 @@ function App() {
     setActiveTool(preferences.defaultTool);
   }, [preferences.defaultTool]);
 
-  useEffect(() => {
-    if (activeTool !== 'mark') {
-      marks.selectMark(null);
-      marks.cancelMark();
-      marks.cancelRelink();
-    }
-  }, [activeTool]);
-
   const handleRestoreCheckpoint = useCallback(async (detail: Parameters<typeof checkpoint.restore>[0], versionLabel: string) => {
     await checkpoint.restore(detail, versionLabel);
     fileNav.selectFile(detail.checkpoint.prototypePath);

@@ -4,7 +4,7 @@ import type { UseMarksOptions, UseMarksReturn } from '../../types/hooks';
 import type { Mark, MarkUpdatePatch, PendingMarkInfo } from '../../types';
 
 export function useMarks(options: UseMarksOptions): UseMarksReturn {
-  const { prototypePath, activeTool, activeCheckpointPreview } = options;
+  const { prototypePath, activeCheckpointPreview } = options;
 
   const [marks, setMarks] = useState<Mark[]>([]);
   const [selectedMarkId, setSelectedMarkId] = useState<string | null>(null);
@@ -43,10 +43,12 @@ export function useMarks(options: UseMarksOptions): UseMarksReturn {
   }, [loadMarks]);
 
   useEffect(() => {
-    if (activeTool === 'mark') return;
+    setSelectedMarkId(null);
     setPendingMarkInfo(null);
     setRelinkingMarkId(null);
-  }, [activeTool]);
+    setMissingMarkIds([]);
+    setHiddenMarkIds([]);
+  }, [prototypePath]);
 
   // 计算有效标记（考虑 checkpoint 预览）
   const effectiveMarks = useMemo(() => {

@@ -868,13 +868,14 @@ export default function Preview({
   }, [marks, onMarkResolutionChange, onMarkVisibilityChange, reloadVersion, filePath, overlayRefreshTick]);
 
   useEffect(() => {
-    if (!inspectToolActive || selectionMode !== 'multiple') {
+    if (selectionMode !== 'multiple') {
       setSelectedElements([]);
     }
-  }, [inspectToolActive, selectionMode]);
+  }, [selectionMode]);
 
   useEffect(() => {
     setSelectedElements([]);
+    setSelectionMode('single');
     setHoveredElement(null);
   }, [filePath]);
 
@@ -1045,13 +1046,6 @@ export default function Preview({
       }
     };
   }, [markToolActive]);
-
-  useEffect(() => {
-    if (!inspectToolActive) {
-      setSelectedElements([]);
-      setSelectionMode('single');
-    }
-  }, [inspectToolActive]);
 
   useEffect(() => {
     if (!markToolActive) {
