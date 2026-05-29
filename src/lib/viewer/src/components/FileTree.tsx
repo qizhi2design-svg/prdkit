@@ -61,7 +61,7 @@ export default function FileTree({
   const [renameSubmitting, setRenameSubmitting] = useState(false);
   const [renameTarget, setRenameTarget] = useState<{ path: string; name: string; type: 'file' | 'folder' } | null>(null);
   const [draggingPrototypePath, setDraggingPrototypePath] = useState<string | null>(null);
-  const [rootDropActive, setRootDropActive] = useState(false);
+  const [, setRootDropActive] = useState(false);
   const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
   const [createPageModalOpen, setCreatePageModalOpen] = useState(false);
   const [createPageSubmitting, setCreatePageSubmitting] = useState(false);
