@@ -1,37 +1,37 @@
 .header-container {
   height: 56px;
-  background: #fff;
-  border-bottom: 1px solid rgba(22, 119, 255, 0.08);
+  background: var(--color-bg-container);
+  border-bottom: 1px solid var(--color-primary-alpha-8);
   display: flex;
   align-items: center;
-  padding: 0 16px;
-  gap: 16px;
+  padding: 0 var(--spacing-4);
+  gap: var(--spacing-4);
   position: relative;
 }
 
 .header-left-rail {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--spacing-2);
   flex-shrink: 0;
 }
 
 .header-menu-button {
-  font-size: 14px;
+  font-size: var(--font-size-md);
   color: var(--color-text-secondary);
   width: 36px;
   height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
-  background: #fff;
-  transition: all 0.2s;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-container);
+  transition: all var(--transition-base);
 }
 
 .header-menu-button:hover {
   color: var(--color-primary);
-  background-color: #f7fbff;
+  background-color: var(--color-primary-lighter);
 }
 
 .header-content {
@@ -50,38 +50,38 @@
 
 .header-project-title {
   color: var(--color-text-primary);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
   white-space: nowrap;
 }
 
-/* 视图模式 Tab（胶囊风格，与 backend 统一） */
+/* 视图模式 Tab（扁平小圆角风格） */
 .header-view-mode-tabs {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin-left: 8px;
+  gap: 2px;
+  margin-left: var(--spacing-2);
   padding: 3px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.12);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-tertiary);
 }
 
 .header-view-mode-tab {
   border: 0;
   background: transparent;
-  color: #64748b;
+  color: var(--color-text-tertiary);
   padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 600;
+  border-radius: var(--radius-xs);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--transition-fast);
 }
 
 .header-view-mode-tab.active {
-  background: #fff;
-  color: #1677ff;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
+  background: var(--color-bg-container);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
 }
 
 .header-project-divider {
@@ -97,8 +97,8 @@
 }
 
 .header-file-name {
-  font-weight: 500;
-  font-size: 14px;
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-md);
   max-width: 320px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -107,7 +107,7 @@
 
 .header-file-count {
   color: var(--color-text-tertiary);
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   flex-shrink: 0;
 }
 
@@ -126,27 +126,33 @@
 }
 
 .header-history-button {
-  border-radius: 10px;
-  border-color: rgba(22, 119, 255, 0.14);
-  background: #fff;
-  color: var(--color-text-primary);
+  border-radius: var(--radius-sm);
+  border-color: var(--color-border-light);
+  background: var(--color-bg-container);
+  color: var(--color-text-secondary);
   box-shadow: none;
 }
 
+.header-history-button:not(:disabled):hover {
+  border-color: var(--color-border-primary);
+  color: var(--color-text-primary);
+  background: var(--color-bg-spotlight);
+}
+
 .header-save-badge .ant-badge-count {
-  box-shadow: 0 0 0 2px #fff;
+  box-shadow: 0 0 0 2px var(--color-bg-container);
 }
 
 .header-save-button {
-  border-radius: 10px;
-  border-color: rgba(22, 119, 255, 0.14);
-  background: var(--color-bg-primary);
-  color: var(--color-text-primary);
+  border-radius: var(--radius-sm);
+  border-color: var(--color-border-light);
+  background: var(--color-bg-container);
+  color: var(--color-text-secondary);
 }
 
 .header-save-button:not(:disabled):hover,
 .header-save-button:not(:disabled):focus {
-  border-color: #91caff;
-  color: var(--color-primary);
-  background: #f7fbff;
+  border-color: var(--color-border-primary);
+  color: var(--color-text-primary);
+  background: var(--color-bg-spotlight);
 }

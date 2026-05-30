@@ -621,9 +621,7 @@ function AppContent() {
 
   // ========== 文件操作处理函数 ==========
   const handlePrototypeDelete = async (prototypePath: string) => {
-    if (ensureEditableWorkspace()) {
-      message.info('已自动退出历史预览，继续删除当前页面');
-    }
+    ensureEditableWorkspace();
 
     try {
       const response = await fetch(`/api/prototypes/${encodeURIComponent(prototypePath)}`, {
@@ -653,9 +651,7 @@ function AppContent() {
   };
 
   const handlePrototypeDuplicate = async (prototypePath: string) => {
-    if (ensureEditableWorkspace()) {
-      message.info('已自动退出历史预览，继续复制当前页面');
-    }
+    ensureEditableWorkspace();
 
     try {
       const response = await fetch('/api/prototypes/duplicate', {
@@ -675,7 +671,6 @@ function AppContent() {
       }
 
       fileNav.refreshPrototypes();
-      message.success(`页面已复制为 ${data?.duplicateName || '副本'}`);
     } catch (error) {
       console.error('复制页面失败:', error);
       message.error(error instanceof Error ? error.message : '复制页面失败');
@@ -683,9 +678,7 @@ function AppContent() {
   };
 
   const handleFolderDelete = async (folderPath: string) => {
-    if (ensureEditableWorkspace()) {
-      message.info('已自动退出历史预览，继续删除当前文件夹');
-    }
+    ensureEditableWorkspace();
 
     try {
       const response = await fetch(`/api/prototypes/folders?folderPath=${encodeURIComponent(folderPath)}`, {
@@ -710,9 +703,7 @@ function AppContent() {
   };
 
   const handleCreateFolder = async (folderName: string) => {
-    if (ensureEditableWorkspace()) {
-      message.info('已自动退出历史预览，继续创建文件夹');
-    }
+    ensureEditableWorkspace();
 
     const response = await fetch('/api/prototypes/folders', {
       method: 'POST',
@@ -726,13 +717,10 @@ function AppContent() {
     }
 
     fileNav.refreshPrototypes();
-    message.success(`已创建文件夹 ${data?.folderName || folderName}`);
   };
 
   const handleRenameNode = async (sourcePath: string, targetName: string) => {
-    if (ensureEditableWorkspace()) {
-      message.info('已自动退出历史预览，继续重命名');
-    }
+    ensureEditableWorkspace();
 
     const response = await fetch('/api/prototypes/rename', {
       method: 'POST',
@@ -755,13 +743,10 @@ function AppContent() {
     }
 
     fileNav.refreshPrototypes();
-    message.success(`已重命名为 ${data?.renamedName || targetName}`);
   };
 
   const handleMovePrototype = async (prototypePath: string, targetFolderPath: string) => {
-    if (ensureEditableWorkspace()) {
-      message.info('已自动退出历史预览，继续移动页面');
-    }
+    ensureEditableWorkspace();
 
     try {
       const response = await fetch('/api/prototypes/move', {
@@ -781,7 +766,6 @@ function AppContent() {
       }
 
       fileNav.refreshPrototypes();
-      message.success(`页面已移动到 ${targetFolderPath || '根目录'}`);
     } catch (error) {
       console.error('移动页面失败:', error);
       message.error(error instanceof Error ? error.message : '移动页面失败');
@@ -846,7 +830,6 @@ function AppContent() {
     }
 
     await loadPrdFiles();
-    message.success(`已创建文件夹 ${data?.folderPath || folderName}`);
   }, [loadPrdFiles]);
 
   const handlePrdDeleteFolder = useCallback(async (folderPath: string) => {
@@ -905,7 +888,6 @@ function AppContent() {
         await loadPrdContent(data.movedPath);
         await loadPrdCheckpoints(data.movedPath);
       }
-      message.success(`文档已移动到 ${targetFolderPath || '根目录'}`);
     });
     return result ?? undefined;
   }, [guardPrdDraft, loadPrdFiles, selectedPrdFile, loadPrdContent, loadPrdCheckpoints]);
@@ -929,7 +911,6 @@ function AppContent() {
         await loadPrdContent(nextFile);
         await loadPrdCheckpoints(nextFile);
       }
-      message.success(`已重命名为 ${data?.renamedName || targetName}`);
     });
     return result ?? undefined;
   }, [guardPrdDraft, loadPrdFiles, selectedPrdFile, loadPrdContent, loadPrdCheckpoints]);
@@ -950,7 +931,6 @@ function AppContent() {
       // 为新复制的文件加载 checkpoint 列表
       await loadPrdCheckpoints(data.newFileName);
     }
-    message.success(`文档已复制为 ${data?.newFileName || '副本'}，并已保存版本`);
   }, [loadPrdFiles, loadPrdContent, loadPrdCheckpoints]);
 
   const handlePrdDelete = useCallback(async (fileName: string) => {

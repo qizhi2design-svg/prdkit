@@ -7,7 +7,7 @@
   background: var(--gradient-ai);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
-  color: #ffffff;
+  color: var(--color-bg-primary);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -81,7 +81,7 @@
   height: var(--height-sm);
   padding: 0;
   border: 1px solid var(--color-border-primary);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
   color: var(--color-text-tertiary);
   background: rgba(255, 255, 255, 0.82);
   box-shadow: var(--shadow-sm);
@@ -97,15 +97,15 @@
 
 .ghost-icon-button-primary {
   color: var(--color-primary);
-  border-color: rgba(22, 119, 255, 0.28);
-  background: rgba(240, 247, 255, 0.92);
+  border-color: var(--color-primary-alpha-28);
+  background: var(--color-primary-lighter);
 }
 
 .ghost-icon-button-primary:hover,
 .ghost-icon-button-primary:focus-visible {
   color: var(--color-primary-active);
-  border-color: rgba(22, 119, 255, 0.42);
-  background: rgba(230, 244, 255, 1);
+  border-color: var(--color-primary-alpha-42);
+  background: var(--color-primary-light);
 }
 
 /* ========== 工具类 ========== */
@@ -131,7 +131,6 @@
 
 .radius-sm { border-radius: var(--radius-sm); }
 .radius-base { border-radius: var(--radius-base); }
-.radius-md { border-radius: var(--radius-md); }
 .radius-lg { border-radius: var(--radius-lg); }
 .radius-xl { border-radius: var(--radius-xl); }
 .radius-full { border-radius: var(--radius-full); }

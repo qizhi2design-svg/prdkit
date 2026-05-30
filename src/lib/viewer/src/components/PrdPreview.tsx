@@ -1,10 +1,12 @@
-import { Children, isValidElement } from 'react';
+import { Children, isValidElement, lazy, Suspense } from 'react';
 import { Button } from 'antd';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Components } from 'react-markdown';
 import MermaidRenderer from './MermaidRenderer';
 import './PrdPreview.css';
+
+const CodeMirrorEditor = lazy(() => import('./CodeMirrorEditor'));
 
 export type DiffLine = { type: 'added'; value: string } | { type: 'removed'; value: string } | { type: 'unchanged'; value: string };
 
@@ -61,7 +63,7 @@ export default function PrdPreview({
   const editing = !viewingHistory && mode === 'edit';
 
   return (
-    <div className="prd-preview">
+    <div className={`prd-preview${editing ? ' prd-preview--editing' : ''}`}>
       {viewingHistory && (
         <div className="prd-preview-history-banner">
           <span>正在查看历史版本</span>
@@ -127,12 +129,9 @@ export default function PrdPreview({
             ))}
           </div>
         ) : editing ? (
-          <textarea
-            className="prd-preview-editor"
-            value={draftContent ?? content}
-            onChange={(event) => onDraftChange?.(event.target.value)}
-            spellCheck={false}
-          />
+          <Suspense fallback={<textarea className="prd-preview-editor" disabled value={draftContent ?? content} />}>
+            <CodeMirrorEditor value={draftContent ?? content} onChange={onDraftChange} />
+          </Suspense>
         ) : (
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}

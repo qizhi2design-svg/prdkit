@@ -17,6 +17,19 @@
   .mobile-full-width {
     width: 100% !important;
   }
+
+  /* 窄屏操作栏图标化 */
+  .nav-label {
+    display: none !important;
+  }
+
+  .nav-icon-only {
+    display: inline-flex !important;
+  }
+
+  .header-actions .ant-btn > span:not(.anticon) {
+    display: none !important;
+  }
 }
 
 /* 平板 (481px - 768px) */
@@ -24,11 +37,36 @@
   .tablet-hidden {
     display: none !important;
   }
+
+  /* 平板部分图标化 */
+  .tablet-nav-label {
+    display: none !important;
+  }
+
+  .header-actions .ant-btn > span:not(.anticon) {
+    display: none !important;
+  }
+}
+
+/* 桌面 (769px - 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .desktop-hidden {
+    display: none !important;
+  }
+
+  /* 小桌面保持完整显示 */
 }
 
 /* 桌面 (>768px) */
 @media (min-width: 769px) {
   .desktop-hidden {
     display: none !important;
+  }
+}
+
+/* 宽屏 (>1280px) */
+@media (min-width: 1280px) {
+  .wide-full {
+    display: flex !important;
   }
 }

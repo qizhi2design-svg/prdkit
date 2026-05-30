@@ -26,8 +26,8 @@ export const antdTheme: ThemeConfig = {
     colorBgSpotlight: '#fafafa',
 
     // ========== 字体 ==========
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif",
-    fontFamilyCode: "'Monaco', 'Menlo', 'Consolas', 'Courier New', monospace",
+    fontFamily: "'Noto Sans SC Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif",
+    fontFamilyCode: "'Monaco', 'Menlo', 'Consolas', 'Courier New', 'Noto Sans SC Variable', monospace",
     fontSize: 13,
     fontSizeHeading1: 28,
     fontSizeHeading2: 24,
