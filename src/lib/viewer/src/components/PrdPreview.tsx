@@ -7,6 +7,7 @@ import Hotkey from './Hotkey';
 import PrdDiffViewer from './PrdDiffViewer';
 import './PrdPreview.css';
 import type { PrdContextBlock } from '../types/prd';
+import { getModifierKey } from '../utils/platform';
 import { parseMarkdownBlocksFromText, toggleBlockSelection } from '../utils/markdownBlocks';
 
 const CodeMirrorEditor = lazy(() => import('./CodeMirrorEditor'));
@@ -144,7 +145,7 @@ export default function PrdPreview({
                 <span className="prd-context-capture-banner-hint">
                   {contextCaptureActive ? (
                     <>
-                      点击 block 选取 · <Hotkey keys={['Shift']} inline />+点击 可直接开启 · <Hotkey keys={['Esc']} inline /> 退出 · <Hotkey keys={['⌘/Ctrl']} inline />+<Hotkey keys={['C']} inline /> 复制
+                      点击 block 选取 · <Hotkey keys={['Shift']} inline />+点击 可直接开启 · <Hotkey keys={['Esc']} inline /> 退出 · <Hotkey keys={[getModifierKey()]} inline />+<Hotkey keys={['C']} inline /> 复制
                     </>
                   ) : (
                     <>
