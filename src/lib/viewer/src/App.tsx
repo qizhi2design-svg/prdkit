@@ -199,9 +199,13 @@ function App() {
   const loadPrdCheckpointContent = useCallback(async (checkpointId: string) => {
     if (!selectedPrdFile) return;
     try {
+      const checkpoint = prdCheckpoints.find((item) => item.id === checkpointId) || null;
+      const diffQuery = checkpoint?.baseCheckpointId
+        ? `?fromCheckpointId=${encodeURIComponent(checkpoint.baseCheckpointId)}`
+        : '?fromCheckpointId=__empty__';
       const [contentRes, diffRes] = await Promise.all([
         fetch(`/api/prds/${encodeURIComponent(selectedPrdFile)}/checkpoints/${checkpointId}`),
-        fetch(`/api/prds/${encodeURIComponent(selectedPrdFile)}/checkpoints/${checkpointId}/diff`),
+        fetch(`/api/prds/${encodeURIComponent(selectedPrdFile)}/checkpoints/${checkpointId}/diff${diffQuery}`),
       ]);
       const data: PrdCheckpointContentResponse = await contentRes.json();
       setPrdContent(data.content);
@@ -213,11 +217,14 @@ function App() {
         const diffData = await diffRes.json();
         setPrdDiffLines(diffData.diffLines);
         setPrdDiffSummary(diffData.summary);
+      } else {
+        setPrdDiffLines(null);
+        setPrdDiffSummary(null);
       }
     } catch (err) {
       console.error('加载 PRD checkpoint 内容失败:', err);
     }
-  }, [selectedPrdFile]);
+  }, [prdCheckpoints, selectedPrdFile]);
 
   // 返回 PRD 当前版本
   const handleReturnToCurrentPrdVersion = useCallback(() => {
@@ -662,7 +669,7 @@ function App() {
     }
   };
 
-  const handlePublishToCloud = async (payload: { projectId: string; message: string; entryFiles: string[] }) => {
+  const handlePublishToCloud = async (payload: { target: 'prototype' | 'prd'; projectId: string; message: string; entryFiles: string[] }) => {
     try {
       const response = await fetch('/api/publish-cloud', {
         method: 'POST',
@@ -700,7 +707,7 @@ function App() {
             projectName={config?.projectName || 'PRDKit'}
             viewMode={appViewMode}
             onViewModeChange={handleViewModeChange}
-            onOpenPublish={publish.open}
+            onOpenPublish={() => publish.open(appViewMode)}
             onOpenHistory={appViewMode === 'prd' ? () => setPrdHistoryOpen(true) : checkpoint.openHistory}
             onSaveVersion={checkpoint.saveVersion}
             historyDisabled={appViewMode === 'prd' ? prdFiles.length === 0 : visibleFileList.length === 0}
@@ -777,8 +784,8 @@ function App() {
                       fileName={selectedPrdFile || ''}
                       viewingHistory={prdViewingHistory}
                       onReturnToCurrent={handleReturnToCurrentPrdVersion}
-                      diffLines={prdDiffLines}
-                      diffSummary={prdDiffSummary}
+                      diffLines={prdDiffLines ?? undefined}
+                      diffSummary={prdDiffSummary ?? undefined}
                     />
                   ) : (
                     <div className="prd-preview-empty">
@@ -871,9 +878,10 @@ function App() {
             open={publish.drawerOpen}
             loading={publish.loading}
             submitting={publish.submitting}
+            target={publish.target}
             projectName={config?.projectName || 'PRDKit'}
-            currentFile={fileNav.selectedFile}
-            fileList={fileNav.fileList}
+            currentFile={publish.target === 'prd' ? selectedPrdFile : fileNav.selectedFile}
+            fileList={publish.target === 'prd' ? prdFiles.map((item) => item.fileName) : fileNav.fileList}
             defaultOutputPath={publish.defaultPath}
             cloudConfig={cloudConfig || undefined}
             onClose={publish.close}

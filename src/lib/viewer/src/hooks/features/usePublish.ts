@@ -7,14 +7,16 @@ export function usePublish(): UsePublishReturn {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [defaultPath, setDefaultPath] = useState('');
+  const [target, setTarget] = useState<'prototype' | 'prd'>('prototype');
 
   // 打开发布抽屉
-  const open = useCallback(async () => {
+  const open = useCallback(async (nextTarget: 'prototype' | 'prd' = 'prototype') => {
+    setTarget(nextTarget);
     setDrawerOpen(true);
     setLoading(true);
 
     try {
-      const response = await fetch(`/api/publish/options?t=${Date.now()}`, { cache: 'no-store' });
+      const response = await fetch(`/api/publish/options?target=${nextTarget}&t=${Date.now()}`, { cache: 'no-store' });
       const data = await response.json();
 
       if (!response.ok) {
@@ -37,7 +39,7 @@ export function usePublish(): UsePublishReturn {
 
   // 提交发布
   const submit = useCallback(async (params: PublishParams) => {
-    const { outputPath, entryFiles, openAfterPublish } = params;
+    const { outputPath, entryFiles, openAfterPublish, target: publishTarget } = params;
     setSubmitting(true);
 
     try {
@@ -45,6 +47,7 @@ export function usePublish(): UsePublishReturn {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          target: publishTarget,
           outputPath,
           entryFiles,
           projectName: new URLSearchParams(window.location.search).get('projectname') || 'PRDKit',
@@ -125,6 +128,7 @@ export function usePublish(): UsePublishReturn {
     loading,
     submitting,
     defaultPath,
+    target,
     open,
     close,
     submit,

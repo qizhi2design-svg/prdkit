@@ -4,6 +4,7 @@ import fs from 'fs';
 import { requireCloudHost, loadConfig, loadCloudConfig, updateCloudConfig } from '#utils/config.js';
 import { createCloudClient } from '../../cloud/client.js';
 import { buildDefaultPublishDirName, publishArtifacts } from '../publish.js';
+import { buildDefaultPrdPublishDirName, publishPrdArtifacts } from '../prd-publish.js';
 import { registerReleaseLink } from '../../links/registry.js';
 import type { ApiHelpers } from './helpers.js';
 
@@ -11,7 +12,7 @@ export function createPublishRouter(helpers: ApiHelpers): Router {
   const router = Router();
   const { projectRoot, prototypesDir } = helpers;
 
-  router.get('/publish/options', (_req: Request, res: Response) => {
+  router.get('/publish/options', (req: Request, res: Response) => {
     try {
       const configPath = path.join(projectRoot, '.prdkit', 'config.json');
       let projectName = 'PRDKit';
@@ -22,11 +23,15 @@ export function createPublishRouter(helpers: ApiHelpers): Router {
         projectName = config.projectName || projectName;
       }
 
+      const target = req.query.target === 'prd' ? 'prd' : 'prototype';
       const defaultOutputRoot = path.join(projectRoot, 'dist', 'publish');
-      const suggestedArtifactName = buildDefaultPublishDirName(projectName);
+      const suggestedArtifactName = target === 'prd'
+        ? buildDefaultPrdPublishDirName(projectName)
+        : buildDefaultPublishDirName(projectName);
       const suggestedOutputPath = path.join(defaultOutputRoot, suggestedArtifactName);
 
       res.json({
+        target,
         projectName,
         defaultOutputRoot,
         suggestedArtifactName,
@@ -47,14 +52,16 @@ export function createPublishRouter(helpers: ApiHelpers): Router {
         outputPath?: string;
         entryFiles?: string[];
         projectName?: string;
+        target?: 'prototype' | 'prd';
       };
+      const target = req.body?.target === 'prd' ? 'prd' : 'prototype';
 
       if (!outputPath || typeof outputPath !== 'string') {
         return res.status(400).json({ error: '缺少输出路径 outputPath' });
       }
 
       if (!Array.isArray(entryFiles) || entryFiles.length === 0) {
-        return res.status(400).json({ error: '请至少选择一个需要发布的页面' });
+        return res.status(400).json({ error: target === 'prd' ? '请至少选择一份需要发布的 PRD 文档' : '请至少选择一个需要发布的页面' });
       }
 
       const configPath = path.join(projectRoot, '.prdkit', 'config.json');
@@ -66,16 +73,24 @@ export function createPublishRouter(helpers: ApiHelpers): Router {
         resolvedProjectName = config.projectName || resolvedProjectName;
       }
 
-      const result = await publishArtifacts({
-        projectRoot,
-        prototypesDir,
-        outputDir: path.resolve(outputPath),
-        projectName: resolvedProjectName,
-        entryFiles,
-      });
+      const result = target === 'prd'
+        ? await publishPrdArtifacts({
+            projectRoot,
+            outputDir: path.resolve(outputPath),
+            projectName: resolvedProjectName,
+            entryFiles,
+          })
+        : await publishArtifacts({
+            projectRoot,
+            prototypesDir,
+            outputDir: path.resolve(outputPath),
+            projectName: resolvedProjectName,
+            entryFiles,
+          });
 
       res.json({
         success: true,
+        target,
         outputDir: result.outputDir,
         entryCount: result.manifest.entryFiles.length,
       });
@@ -90,12 +105,17 @@ export function createPublishRouter(helpers: ApiHelpers): Router {
 
   router.post('/publish-cloud', async (req: Request, res: Response) => {
     try {
-      const { projectId, message, entryFiles } = req.body as {
+      const { projectId, message, entryFiles, target } = req.body as {
         projectId?: string;
         message?: string;
         entryFiles?: string[];
+        target?: 'prototype' | 'prd';
       };
-      const { publishToCloud } = await import('../../cloud/publisher.js');
+      const publishTarget = target === 'prd' ? 'prd' : 'prototype';
+      const [{ publishToCloud }, { publishPrdsToCloud }] = await Promise.all([
+        import('../../cloud/publisher.js'),
+        import('../../cloud/prd-publisher.js'),
+      ]);
       const config = await loadConfig(projectRoot);
       const cloudConfig = await loadCloudConfig(projectRoot);
 
@@ -110,23 +130,35 @@ export function createPublishRouter(helpers: ApiHelpers): Router {
         return res.status(400).json({ error: '缺少 projectId' });
       }
 
-      const result = await publishToCloud({
-        projectRoot,
-        config,
-        cloudConfig,
-        message,
-        entryFiles,
-        project: projectId,
-      });
+      const result = publishTarget === 'prd'
+        ? await publishPrdsToCloud({
+            projectRoot,
+            config,
+            cloudConfig,
+            message,
+            entryFiles,
+            project: projectId,
+          })
+        : await publishToCloud({
+            projectRoot,
+            config,
+            cloudConfig,
+            message,
+            entryFiles,
+            project: projectId,
+          });
 
       const host = await requireCloudHost(projectRoot);
       const client = await createCloudClient(host);
       const projects = await client.listProjects().catch(() => []);
-      const selectedProject = projects.find((item) => item.id === result.projectId);
+      const listedProject = projects.find((item) => item.id === result.projectId);
+      const selectedProject = isValidProjectSummary(listedProject)
+        ? listedProject
+        : await client.getProject(result.projectId).catch(() => listedProject);
       await updateCloudConfig(projectRoot, {
         projectId: result.projectId,
-        projectSlug: selectedProject?.slug,
-        projectName: selectedProject?.name,
+        projectSlug: isNonEmptyString(selectedProject?.slug) ? selectedProject.slug : undefined,
+        projectName: isNonEmptyString(selectedProject?.name) ? selectedProject.name : undefined,
         lastReleaseId: result.releaseId,
         lastPublishedAt: new Date().toISOString(),
       });
@@ -135,7 +167,11 @@ export function createPublishRouter(helpers: ApiHelpers): Router {
         releaseId: result.releaseId,
         projectId: result.projectId,
         url: result.releaseUrl,
-        prototypePaths: result.results.map((r) => r.prototypePath),
+        prototypePaths: publishTarget === 'prd'
+          ? []
+          : result.results
+              .map((r) => ('prototypePath' in r ? r.prototypePath : null))
+              .filter((item): item is string => Boolean(item)),
         source: "viewer-publish",
         publishedAt: new Date().toISOString(),
       }).catch(() => {
@@ -144,6 +180,7 @@ export function createPublishRouter(helpers: ApiHelpers): Router {
 
       res.json({
         success: true,
+        target: publishTarget,
         result,
         project: selectedProject ?? null,
       });
@@ -157,4 +194,14 @@ export function createPublishRouter(helpers: ApiHelpers): Router {
   });
 
   return router;
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0 && value !== 'undefined' && value !== 'null';
+}
+
+function isValidProjectSummary(
+  value: { id?: unknown; name?: unknown; slug?: unknown } | undefined
+): value is { id: string; name: string; slug: string } {
+  return Boolean(value && isNonEmptyString(value.id) && isNonEmptyString(value.name) && isNonEmptyString(value.slug));
 }

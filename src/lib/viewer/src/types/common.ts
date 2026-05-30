@@ -19,6 +19,7 @@ export interface PrdFileInfo {
 // PRD checkpoint 记录（前端展示用）
 export interface PrdCheckpointListItem {
   id: string;
+  baseCheckpointId?: string | null;
   message: string | null;
   kind: string;
   createdAt: string;

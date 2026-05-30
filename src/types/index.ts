@@ -72,6 +72,7 @@ export type CloudCloneManifest = {
 };
 
 export type ReleaseItemStatus = "changed" | "unchanged" | "failed" | "removed";
+export type ReleaseKind = "prototype" | "prd";
 
 export type ReleaseIterationMeta = {
   iterationId?: string | null;
@@ -89,9 +90,21 @@ export type ReleasePreparePrototype = {
   blobHashes: string[];
 };
 
+export type ReleasePreparePrdDocument = {
+  path: string;
+  name: string;
+  title: string;
+  contentHash: string;
+  lineCount: number;
+  wordCount: number;
+  message?: string;
+};
+
 export type ReleasePrepareResult = {
   releaseId: string;
   projectId: string;
+  kind?: ReleaseKind;
+  sequenceNumber?: number;
   uploadUrl: string;
   webUrl: string;
   releaseUrl: string;
@@ -105,9 +118,18 @@ export type ReleasePrepareResult = {
     latestVersionId?: string | null;
     latestVersionNumber?: number | null;
   }>;
+  documents?: Array<{
+    path: string;
+    name: string;
+    title: string;
+    status: "changed" | "unchanged";
+    latestVersionId?: string | null;
+    latestVersionNumber?: number | null;
+  }>;
 };
 
 export type ReleaseCommitPayload = {
+  kind?: ReleaseKind;
   message?: string;
   iteration?: ReleaseIterationMeta | null;
   prototypes: Array<{
@@ -137,10 +159,28 @@ export type ReleaseCommitPayload = {
   }>;
 };
 
+export type PrdReleaseCommitPayload = {
+  kind: "prd";
+  message?: string;
+  documents: Array<{
+    path: string;
+    name: string;
+    title: string;
+    contentHash: string;
+    lineCount: number;
+    wordCount: number;
+    content: string;
+    frontmatter: Record<string, unknown>;
+    baseVersionId?: string | null;
+  }>;
+};
+
 export type ReleaseCommitResult = {
   release: {
     id: string;
     projectId: string;
+    kind?: ReleaseKind;
+    sequenceNumber?: number;
     message?: string | null;
     status: string;
     createdAt: string;
@@ -163,6 +203,52 @@ export type ReleaseStatusResult = ReleaseCommitResult & {
     slug: string;
     name: string;
   };
+};
+
+export type PrdReleaseCommitResult = {
+  project: {
+    id: string;
+    slug: string;
+    name: string;
+  };
+  release: {
+    id: string;
+    projectId: string;
+    kind: "prd";
+    sequenceNumber: number;
+    message?: string | null;
+    status: string;
+    createdAt: string;
+    webUrl: string;
+    releaseUrl: string;
+  };
+  results: Array<{
+    documentPath: string;
+    documentId: string;
+    versionId?: string;
+    versionNumber?: number;
+    status: ReleaseItemStatus;
+    message?: string | null;
+  }>;
+};
+
+export type PrdReleasePrepareResult = {
+  releaseId: string;
+  projectId: string;
+  kind: "prd";
+  sequenceNumber: number;
+  uploadUrl: string;
+  webUrl: string;
+  releaseUrl: string;
+  missingBlobHashes: string[];
+  documents: Array<{
+    path: string;
+    name: string;
+    title: string;
+    status: "changed" | "unchanged";
+    latestVersionId?: string | null;
+    latestVersionNumber?: number | null;
+  }>;
 };
 
 export type PrdkitConfig = {

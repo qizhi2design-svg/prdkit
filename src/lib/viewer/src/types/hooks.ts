@@ -193,6 +193,7 @@ export interface WebSocketReturn {
 // ==================== Feature Hooks ====================
 
 export interface PublishParams {
+  target: 'prototype' | 'prd';
   outputPath: string;
   entryFiles: string[];
   openAfterPublish: boolean;
@@ -203,8 +204,9 @@ export interface UsePublishReturn {
   loading: boolean;
   submitting: boolean;
   defaultPath: string;
+  target: 'prototype' | 'prd';
 
-  open: () => Promise<void>;
+  open: (target?: 'prototype' | 'prd') => Promise<void>;
   close: () => void;
   submit: (params: PublishParams) => Promise<void>;
   pickDirectory: (currentPath: string) => Promise<string | null>;

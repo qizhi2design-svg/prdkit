@@ -85,6 +85,31 @@ function buildSummary(
   };
 }
 
+function buildDiffResult(
+  fromCheckpointId: string,
+  toCheckpointId: string,
+  fromContent: string,
+  toContent: string,
+  beforeSize: number,
+  afterSize: number,
+  beforeLineCount: number,
+  afterLineCount: number,
+): { diffLines: DiffLine[]; summary: PrdCheckpointDiffSummary } {
+  return {
+    diffLines: computeLineDiff(splitLines(fromContent), splitLines(toContent)),
+    summary: buildSummary(
+      fromCheckpointId,
+      toCheckpointId,
+      fromContent,
+      toContent,
+      beforeSize,
+      afterSize,
+      beforeLineCount,
+      afterLineCount,
+    ),
+  };
+}
+
 export async function diffPrdCheckpoints(projectRoot: string, fromCheckpointId: string, toCheckpointId: string): Promise<PrdCheckpointDiffSummary> {
   const from = readPrdCheckpointData(projectRoot, fromCheckpointId);
   const to = readPrdCheckpointData(projectRoot, toCheckpointId);
@@ -102,6 +127,49 @@ export async function diffPrdCheckpoints(projectRoot: string, fromCheckpointId: 
     to.document.size,
     from.document.lineCount,
     to.document.lineCount,
+  );
+}
+
+export async function diffPrdCheckpointsWithLines(
+  projectRoot: string,
+  fromCheckpointId: string,
+  toCheckpointId: string
+): Promise<{ diffLines: DiffLine[]; summary: PrdCheckpointDiffSummary }> {
+  const from = readPrdCheckpointData(projectRoot, fromCheckpointId);
+  const to = readPrdCheckpointData(projectRoot, toCheckpointId);
+  const [fromContent, toContent] = await Promise.all([
+    readPrdBlob(projectRoot, from.document.blobHash).then((buffer) => buffer.toString("utf8")),
+    readPrdBlob(projectRoot, to.document.blobHash).then((buffer) => buffer.toString("utf8")),
+  ]);
+
+  return buildDiffResult(
+    fromCheckpointId,
+    toCheckpointId,
+    fromContent,
+    toContent,
+    from.document.size,
+    to.document.size,
+    from.document.lineCount,
+    to.document.lineCount,
+  );
+}
+
+export async function diffPrdCheckpointAgainstEmpty(
+  projectRoot: string,
+  checkpointId: string
+): Promise<{ diffLines: DiffLine[]; summary: PrdCheckpointDiffSummary }> {
+  const data = readPrdCheckpointData(projectRoot, checkpointId);
+  const content = await readPrdBlob(projectRoot, data.document.blobHash).then((buf) => buf.toString("utf8"));
+
+  return buildDiffResult(
+    "empty",
+    checkpointId,
+    "",
+    content,
+    0,
+    data.document.size,
+    0,
+    data.document.lineCount,
   );
 }
 
@@ -174,10 +242,7 @@ export async function diffPrdCheckpointAgainstCurrent(
   const checkpointContent = await readPrdBlob(projectRoot, data.document.blobHash).then((buf) => buf.toString("utf8"));
   const currentContent = readPrdBlobSource(projectRoot, prdPath).toString("utf8");
 
-  const fromLines = splitLines(checkpointContent);
-  const toLines = splitLines(currentContent);
-  const diffLines = computeLineDiff(fromLines, toLines);
-  const summary = buildSummary(
+  const { diffLines, summary } = buildDiffResult(
     checkpointId,
     "working-tree",
     checkpointContent,

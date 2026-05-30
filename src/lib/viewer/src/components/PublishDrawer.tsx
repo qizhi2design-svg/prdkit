@@ -37,6 +37,7 @@ interface PublishDrawerProps {
   open: boolean;
   loading: boolean;
   submitting: boolean;
+  target: 'prototype' | 'prd';
   projectName: string;
   currentFile: string | null;
   fileList: string[];
@@ -44,8 +45,8 @@ interface PublishDrawerProps {
   cloudConfig?: CloudConfig;
   onClose: () => void;
   onPickOutputDirectory: (currentOutputPath: string) => Promise<string | null>;
-  onSubmit: (payload: { outputPath: string; entryFiles: string[]; openAfterPublish: boolean }) => Promise<void>;
-  onPublishToCloud?: (payload: { projectId: string; message: string; entryFiles: string[] }) => Promise<void>;
+  onSubmit: (payload: { target: 'prototype' | 'prd'; outputPath: string; entryFiles: string[]; openAfterPublish: boolean }) => Promise<void>;
+  onPublishToCloud?: (payload: { target: 'prototype' | 'prd'; projectId: string; message: string; entryFiles: string[] }) => Promise<void>;
   onRefreshConfig?: () => Promise<void>;
 }
 
@@ -87,6 +88,7 @@ export default function PublishDrawer({
   open,
   loading,
   submitting,
+  target,
   currentFile,
   fileList,
   defaultOutputPath,
@@ -129,7 +131,7 @@ export default function PublishDrawer({
     setProjectPickerOpen(false);
     setNewProjectName('');
     setSelectedProjectId(cloudConfig?.projectId);
-  }, [open, defaultOutputPath, fileList, cloudConfig?.projectId]);
+  }, [open, defaultOutputPath, fileList, cloudConfig?.projectId, target]);
 
   useEffect(() => {
     if (!open || publishMode !== 'cloud' || cloudConfig?.authStatus !== 'active') {
@@ -283,6 +285,7 @@ export default function PublishDrawer({
       setCloudSubmitting(true);
       try {
         await onPublishToCloud({
+          target,
           projectId: selectedProjectId,
           message: versionMessage,
           entryFiles: normalizedFiles,
@@ -296,6 +299,7 @@ export default function PublishDrawer({
       }
     } else {
       await onSubmit({
+        target,
         outputPath: outputPath.trim(),
         entryFiles: normalizedFiles,
         openAfterPublish,
@@ -322,7 +326,7 @@ export default function PublishDrawer({
 
   return (
     <Modal
-      title="发布项目"
+      title={target === 'prd' ? '发布 PRD' : '发布项目'}
       open={open}
       onCancel={onClose}
       footer={null}
@@ -533,7 +537,9 @@ export default function PublishDrawer({
               onClick={handleSubmit}
               className="publish-dialog-submit"
             >
-              {publishMode === 'cloud' ? '发布到云端' : '发布到本地'}
+              {publishMode === 'cloud'
+                ? (target === 'prd' ? '发布 PRD 到云端' : '发布到云端')
+                : (target === 'prd' ? '发布 PRD 到本地' : '发布到本地')}
             </Button>
           </div>
         </div>
@@ -541,20 +547,22 @@ export default function PublishDrawer({
         {pagePanelOpen && (
           <div className="publish-dialog-page-panel">
             <div className="publish-dialog-page-panel-header">
-              <div className="publish-dialog-page-panel-subtitle">按目录结构勾选需要导出的页面</div>
+              <div className="publish-dialog-page-panel-subtitle">
+                {target === 'prd' ? '按列表勾选需要发布的 PRD 文档' : '按目录结构勾选需要导出的页面'}
+              </div>
               <div className="publish-dialog-page-panel-count">{selectedCount} / {fileList.length}</div>
             </div>
 
             <div className="publish-dialog-page-panel-actions">
               <Button size="small" onClick={() => setSelectedFiles(fileList)} disabled={loading || fileList.length === 0}>
-                全部页面
+                {target === 'prd' ? '全部文档' : '全部页面'}
               </Button>
               <Button
                 size="small"
                 onClick={() => currentFile && setSelectedFiles([currentFile])}
                 disabled={loading || !currentFile}
               >
-                仅当前页
+                {target === 'prd' ? '仅当前文档' : '仅当前页'}
               </Button>
               <Button size="small" onClick={() => setSelectedFiles([])} disabled={loading || selectedCount === 0}>
                 清空选择
@@ -565,14 +573,14 @@ export default function PublishDrawer({
               value={searchValue}
               onChange={(event) => setSearchValue(event.target.value)}
               prefix={<SearchOutlined />}
-              placeholder="搜索页面路径"
+              placeholder={target === 'prd' ? '搜索文档名称' : '搜索页面路径'}
               allowClear
               className="publish-dialog-search"
             />
 
             <div className="publish-dialog-tree-shell">
               {treeData.length === 0 ? (
-                <div className="publish-dialog-empty">没有匹配的页面</div>
+                <div className="publish-dialog-empty">{target === 'prd' ? '没有匹配的文档' : '没有匹配的页面'}</div>
               ) : (
                 <Tree
                   checkable

@@ -4,9 +4,13 @@ import type {
   AuthenticatedUser,
   CloudCloneManifest,
   CloudProjectSummary,
+  PrdReleaseCommitPayload,
+  PrdReleaseCommitResult,
+  PrdReleasePrepareResult,
   ReleaseIterationMeta,
   ReleaseCommitPayload,
   ReleaseCommitResult,
+  ReleasePreparePrdDocument,
   ReleasePreparePrototype,
   ReleasePrepareResult,
   ReleaseStatusResult
@@ -253,6 +257,17 @@ export class CloudClient {
     });
   }
 
+  async preparePrdRelease(
+    projectId: string,
+    payload: { kind: "prd"; message?: string; documents: ReleasePreparePrdDocument[] }
+  ): Promise<PrdReleasePrepareResult> {
+    return this.requestJson<PrdReleasePrepareResult>(`/api/projects/${projectId}/releases/prepare`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   async uploadBlobs(
     releaseId: string,
     files: Array<{ hash: string; content: Buffer; contentType?: string }>
@@ -277,8 +292,24 @@ export class CloudClient {
     });
   }
 
+  async commitPrdRelease(
+    projectId: string,
+    releaseId: string,
+    payload: PrdReleaseCommitPayload
+  ): Promise<PrdReleaseCommitResult> {
+    return this.requestJson<PrdReleaseCommitResult>(`/api/projects/${projectId}/releases/${releaseId}/commit`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   async getReleaseStatus(projectId: string, releaseId: string): Promise<ReleaseStatusResult> {
     return this.requestJson<ReleaseStatusResult>(`/api/projects/${projectId}/releases/${releaseId}`);
+  }
+
+  async getPrdReleaseStatus(projectId: string, releaseId: string): Promise<PrdReleaseCommitResult> {
+    return this.requestJson<PrdReleaseCommitResult>(`/api/projects/${projectId}/releases/${releaseId}`);
   }
 
   async ensureValidAuth(): Promise<AuthHostRecord> {

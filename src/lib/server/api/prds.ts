@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
 import { createPrdCheckpoint, listPrdCheckpointRecords, readPrdCheckpointData, readPrdBlob } from '../../checkpoints/prd/store.js';
-import { diffPrdCheckpointAgainstCurrent } from '../../checkpoints/prd/diff.js';
+import { diffPrdCheckpointAgainstCurrent, diffPrdCheckpointAgainstEmpty, diffPrdCheckpointsWithLines } from '../../checkpoints/prd/diff.js';
 import type { ApiHelpers } from './helpers.js';
 
 export function createPrdsRouter(helpers: ApiHelpers): Router {
@@ -85,6 +85,7 @@ export function createPrdsRouter(helpers: ApiHelpers): Router {
 
       const list = records.map((record) => ({
         id: record.id,
+        baseCheckpointId: record.baseCheckpointId ?? null,
         message: record.message || null,
         kind: record.kind,
         createdAt: record.createdAt,
@@ -145,8 +146,20 @@ export function createPrdsRouter(helpers: ApiHelpers): Router {
       const fileName = getRouteParam(req.params[0]);
       const safePath = path.normalize(fileName).replace(/^(\.\.[/\\])+/, '');
       const prdPath = path.join('workspace', 'prds', safePath);
+      const fromCheckpointIdRaw = req.query.fromCheckpointId;
+      const fromCheckpointId = Array.isArray(fromCheckpointIdRaw)
+        ? typeof fromCheckpointIdRaw[0] === 'string'
+          ? fromCheckpointIdRaw[0]
+          : ''
+        : typeof fromCheckpointIdRaw === 'string'
+          ? fromCheckpointIdRaw
+          : '';
 
-      const { diffLines, summary } = await diffPrdCheckpointAgainstCurrent(projectRoot, checkpointId, prdPath);
+      const { diffLines, summary } = fromCheckpointId
+        ? fromCheckpointId === '__empty__'
+          ? await diffPrdCheckpointAgainstEmpty(projectRoot, checkpointId)
+          : await diffPrdCheckpointsWithLines(projectRoot, fromCheckpointId, checkpointId)
+        : await diffPrdCheckpointAgainstCurrent(projectRoot, checkpointId, prdPath);
 
       res.json({
         checkpointId,

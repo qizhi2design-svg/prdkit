@@ -66,8 +66,6 @@ export default function HistoryDrawer({
   prdCheckpoints = [],
   prdActiveCheckpointId = null,
   onPreviewCheckpoint = () => {},
-  onReturnToCurrent = () => {},
-  viewingHistory = false,
 }: HistoryDrawerProps) {
   const [loading, setLoading] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
