@@ -55,40 +55,33 @@
   white-space: nowrap;
 }
 
-/* 视图模式 Tab */
+/* 视图模式 Tab（胶囊风格，与 backend 统一） */
 .header-view-mode-tabs {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  margin-left: 4px;
-  padding-left: 10px;
-  border-left: 1px solid var(--color-border, #e3e5e8);
+  gap: 6px;
+  margin-left: 8px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.12);
 }
 
 .header-view-mode-tab {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 12px;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  color: var(--color-text-secondary, #666);
+  border: 0;
   background: transparent;
+  color: #64748b;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.header-view-mode-tab:hover {
-  color: var(--color-primary, #1677ff);
-  background: rgba(22, 119, 255, 0.04);
-}
-
 .header-view-mode-tab.active {
+  background: #fff;
   color: #1677ff;
-  background: #e6f4ff;
-  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
 }
 
 .header-project-divider {
