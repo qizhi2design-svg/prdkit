@@ -301,33 +301,48 @@ export default function HistoryDrawer({
         {viewMode === 'prd' ? (
           <div className="history-list">
             {prdCheckpoints && prdCheckpoints.length > 0 ? (
-              prdCheckpoints.map((cp) => (
-                <div
-                  key={cp.id}
-                  className={`version-timeline-item${prdActiveCheckpointId === cp.id ? ' active' : ''}`}
-                  onClick={() => onPreviewCheckpoint?.(cp.id)}
-                  style={{ cursor: 'pointer', padding: '12px 16px', borderBottom: '1px solid #edeef0' }}
-                >
-                  <div className="version-timeline-item-header">
-                    <span className="version-timeline-item-date">
-                      {new Date(cp.createdAt).toLocaleString('zh-CN')}
-                    </span>
-                    <Tag
-                      color={cp.kind === 'manual' ? 'blue' : cp.kind === 'auto' ? 'default' : 'orange'}
-                      className="history-iteration-tag"
+              <ul className="history-version-list">
+                {prdCheckpoints.map((cp, index) => {
+                  const isActive = prdActiveCheckpointId === cp.id;
+                  const versionLabel = `版本${prdCheckpoints.length - index}`;
+                  return (
+                    <li
+                      key={cp.id}
+                      className={`history-version-item${isActive ? ' active' : ''}`}
+                      onClick={() => onPreviewCheckpoint?.(cp.id)}
                     >
-                      {cp.kind === 'manual' ? '手动' : cp.kind === 'auto' ? '自动' : '预恢复'}
-                    </Tag>
-                  </div>
-                  {cp.message && (
-                    <div className="version-timeline-item-message">{cp.message}</div>
-                  )}
-                </div>
-              ))
+                      <div className="history-version-item-circle">
+                        <p className={`history-version-dot${isActive ? ' active' : ''}`} />
+                        <p className="history-version-line" />
+                      </div>
+                      <div className="history-version-content">
+                        <div className="history-version-time-row">
+                          <span className="history-version-time">
+                            {new Date(cp.createdAt).toLocaleString('zh-CN')}
+                          </span>
+                          <Tag
+                            color={cp.kind === 'manual' ? 'blue' : cp.kind === 'auto' ? 'default' : 'orange'}
+                            className="history-current-tag"
+                          >
+                            {cp.kind === 'manual' ? '手动' : cp.kind === 'auto' ? '自动' : '预恢复'}
+                          </Tag>
+                        </div>
+                        <p className={`history-version-title${isActive ? ' active' : ''}`}>
+                          <span>{versionLabel}</span>
+                          {isActive && (
+                            <Tag color="blue" className="history-current-tag">当前</Tag>
+                          )}
+                        </p>
+                        <p className="history-version-summary">
+                          {cp.message || cp.title || '无描述'}
+                        </p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
             ) : (
-              <div className="history-empty" style={{ padding: '24px', textAlign: 'center', color: '#8c8f96' }}>
-                暂无版本记录
-              </div>
+              <div className="history-empty">暂无版本记录</div>
             )}
           </div>
         ) : !prototypePath ? (

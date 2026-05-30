@@ -617,6 +617,14 @@ export function createPrdsRouter(helpers: ApiHelpers): Router {
 
       const data = readPrdCheckpointData(projectRoot, checkpointId);
       const blob = await readPrdBlob(projectRoot, data.document.blobHash);
+      const parsed = matter(blob.toString('utf8'));
+      const frontmatter: Record<string, unknown> = {};
+
+      if (parsed.data && typeof parsed.data === 'object') {
+        for (const [key, value] of Object.entries(parsed.data)) {
+          frontmatter[key] = value;
+        }
+      }
 
       res.json({
         checkpointId,
@@ -625,7 +633,8 @@ export function createPrdsRouter(helpers: ApiHelpers): Router {
         kind: data.manifest.kind,
         message: data.manifest.message || null,
         createdAt: data.manifest.createdAt,
-        content: blob.toString('utf8'),
+        content: parsed.content,
+        frontmatter,
       });
     } catch (error) {
       console.error('读取 PRD checkpoint 失败:', error);

@@ -130,7 +130,7 @@
 }
 
 .history-version-item.active .history-version-content {
-  border-color: var(--color-primary-alpha-35);
+  border-color: var(--color-primary-alpha-28);
   background: var(--color-primary-lighter);
   box-shadow: 0 0 0 1px var(--color-primary-alpha-8), 0 16px 40px var(--color-primary-alpha-12);
 }
@@ -225,6 +225,31 @@
   padding-inline: 7px;
   font-size: var(--font-size-xs);
   line-height: 18px;
+}
+
+/* ===== PRD 历史版本列表（复用 prototype timeline 布局） ===== */
+.history-list {
+  padding: var(--spacing-2) 0;
+}
+
+.history-list .history-version-item {
+  padding: var(--spacing-3) var(--spacing-4);
+}
+
+.history-list .history-version-content {
+  margin-bottom: 0;
+}
+
+/* PRD 版本无 timeline 连线，只保留圆点 */
+.history-list .history-version-line {
+  background: transparent;
+}
+
+.history-empty {
+  padding: var(--spacing-6);
+  text-align: center;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-sm);
 }
 
 .history-iteration-mark-btn {

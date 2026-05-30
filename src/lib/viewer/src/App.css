@@ -47,8 +47,7 @@
 /* PRD 预览容器 */
 .prd-preview-container {
   height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   padding: var(--spacing-5);
   box-sizing: border-box;
   background:

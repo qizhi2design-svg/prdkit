@@ -24,7 +24,7 @@ import type { ActiveTool, AppViewMode, PrdFileInfo, PrdFolderInfo, PrdCheckpoint
 import type { DiffLine } from './components/PrdPreview';
 import type { AppConfig } from './contexts/AppConfigContext';
 import type { CanvasViewportSize } from './types';
-import type { PrdContentResponse, PrdCheckpointContentResponse, PrdSaveResponse } from './types/prd';
+import type { PrdContentResponse, PrdCheckpointContentResponse, PrdContextBlock, PrdSaveResponse } from './types/prd';
 import { antdTheme } from './theme/antd-theme';
 import { message, setMessageApi } from './utils/message';
 import './App.css';
@@ -142,7 +142,14 @@ function AppContent() {
   const [prdDiffSummary, setPrdDiffSummary] = useState<{ lineAdded: number; lineDeleted: number; changed: boolean } | null>(null);
   const [prdViewMode, setPrdViewMode] = useState<'preview' | 'edit'>('preview');
   const [prdSaveSubmitting, setPrdSaveSubmitting] = useState(false);
+  const [prdContextCaptureActive, setPrdContextCaptureActive] = useState(false);
+  const [selectedPrdContextBlocks, setSelectedPrdContextBlocks] = useState<PrdContextBlock[]>([]);
   const prdDirty = !prdViewingHistory && prdContent !== null && prdDraftContent !== prdContent;
+
+  const resetPrdContextCapture = useCallback(() => {
+    setPrdContextCaptureActive(false);
+    setSelectedPrdContextBlocks([]);
+  }, []);
 
   // 加载 PRD 文件列表
   const loadPrdFiles = useCallback(async () => {
@@ -175,10 +182,11 @@ function AppContent() {
       setPrdDiffLines(null);
       setPrdDiffSummary(null);
       setPrdViewMode('preview');
+      resetPrdContextCapture();
     } catch (err) {
       console.error('加载 PRD 内容失败:', err);
     }
-  }, []);
+  }, [resetPrdContextCapture]);
 
   // 加载 PRD checkpoint 列表
   const loadPrdCheckpoints = useCallback(async (fileName: string) => {
@@ -206,10 +214,11 @@ function AppContent() {
       const data: PrdCheckpointContentResponse = await contentRes.json();
       setPrdContent(data.content);
       setPrdDraftContent(data.content);
-      setPrdFrontmatter({ title: data.title, kind: data.kind, message: data.message, createdAt: data.createdAt });
+      setPrdFrontmatter(data.frontmatter);
       setPrdActiveCheckpointId(checkpointId);
       setPrdViewingHistory(true);
       setPrdViewMode('preview');
+      resetPrdContextCapture();
 
       if (diffRes.ok) {
         const diffData = await diffRes.json();
@@ -222,7 +231,7 @@ function AppContent() {
     } catch (err) {
       console.error('加载 PRD checkpoint 内容失败:', err);
     }
-  }, [prdCheckpoints, selectedPrdFile]);
+  }, [prdCheckpoints, resetPrdContextCapture, selectedPrdFile]);
 
   // 返回 PRD 当前版本
   const handleReturnToCurrentPrdVersion = useCallback(() => {
@@ -234,7 +243,8 @@ function AppContent() {
   const discardPrdDraft = useCallback(() => {
     setPrdDraftContent(prdContent ?? '');
     setPrdViewMode('preview');
-  }, [prdContent]);
+    resetPrdContextCapture();
+  }, [prdContent, resetPrdContextCapture]);
 
   const confirmDiscardPrdDraft = useCallback(() => {
     if (!prdDirty) return true;
@@ -276,8 +286,9 @@ function AppContent() {
     setPrdActiveCheckpointId(null);
     setPrdDiffLines(null);
     setPrdDiffSummary(null);
+    resetPrdContextCapture();
     return data;
-  }, [prdDraftContent, selectedPrdFile]);
+  }, [prdDraftContent, resetPrdContextCapture, selectedPrdFile]);
 
   const handleSavePrdVersion = useCallback(async () => {
     if (!selectedPrdFile || !prdDirty || prdViewingHistory) return;
@@ -325,6 +336,7 @@ function AppContent() {
       setPrdDiffLines(null);
       setPrdDiffSummary(null);
       setPrdViewMode('preview');
+      resetPrdContextCapture();
       return;
     }
 
@@ -344,7 +356,67 @@ function AppContent() {
     loadPrdCheckpoints,
     loadPrdCheckpointContent,
     loadPrdContent,
+    resetPrdContextCapture,
   ]);
+
+  const handlePrdDraftChange = useCallback((content: string) => {
+    setPrdDraftContent(content);
+    if (prdContextCaptureActive || selectedPrdContextBlocks.length > 0) {
+      resetPrdContextCapture();
+    }
+  }, [prdContextCaptureActive, resetPrdContextCapture, selectedPrdContextBlocks.length]);
+
+  const handlePrdModeChange = useCallback((mode: 'preview' | 'edit') => {
+    setPrdViewMode(mode);
+    if (mode !== 'preview') {
+      resetPrdContextCapture();
+    }
+  }, [resetPrdContextCapture]);
+
+  const handlePrdContextCaptureChange = useCallback((active: boolean, blocks: PrdContextBlock[]) => {
+    setPrdContextCaptureActive(active);
+    setSelectedPrdContextBlocks(blocks);
+  }, []);
+
+  const handleCopyPrdContextBlocks = useCallback(async () => {
+    if (selectedPrdContextBlocks.length === 0) {
+      message.warning('请先选择要复制的 block');
+      return;
+    }
+
+    const fileName = selectedPrdFile || '';
+    const title = (prdFrontmatter.title as string)
+      || fileName.split('/').pop()?.replace(/\.md$/, '')
+      || '未命名 PRD';
+    const payload = [
+      `文件: ${fileName || '未命名文件'}`,
+      `标题: ${title}`,
+      '',
+      '以下为选中的 PRD 上下文 blocks:',
+      '',
+      ...selectedPrdContextBlocks.flatMap((block, index) => [
+        `--- block ${index + 1} ---`,
+        block.text.trimEnd(),
+        '',
+      ]),
+    ].join('\n').trimEnd();
+
+    try {
+      await copySkillClipboardText(
+        {
+          skillCommand: config?.viewerSkills.inspectCopySkillCommand || DEFAULT_INSPECT_COPY_SKILL_COMMAND,
+          payload,
+        },
+        {
+          successPrefix: `已复制 ${selectedPrdContextBlocks.length} 个 block 的 skill 指令`,
+          terminalGuide: config?.viewerSkills.copyTerminalGuide || DEFAULT_COPY_TERMINAL_GUIDE,
+        }
+      );
+    } catch (error) {
+      console.error('复制 PRD 上下文失败:', error);
+      message.error('复制失败，请检查浏览器权限');
+    }
+  }, [config?.viewerSkills.copyTerminalGuide, config?.viewerSkills.inspectCopySkillCommand, prdFrontmatter.title, selectedPrdContextBlocks, selectedPrdFile]);
 
   const ws = useWebSocket({
     url: getWebSocketUrl(),
@@ -1152,13 +1224,17 @@ function AppContent() {
                       fileName={selectedPrdFile || ''}
                       mode={prdViewMode}
                       draftContent={prdDraftContent}
-                      onDraftChange={setPrdDraftContent}
-                      onModeChange={setPrdViewMode}
+                      onDraftChange={handlePrdDraftChange}
+                      onModeChange={handlePrdModeChange}
                       editDisabled={prdViewingHistory || !selectedPrdFile}
                       viewingHistory={prdViewingHistory}
                       onReturnToCurrent={handleReturnToCurrentPrdVersion}
                       diffLines={prdDiffLines ?? undefined}
                       diffSummary={prdDiffSummary ?? undefined}
+                      contextCaptureActive={prdContextCaptureActive}
+                      selectedContextBlocks={selectedPrdContextBlocks}
+                      onContextCaptureChange={handlePrdContextCaptureChange}
+                      onCopyContextBlocks={handleCopyPrdContextBlocks}
                     />
                   ) : (
                     <div className="prd-preview-empty">

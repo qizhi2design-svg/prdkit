@@ -5,6 +5,15 @@ export interface PrdContentResponse {
   frontmatter: Record<string, unknown>;
 }
 
+export interface PrdContextBlock {
+  id: string;
+  from: number;
+  to: number;
+  text: string;
+  startLine: number;
+  endLine: number;
+}
+
 export interface PrdSaveResponse {
   fileName: string;
   content: string;
@@ -20,4 +29,5 @@ export interface PrdCheckpointContentResponse {
   message: string | null;
   createdAt: string;
   content: string;
+  frontmatter: Record<string, unknown>;
 }
