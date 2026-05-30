@@ -27,6 +27,7 @@ import type { CanvasViewportSize } from './types';
 import type { PrdContentResponse, PrdCheckpointContentResponse, PrdContextBlock, PrdSaveResponse } from './types/prd';
 import { antdTheme } from './theme/antd-theme';
 import { message, setMessageApi } from './utils/message';
+import './components/Hotkey.css';
 import './App.css';
 
 const { Sider, Content } = Layout;
