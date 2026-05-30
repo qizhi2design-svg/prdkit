@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Components } from 'react-markdown';
 import MermaidRenderer from './MermaidRenderer';
+import Hotkey from './Hotkey';
 import PrdDiffViewer from './PrdDiffViewer';
 import './PrdPreview.css';
 import type { PrdContextBlock } from '../types/prd';
@@ -143,11 +144,11 @@ export default function PrdPreview({
                 <span className="prd-context-capture-banner-hint">
                   {contextCaptureActive ? (
                     <>
-                      点击 block 选取 · <kbd className="hotkey-key">Shift</kbd>+点击 可直接开启 · <kbd className="hotkey-key">Esc</kbd> 退出 · <kbd className="hotkey-key">⌘/Ctrl</kbd>+<kbd className="hotkey-key">C</kbd> 复制
+                      点击 block 选取 · <Hotkey keys={['Shift']} inline />+点击 可直接开启 · <Hotkey keys={['Esc']} inline /> 退出 · <Hotkey keys={['⌘/Ctrl']} inline />+<Hotkey keys={['C']} inline /> 复制
                     </>
                   ) : (
                     <>
-                      预览文档 · <kbd className="hotkey-key">Shift</kbd>+点击 进入块选择
+                      预览文档 · <Hotkey keys={['Shift']} inline />+点击 进入块选择
                     </>
                   )}
                 </span>

@@ -6,6 +6,7 @@ import { getModifierKey } from '../utils/platform';
 import { copySkillClipboardText } from '../utils/clipboard';
 import { message } from '../utils/message';
 import MarkPanel from './MarkPanel';
+import Hotkey from './Hotkey';
 import { computePreviewOverlayRect } from './previewGeometry';
 import type { ActiveTool, Mark, PendingMarkInfo, ViewerSkillConfig, MarkUpdatePatch, CanvasPanOffset, CanvasViewportSize } from '../types';
 import './Preview.css';
@@ -1147,7 +1148,7 @@ export default function Preview({
                   <span className="preview-inspect-banner-count">已选 {selectedElements.length} 个元素</span>
                 ) : null}
                 <span className="preview-inspect-banner-status">
-                  点击元素复制 · <kbd className="hotkey-key">Shift</kbd>+点击多选 · <kbd className="hotkey-key">空格</kbd>拖拽画布
+                  点击元素复制 · <Hotkey keys={['Shift']} inline />+点击多选 · <Hotkey keys={['空格']} inline />拖拽画布
                 </span>
               </>
             ) : markToolActive ? (
@@ -1158,13 +1159,13 @@ export default function Preview({
                     : relinkingMarkId
                       ? '请点击页面中的新元素，重新绑定当前标记'
                       : (marksVisible ? '点击页面元素创建标记或查看详情' : '标记已隐藏')}
-                  · <kbd className="hotkey-key">空格</kbd>拖拽画布
+                  · <Hotkey keys={['空格']} inline />拖拽画布
                 </span>
               </>
             ) : (
               <>
                 <span className="preview-inspect-banner-status">
-                  只读预览画布，支持缩放与平移浏览 · <kbd className="hotkey-key">空格</kbd>拖拽画布
+                  只读预览画布，支持缩放与平移浏览 · <Hotkey keys={['空格']} inline />拖拽画布
                 </span>
               </>
             )}
