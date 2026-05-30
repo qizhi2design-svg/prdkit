@@ -187,23 +187,35 @@ export default function PrdPreview({
               </span>
             )}
           </div>
-          {mode === 'block-select' && selectionMode === 'multiple' ? (
+          {mode === 'block-select' ? (
             <div className="prd-context-capture-banner-actions">
-              <button
-                type="button"
-                className="prd-context-capture-exit-button active"
-                onClick={() => { setSelectionMode('single'); onContextCaptureChange?.(true, []); }}
-              >
-                退出批量选择
-              </button>
-              <button
-                type="button"
-                className="prd-context-capture-copy-button"
-                onClick={() => onCopyContextBlocks?.()}
-                disabled={selectedContextBlocks.length === 0}
-              >
-                复制给 AI
-              </button>
+              {selectionMode === 'multiple' ? (
+                <>
+                  <button
+                    type="button"
+                    className="prd-context-capture-exit-button active"
+                    onClick={() => { setSelectionMode('single'); onContextCaptureChange?.(true, []); }}
+                  >
+                    退出批量选择
+                  </button>
+                  <button
+                    type="button"
+                    className="prd-context-capture-copy-button"
+                    onClick={() => onCopyContextBlocks?.()}
+                    disabled={selectedContextBlocks.length === 0}
+                  >
+                    复制给 AI
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className={`prd-context-capture-exit-button`}
+                  onClick={() => setSelectionMode('multiple')}
+                >
+                  批量选择
+                </button>
+              )}
             </div>
           ) : null}
         </div>
