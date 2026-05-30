@@ -16,10 +16,10 @@ interface PrdPreviewProps {
   content: string;
   frontmatter?: Record<string, unknown>;
   fileName: string;
-  mode?: 'preview' | 'edit';
+  mode?: 'preview' | 'edit' | 'block-select';
   draftContent?: string;
   onDraftChange?: (content: string) => void;
-  onModeChange?: (mode: 'preview' | 'edit') => void;
+  onModeChange?: (mode: 'preview' | 'edit' | 'block-select') => void;
   editDisabled?: boolean;
   viewingHistory?: boolean;
   onReturnToCurrent?: () => void;
@@ -71,7 +71,7 @@ export default function PrdPreview({
   const selectedBlockIds = useMemo(() => new Set(selectedContextBlocks.map((block) => block.id)), [selectedContextBlocks]);
 
   useEffect(() => {
-    if (viewingHistory || mode !== 'preview' || !contextCaptureActive) {
+    if (viewingHistory || mode !== 'block-select') {
       return;
     }
 
@@ -127,17 +127,15 @@ export default function PrdPreview({
               >
                 编辑
               </button>
-              {mode === 'preview' ? (
-                <button
-                  type="button"
-                  className={`prd-context-capture-toggle-pill${contextCaptureActive ? ' active' : ''}`}
-                  onClick={() => onContextCaptureChange?.(!contextCaptureActive, contextCaptureActive ? [] : selectedContextBlocks)}
-                >
-                  块选择
-                </button>
-                ) : null}
+              <button
+                type="button"
+                className={`prd-context-capture-toggle-pill${mode === 'block-select' ? ' active' : ''}`}
+                onClick={() => onModeChange?.('block-select')}
+              >
+                块选择
+              </button>
             </div>
-            {mode === 'preview' ? (
+            {(mode === 'preview' || mode === 'block-select') ? (
               <>
                 {contextCaptureActive && selectedContextBlocks.length > 0 ? (
                   <span className="prd-context-capture-banner-count">已选 {selectedContextBlocks.length} 个块</span>
@@ -160,7 +158,7 @@ export default function PrdPreview({
               </span>
             )}
           </div>
-          {mode === 'preview' ? (
+          {mode !== 'edit' ? (
             <div className="prd-context-capture-banner-actions">
               <button
                 type="button"

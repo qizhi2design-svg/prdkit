@@ -140,14 +140,13 @@ function AppContent() {
   const [prdActiveCheckpointId, setPrdActiveCheckpointId] = useState<string | null>(null);
   const [prdDiffLines, setPrdDiffLines] = useState<DiffLine[] | null>(null);
   const [prdDiffSummary, setPrdDiffSummary] = useState<{ lineAdded: number; lineDeleted: number; changed: boolean } | null>(null);
-  const [prdViewMode, setPrdViewMode] = useState<'preview' | 'edit'>('preview');
+  const [prdViewMode, setPrdViewMode] = useState<'preview' | 'edit' | 'block-select'>('preview');
   const [prdSaveSubmitting, setPrdSaveSubmitting] = useState(false);
-  const [prdContextCaptureActive, setPrdContextCaptureActive] = useState(false);
   const [selectedPrdContextBlocks, setSelectedPrdContextBlocks] = useState<PrdContextBlock[]>([]);
   const prdDirty = !prdViewingHistory && prdContent !== null && prdDraftContent !== prdContent;
 
   const resetPrdContextCapture = useCallback(() => {
-    setPrdContextCaptureActive(false);
+    setPrdViewMode('preview');
     setSelectedPrdContextBlocks([]);
   }, []);
 
@@ -361,21 +360,18 @@ function AppContent() {
 
   const handlePrdDraftChange = useCallback((content: string) => {
     setPrdDraftContent(content);
-    if (prdContextCaptureActive || selectedPrdContextBlocks.length > 0) {
-      resetPrdContextCapture();
-    }
-  }, [prdContextCaptureActive, resetPrdContextCapture, selectedPrdContextBlocks.length]);
+  }, []);
 
-  const handlePrdModeChange = useCallback((mode: 'preview' | 'edit') => {
+  const handlePrdModeChange = useCallback((mode: 'preview' | 'edit' | 'block-select') => {
     setPrdViewMode(mode);
-    if (mode !== 'preview') {
-      resetPrdContextCapture();
+    if (mode !== 'block-select') {
+      setSelectedPrdContextBlocks([]);
     }
-  }, [resetPrdContextCapture]);
+  }, []);
 
   const handlePrdContextCaptureChange = useCallback((active: boolean, blocks: PrdContextBlock[]) => {
-    setPrdContextCaptureActive(active);
     setSelectedPrdContextBlocks(blocks);
+    setPrdViewMode(active ? 'block-select' : 'preview');
   }, []);
 
   const handleCopyPrdContextBlocks = useCallback(async () => {
@@ -1231,7 +1227,7 @@ function AppContent() {
                       onReturnToCurrent={handleReturnToCurrentPrdVersion}
                       diffLines={prdDiffLines ?? undefined}
                       diffSummary={prdDiffSummary ?? undefined}
-                      contextCaptureActive={prdContextCaptureActive}
+                      contextCaptureActive={prdViewMode === 'block-select'}
                       selectedContextBlocks={selectedPrdContextBlocks}
                       onContextCaptureChange={handlePrdContextCaptureChange}
                       onCopyContextBlocks={handleCopyPrdContextBlocks}
