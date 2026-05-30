@@ -160,25 +160,23 @@ export default function PrdPreview({
               </span>
             )}
           </div>
-          {mode !== 'edit' ? (
+          {mode === 'block-select' ? (
             <div className="prd-context-capture-banner-actions">
               <button
                 type="button"
-                className={`prd-context-capture-exit-button${contextCaptureActive ? ' active' : ''}`}
-                onClick={() => onContextCaptureChange?.(!contextCaptureActive, contextCaptureActive ? [] : selectedContextBlocks)}
+                className="prd-context-capture-exit-button active"
+                onClick={() => onModeChange?.('preview')}
               >
-                {contextCaptureActive ? '退出批量选择' : '批量选择'}
+                退出批量选择
               </button>
-              {contextCaptureActive ? (
-                <button
-                  type="button"
-                  className="prd-context-capture-copy-button"
-                  onClick={onCopyContextBlocks}
-                  disabled={selectedContextBlocks.length === 0}
-                >
-                  复制给 AI
-                </button>
-              ) : null}
+              <button
+                type="button"
+                className="prd-context-capture-copy-button"
+                onClick={onCopyContextBlocks}
+                disabled={selectedContextBlocks.length === 0}
+              >
+                复制给 AI
+              </button>
             </div>
           ) : null}
         </div>
