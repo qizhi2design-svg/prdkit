@@ -1,4 +1,4 @@
-import { Children, isValidElement, lazy, Suspense, useEffect, useMemo, type MouseEvent } from 'react';
+import { Children, isValidElement, lazy, Suspense, useEffect, useMemo, useState, type MouseEvent } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Components } from 'react-markdown';
@@ -30,7 +30,7 @@ interface PrdPreviewProps {
   contextCaptureActive?: boolean;
   selectedContextBlocks?: PrdContextBlock[];
   onContextCaptureChange?: (active: boolean, blocks: PrdContextBlock[]) => void;
-  onCopyContextBlocks?: () => void;
+  onCopyContextBlocks?: (blocks?: PrdContextBlock[]) => void;
 }
 
 /** react-markdown 自定义组件，拦截 mermaid 代码块 */
@@ -69,8 +69,16 @@ export default function PrdPreview({
   const title = (frontmatter?.title as string) || fileName.split('/').pop()?.replace(/\.md$/, '') || fileName;
   const renderedContent = viewingHistory ? content : (draftContent ?? content);
   const editing = !viewingHistory && mode === 'edit';
+  const [selectionMode, setSelectionMode] = useState<'single' | 'multiple'>('single');
   const previewBlocks = useMemo(() => parseMarkdownBlocksFromText(renderedContent), [renderedContent]);
   const selectedBlockIds = useMemo(() => new Set(selectedContextBlocks.map((block) => block.id)), [selectedContextBlocks]);
+
+  // 进入块选择模式时重置为单选
+  useEffect(() => {
+    if (mode === 'block-select') {
+      setSelectionMode('single');
+    }
+  }, [mode]);
 
   useEffect(() => {
     if (viewingHistory || mode !== 'block-select') {
@@ -98,15 +106,19 @@ export default function PrdPreview({
 
   const handlePreviewBlockClick = (event: MouseEvent<HTMLDivElement>, block: PrdContextBlock) => {
     if (!contextCaptureActive) return;
-
     event.preventDefault();
 
-    if (event.shiftKey) {
-      // Shift+点击：批量点选（切换当前 block 选中状态，不影响其他）
+    if (selectionMode === 'multiple' || event.shiftKey) {
+      // 多选模式 或 Shift+点击：切换选中状态
+      if (selectionMode === 'single' && event.shiftKey) {
+        // Shift+点击从单选进入多选
+        setSelectionMode('multiple');
+      }
       onContextCaptureChange?.(true, toggleBlockSelection(selectedContextBlocks, block));
     } else {
-      // 点击：单独点选（仅选中当前 block，取消其他）
+      // 单选模式：复制该 block 内容
       onContextCaptureChange?.(true, [block]);
+      onCopyContextBlocks?.([block]);
     }
   };
 
@@ -141,14 +153,20 @@ export default function PrdPreview({
             </div>
             {(mode === 'preview' || mode === 'block-select') ? (
               <>
-                {contextCaptureActive && selectedContextBlocks.length > 0 ? (
+                {contextCaptureActive && selectionMode === 'multiple' && selectedContextBlocks.length > 0 ? (
                   <span className="prd-context-capture-banner-count">已选 {selectedContextBlocks.length} 个块</span>
                 ) : null}
                 <span className="prd-context-capture-banner-hint">
                   {contextCaptureActive ? (
-                    <>
-                      点击单独选取 · <Hotkey keys={['Shift']} inline />+点击 批量多选 · <Hotkey keys={['Esc']} inline /> 退出 · <Hotkey keys={[getModifierKey()]} inline />+<Hotkey keys={['C']} inline /> 复制
-                    </>
+                    selectionMode === 'multiple' ? (
+                      <>
+                        点击切换选中 · <Hotkey keys={['Esc']} inline /> 退出 · <Hotkey keys={[getModifierKey()]} inline />+<Hotkey keys={['C']} inline /> 复制
+                      </>
+                    ) : (
+                      <>
+                        点击复制 · <Hotkey keys={['Shift']} inline />+点击 批量选择 · <Hotkey keys={['Esc']} inline /> 退出
+                      </>
+                    )
                   ) : (
                     <>
                       预览文档
@@ -162,19 +180,19 @@ export default function PrdPreview({
               </span>
             )}
           </div>
-          {mode === 'block-select' ? (
+          {mode === 'block-select' && selectionMode === 'multiple' ? (
             <div className="prd-context-capture-banner-actions">
               <button
                 type="button"
                 className="prd-context-capture-exit-button active"
-                onClick={() => onModeChange?.('preview')}
+                onClick={() => { setSelectionMode('single'); onContextCaptureChange?.(true, []); }}
               >
                 退出批量选择
               </button>
               <button
                 type="button"
                 className="prd-context-capture-copy-button"
-                onClick={onCopyContextBlocks}
+                onClick={() => onCopyContextBlocks?.()}
                 disabled={selectedContextBlocks.length === 0}
               >
                 复制给 AI

@@ -374,8 +374,9 @@ function AppContent() {
     setPrdViewMode(active ? 'block-select' : 'preview');
   }, []);
 
-  const handleCopyPrdContextBlocks = useCallback(async () => {
-    if (selectedPrdContextBlocks.length === 0) {
+  const handleCopyPrdContextBlocks = useCallback(async (blocksOverride?: PrdContextBlock[]) => {
+    const blocks = blocksOverride ?? selectedPrdContextBlocks;
+    if (blocks.length === 0) {
       message.warning('请先选择要复制的 block');
       return;
     }
@@ -384,18 +385,21 @@ function AppContent() {
     const title = (prdFrontmatter.title as string)
       || fileName.split('/').pop()?.replace(/\.md$/, '')
       || '未命名 PRD';
-    const payload = [
-      `文件: ${fileName || '未命名文件'}`,
-      `标题: ${title}`,
-      '',
-      '以下为选中的 PRD 上下文 blocks:',
-      '',
-      ...selectedPrdContextBlocks.flatMap((block, index) => [
-        `--- block ${index + 1} ---`,
-        block.text.trimEnd(),
-        '',
-      ]),
-    ].join('\n').trimEnd();
+
+    const payload = blocksOverride
+      ? `文件: ${fileName || '未命名文件'}\n标题: ${title}\n\n${blocks[0].text.trimEnd()}`
+      : [
+          `文件: ${fileName || '未命名文件'}`,
+          `标题: ${title}`,
+          '',
+          '以下为选中的 PRD 上下文 blocks:',
+          '',
+          ...blocks.flatMap((block, index) => [
+            `--- block ${index + 1} ---`,
+            block.text.trimEnd(),
+            '',
+          ]),
+        ].join('\n').trimEnd();
 
     try {
       await copySkillClipboardText(
@@ -404,7 +408,7 @@ function AppContent() {
           payload,
         },
         {
-          successPrefix: `已复制 ${selectedPrdContextBlocks.length} 个 block 的 skill 指令`,
+          successPrefix: `已复制 ${blocks.length} 个 block 的 skill 指令`,
           terminalGuide: config?.viewerSkills.copyTerminalGuide || DEFAULT_COPY_TERMINAL_GUIDE,
         }
       );
