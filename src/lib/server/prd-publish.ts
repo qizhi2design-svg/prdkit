@@ -165,7 +165,7 @@ function readPrdDocument(prdsDir: string, fileName: string): PrdPublishDocument 
   const parsed = matter(rawContent);
   const title = typeof parsed.data?.title === "string" && parsed.data.title.trim()
     ? parsed.data.title.trim()
-    : fileName.replace(/\.md$/, "");
+    : fileName.split("/").pop()?.replace(/\.md$/, "") || fileName;
   const status = typeof parsed.data?.status === "string" ? parsed.data.status : undefined;
   const version = typeof parsed.data?.version === "string" ? parsed.data.version : undefined;
 

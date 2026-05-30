@@ -1,4 +1,5 @@
 import { Children, isValidElement } from 'react';
+import { Button } from 'antd';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Components } from 'react-markdown';
@@ -11,6 +12,11 @@ interface PrdPreviewProps {
   content: string;
   frontmatter?: Record<string, unknown>;
   fileName: string;
+  mode?: 'preview' | 'edit';
+  draftContent?: string;
+  onDraftChange?: (content: string) => void;
+  onModeChange?: (mode: 'preview' | 'edit') => void;
+  editDisabled?: boolean;
   viewingHistory?: boolean;
   onReturnToCurrent?: () => void;
   diffLines?: DiffLine[];
@@ -36,16 +42,23 @@ export default function PrdPreview({
   content,
   frontmatter,
   fileName,
+  mode = 'preview',
+  draftContent,
+  onDraftChange,
+  onModeChange,
+  editDisabled = false,
   viewingHistory = false,
   onReturnToCurrent,
   diffLines,
   diffSummary,
 }: PrdPreviewProps) {
-  const title = (frontmatter?.title as string) || fileName.replace(/\.md$/, '');
+  const title = (frontmatter?.title as string) || fileName.split('/').pop()?.replace(/\.md$/, '') || fileName;
   const status = frontmatter?.status as string | undefined;
   const version = frontmatter?.version as string | undefined;
   const author = frontmatter?.author as string | undefined;
   const date = frontmatter?.date as string | undefined;
+  const renderedContent = viewingHistory ? content : (draftContent ?? content);
+  const editing = !viewingHistory && mode === 'edit';
 
   return (
     <div className="prd-preview">
@@ -71,12 +84,33 @@ export default function PrdPreview({
       )}
 
       <div className="prd-preview-header">
-        <h1 className="prd-preview-title">{title}</h1>
-        <div className="prd-preview-meta">
-          {author && <span className="prd-preview-meta-item">作者: {author}</span>}
-          {status && <span className="prd-preview-meta-item">状态: {status}</span>}
-          {version && <span className="prd-preview-meta-item">版本: {version}</span>}
-          {date && <span className="prd-preview-meta-item">日期: {date}</span>}
+        <div className="prd-preview-header-main">
+          <div>
+            <h1 className="prd-preview-title">{title}</h1>
+            <div className="prd-preview-meta">
+              {author && <span className="prd-preview-meta-item">作者: {author}</span>}
+              {status && <span className="prd-preview-meta-item">状态: {status}</span>}
+              {version && <span className="prd-preview-meta-item">版本: {version}</span>}
+              {date && <span className="prd-preview-meta-item">日期: {date}</span>}
+            </div>
+          </div>
+          {!viewingHistory && (
+            <div className="prd-preview-mode-switch">
+              <Button
+                type={mode === 'preview' ? 'primary' : 'default'}
+                onClick={() => onModeChange?.('preview')}
+              >
+                预览
+              </Button>
+              <Button
+                type={mode === 'edit' ? 'primary' : 'default'}
+                onClick={() => onModeChange?.('edit')}
+                disabled={editDisabled}
+              >
+                编辑
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -92,12 +126,19 @@ export default function PrdPreview({
               </div>
             ))}
           </div>
+        ) : editing ? (
+          <textarea
+            className="prd-preview-editor"
+            value={draftContent ?? content}
+            onChange={(event) => onDraftChange?.(event.target.value)}
+            spellCheck={false}
+          />
         ) : (
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={markdownComponents}
           >
-            {content}
+            {renderedContent}
           </ReactMarkdown>
         )}
       </div>
