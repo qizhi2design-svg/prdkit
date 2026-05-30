@@ -448,15 +448,6 @@
   cursor: default;
 }
 
-.prd-context-capture-banner-hint .hotkey-key {
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  margin: 0 2px;
-  font-size: 11px;
-  vertical-align: middle;
-}
-
 .prd-preview-body h1,
 .prd-preview-body h2,
 .prd-preview-body h3,
