@@ -88,7 +88,14 @@ export default function PrdPreview({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onContextCaptureChange?.(false, []);
+        if (selectionMode === 'multiple') {
+          // 批量模式 → 退回单选，清空选择
+          setSelectionMode('single');
+          onContextCaptureChange?.(true, []);
+        } else {
+          // 单选模式 → 退出块选择
+          onContextCaptureChange?.(false, []);
+        }
         return;
       }
 
@@ -102,7 +109,7 @@ export default function PrdPreview({
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true);
     };
-  }, [contextCaptureActive, mode, onContextCaptureChange, onCopyContextBlocks, selectedContextBlocks.length, viewingHistory]);
+  }, [contextCaptureActive, mode, onContextCaptureChange, onCopyContextBlocks, selectedContextBlocks.length, selectionMode, viewingHistory]);
 
   const handlePreviewBlockClick = (event: MouseEvent<HTMLDivElement>, block: PrdContextBlock) => {
     if (!contextCaptureActive) return;
