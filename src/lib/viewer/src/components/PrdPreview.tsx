@@ -97,12 +97,7 @@ export default function PrdPreview({
   }, [contextCaptureActive, mode, onContextCaptureChange, onCopyContextBlocks, selectedContextBlocks.length, viewingHistory]);
 
   const handlePreviewBlockClick = (event: MouseEvent<HTMLDivElement>, block: PrdContextBlock) => {
-    if (!contextCaptureActive) {
-      if (!event.shiftKey) return;
-      event.preventDefault();
-      onContextCaptureChange?.(true, [block]);
-      return;
-    }
+    if (!contextCaptureActive) return;
 
     event.preventDefault();
 
@@ -110,7 +105,7 @@ export default function PrdPreview({
       // Shift+点击：批量点选（切换当前 block 选中状态，不影响其他）
       onContextCaptureChange?.(true, toggleBlockSelection(selectedContextBlocks, block));
     } else {
-      // 单独点选：仅选中当前 block，取消其他
+      // 点击：单独点选（仅选中当前 block，取消其他）
       onContextCaptureChange?.(true, [block]);
     }
   };
@@ -156,7 +151,7 @@ export default function PrdPreview({
                     </>
                   ) : (
                     <>
-                      预览文档 · <Hotkey keys={['Shift']} inline />+点击 进入块选择
+                      预览文档
                     </>
                   )}
                 </span>
