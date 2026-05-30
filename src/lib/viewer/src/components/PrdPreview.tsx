@@ -105,7 +105,14 @@ export default function PrdPreview({
     }
 
     event.preventDefault();
-    onContextCaptureChange?.(true, toggleBlockSelection(selectedContextBlocks, block));
+
+    if (event.shiftKey) {
+      // Shift+点击：批量点选（切换当前 block 选中状态，不影响其他）
+      onContextCaptureChange?.(true, toggleBlockSelection(selectedContextBlocks, block));
+    } else {
+      // 单独点选：仅选中当前 block，取消其他
+      onContextCaptureChange?.(true, [block]);
+    }
   };
 
   return (
@@ -145,7 +152,7 @@ export default function PrdPreview({
                 <span className="prd-context-capture-banner-hint">
                   {contextCaptureActive ? (
                     <>
-                      点击 block 选取 · <Hotkey keys={['Shift']} inline />+点击 可直接开启 · <Hotkey keys={['Esc']} inline /> 退出 · <Hotkey keys={[getModifierKey()]} inline />+<Hotkey keys={['C']} inline /> 复制
+                      点击单独选取 · <Hotkey keys={['Shift']} inline />+点击 批量多选 · <Hotkey keys={['Esc']} inline /> 退出 · <Hotkey keys={[getModifierKey()]} inline />+<Hotkey keys={['C']} inline /> 复制
                     </>
                   ) : (
                     <>
