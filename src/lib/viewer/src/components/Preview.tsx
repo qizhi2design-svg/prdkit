@@ -1,9 +1,10 @@
 import { CompressOutlined, CopyOutlined } from '@ant-design/icons';
-import { Button, Dropdown, Empty, Tooltip, message, type MenuProps } from 'antd';
+import { Button, Dropdown, Empty, Tooltip, type MenuProps } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { getElementInfo, getElementPath, formatMultipleElementsInfo, generateUniqueSelector, findElementBySelector, isElementVisible, isElementCovered, type ElementInfo } from '../utils/domUtils';
 import { getModifierKey } from '../utils/platform';
 import { copySkillClipboardText } from '../utils/clipboard';
+import { message } from '../utils/message';
 import MarkPanel from './MarkPanel';
 import { computePreviewOverlayRect } from './previewGeometry';
 import type { ActiveTool, Mark, PendingMarkInfo, ViewerSkillConfig, MarkUpdatePatch, CanvasPanOffset, CanvasViewportSize } from '../types';

@@ -8,7 +8,6 @@ import {
   Select,
   Skeleton,
   Tag,
-  message,
 } from 'antd';
 import {
   ReloadOutlined,
@@ -17,6 +16,7 @@ import {
 } from '@ant-design/icons';
 import type { CheckpointDetail, CheckpointRecord, IterationSummary } from '../types';
 import type { PrdCheckpointListItem } from '../types/common';
+import { message } from '../utils/message';
 import './HistoryDrawer.css';
 
 interface HistoryDrawerProps {

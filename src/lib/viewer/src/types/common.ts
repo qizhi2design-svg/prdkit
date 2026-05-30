@@ -9,11 +9,18 @@ export type AppViewMode = 'prototype' | 'prd';
 // PRD 文件信息
 export interface PrdFileInfo {
   fileName: string;
+  name: string;
   title: string;
   status?: string;
   version?: string;
   modifiedAt: string;
   size: number;
+}
+
+export interface PrdFolderInfo {
+  folderPath: string;
+  name: string;
+  modifiedAt: string;
 }
 
 // PRD checkpoint 记录（前端展示用）

@@ -41,12 +41,19 @@
 
 .app-content {
   position: relative;
+  overflow: hidden;
 }
 
 /* PRD 预览容器 */
 .prd-preview-container {
   height: 100%;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 20px;
+  box-sizing: border-box;
+  background:
+    radial-gradient(circle at top, rgba(22, 119, 255, 0.08), transparent 32%),
+    linear-gradient(180deg, #eef3fb 0%, #f5f7fb 100%);
 }
 
 .prd-preview-empty {

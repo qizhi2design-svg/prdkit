@@ -29,6 +29,7 @@ function logConnectionStatus(count: number) {
 export async function startServer(options: ServerOptions) {
   const { port, prototypesDir, viewerDir } = options;
   const projectRoot = path.dirname(path.dirname(prototypesDir));
+  const prdsDir = path.join(projectRoot, 'workspace', 'prds');
 
   const app = express();
   const server = createServer(app);
@@ -110,6 +111,7 @@ export async function startServer(options: ServerOptions) {
   // 启动文件监听
   const watcher = createWatcher({
     prototypesDir,
+    prdsDir,
     onReload: () => {
       broadcastReload(clients);
     },

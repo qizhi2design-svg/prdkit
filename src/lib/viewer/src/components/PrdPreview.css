@@ -1,9 +1,18 @@
 /* ===== PRD 预览容器 ===== */
 .prd-preview {
-  height: 100%;
-  overflow-y: auto;
-  padding: 40px 48px;
+  min-height: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 40px 64px 48px;
+  box-sizing: border-box;
   background: #fff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  box-shadow:
+    0 20px 48px rgba(15, 23, 42, 0.08),
+    0 2px 10px rgba(15, 23, 42, 0.04);
+  overflow-x: hidden;
+  overflow-y: visible;
 }
 
 /* ===== 历史版本提示条 ===== */
@@ -39,9 +48,25 @@
 
 /* ===== 文档头部 ===== */
 .prd-preview-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: -40px -64px 32px;
+  padding: 40px 64px 24px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   margin-bottom: 32px;
-  padding-bottom: 24px;
   border-bottom: 1px solid #e3e5e8;
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
+}
+
+.prd-preview-header-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .prd-preview-title {
@@ -63,11 +88,18 @@
   color: #8c8f96;
 }
 
+.prd-preview-mode-switch {
+  display: inline-flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 /* ===== 文档正文 ===== */
 .prd-preview-body {
   font-size: 15px;
   line-height: 1.7;
   color: #1a1d23;
+  overflow-x: hidden;
 }
 
 .prd-preview-body h1,
@@ -94,6 +126,7 @@
   width: 100%;
   border-collapse: collapse;
   margin: 16px 0;
+  table-layout: fixed;
 }
 
 .prd-preview-body th,
@@ -102,6 +135,7 @@
   border: 1px solid #e3e5e8;
   text-align: left;
   font-size: 13px;
+  word-break: break-word;
 }
 
 .prd-preview-body th {
@@ -113,7 +147,9 @@
   background: #f5f6f8;
   border-radius: 8px;
   padding: 16px;
-  overflow-x: auto;
+  overflow-x: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
   font-size: 13px;
   line-height: 1.5;
 }
@@ -121,6 +157,8 @@
 .prd-preview-body code {
   font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
   font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .prd-preview-body blockquote {
@@ -137,6 +175,30 @@
   margin: 8px 0;
 }
 
+.prd-preview-editor {
+  width: 100%;
+  min-height: calc(100vh - 210px);
+  height: calc(100vh - 210px);
+  padding: 22px 24px;
+  box-sizing: border-box;
+  border: 1px solid #d6dae1;
+  border-radius: 14px;
+  background: #fff;
+  color: #1a1d23;
+  font-size: 15px;
+  line-height: 1.7;
+  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+  resize: none;
+  outline: none;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
+  overflow: auto;
+}
+
+.prd-preview-editor:focus {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.12);
+}
+
 /* ===== Diff 视图 ===== */
 .prd-diff-view {
   font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
@@ -145,6 +207,8 @@
   border: 1px solid #e3e5e8;
   border-radius: 8px;
   overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .prd-diff-line {
@@ -201,4 +265,48 @@
 
 .diff-removed-count {
   color: #ff4d4f;
+}
+
+@media (max-width: 1080px) {
+  .prd-preview {
+    max-width: none;
+    padding: 28px 24px 36px;
+    border-radius: 14px;
+  }
+
+  .prd-preview-header {
+    margin: -28px -24px 28px;
+    padding: 28px 24px 20px;
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+  }
+}
+
+@media (max-width: 720px) {
+  .prd-preview {
+    padding: 20px 16px 24px;
+  }
+
+  .prd-preview-header {
+    margin: -20px -16px 24px;
+    padding: 20px 16px 16px;
+  }
+
+  .prd-preview-header-main {
+    flex-direction: column;
+  }
+
+  .prd-preview-mode-switch {
+    width: 100%;
+  }
+
+  .prd-preview-mode-switch .ant-btn {
+    flex: 1;
+  }
+
+  .prd-preview-editor {
+    min-height: calc(100vh - 190px);
+    height: calc(100vh - 190px);
+    padding: 16px 18px;
+  }
 }

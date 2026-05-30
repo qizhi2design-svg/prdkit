@@ -1,5 +1,5 @@
-import { message } from 'antd';
 import { DEFAULT_COPY_TERMINAL_GUIDE, DEFAULT_INSPECT_COPY_SKILL_COMMAND } from '../constants/clipboard';
+import { message } from './message';
 
 export interface SkillClipboardTemplate {
   skillCommand?: string;

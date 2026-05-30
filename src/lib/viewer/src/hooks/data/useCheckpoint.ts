@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { message } from 'antd';
 import type { UseCheckpointOptions, UseCheckpointReturn } from '../../types/hooks';
 import type { ActiveCheckpointPreview, CheckpointDetail, CheckpointRecord, CheckpointStatus, IterationSummary } from '../../types';
+import { message } from '../../utils/message';
 
 function toActivePreview(detail: CheckpointDetail): ActiveCheckpointPreview | null {
   if (!detail.previewUrl) {

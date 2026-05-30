@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Button, Input, Empty, Avatar, Tag, message, Popconfirm, Modal } from 'antd';
+import { Button, Input, Empty, Avatar, Tag, Popconfirm, Modal } from 'antd';
 import { DeleteOutlined, EditOutlined, ArrowLeftOutlined, UpOutlined, DownOutlined, DoubleRightOutlined, DoubleLeftOutlined, SearchOutlined, CopyOutlined, CheckOutlined, CloseOutlined, NodeIndexOutlined, DisconnectOutlined, FullscreenOutlined, FullscreenExitOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { markdownComponents } from './MarkdownComponents';
 import { copySkillClipboardText } from '../utils/clipboard';
+import { message } from '../utils/message';
 import type { Mark, MarkUpdatePatch, PendingMarkInfo, ViewerSkillConfig } from '../types';
 import DomPathBreadcrumb from './DomPathBreadcrumb';
 import './MarkPanel.css';

@@ -5,6 +5,62 @@ interface MermaidRendererProps {
   code: string;
 }
 
+const KNOWN_DIAGRAM_PREFIXES = [
+  'graph',
+  'flowchart',
+  'sequenceDiagram',
+  'classDiagram',
+  'stateDiagram',
+  'erDiagram',
+  'journey',
+  'gantt',
+  'pie',
+  'mindmap',
+  'timeline',
+  'gitGraph',
+  'quadrantChart',
+  'requirementDiagram',
+  'c4Context',
+  'c4Container',
+  'c4Component',
+  'c4Dynamic',
+  'c4Deployment',
+  'architecture-beta',
+  'kanban',
+  'block-beta',
+  'zenuml',
+  'packet-beta',
+  'xychart-beta',
+  'sankey-beta',
+].map((item) => item.toLowerCase());
+
+function normalizeMermaidCode(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed) return input;
+
+  const firstNonEmptyLine = trimmed.split(/\r?\n/).find((line) => line.trim());
+  if (!firstNonEmptyLine) return input;
+
+  const normalizedFirstLine = firstNonEmptyLine.trim().toLowerCase();
+  if (KNOWN_DIAGRAM_PREFIXES.some((prefix) => normalizedFirstLine.startsWith(prefix))) {
+    return trimmed;
+  }
+
+  const looksLikeSequence =
+    /^[A-Za-z0-9_\u4e00-\u9fa5-]+\s*[-=]+>+[-=]*\s*[A-Za-z0-9_\u4e00-\u9fa5-]+\s*:/.test(normalizedFirstLine);
+  if (looksLikeSequence) {
+    return `sequenceDiagram\n${trimmed}`;
+  }
+
+  const looksLikeFlow =
+    /^[A-Za-z0-9_\u4e00-\u9fa5-]+\s*--?>\s*[A-Za-z0-9_\u4e00-\u9fa5-]+/.test(normalizedFirstLine);
+  if (looksLikeFlow) {
+    return `flowchart TD\n${trimmed}`;
+  }
+
+  return trimmed;
+}
+
 type RenderState =
   | { status: "loading" }
   | { status: "ready"; svg: string }
@@ -24,6 +80,7 @@ export default function MermaidRenderer({ code }: MermaidRendererProps) {
     let objectUrl: string | null = null;
     idRef.current += 1;
     const id = `mermaid-${idRef.current}`;
+    const normalizedCode = normalizeMermaidCode(code);
 
     const render = async () => {
       try {
@@ -34,7 +91,7 @@ export default function MermaidRenderer({ code }: MermaidRendererProps) {
           securityLevel: "loose",
         });
 
-        const { svg } = await mermaid.render(id, code);
+        const { svg } = await mermaid.render(id, normalizedCode);
         if (!cancelled) {
           svgRef.current = svg;
           setState({ status: "ready", svg });
@@ -78,7 +135,7 @@ export default function MermaidRenderer({ code }: MermaidRendererProps) {
   if (state.status === "error") {
     return (
       <div className="mermaid-container mermaid-error" title={state.message}>
-        <pre><code>{code}</code></pre>
+        <pre><code>{normalizeMermaidCode(code)}</code></pre>
       </div>
     );
   }

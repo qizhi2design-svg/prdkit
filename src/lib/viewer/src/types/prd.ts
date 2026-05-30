@@ -5,6 +5,12 @@ export interface PrdContentResponse {
   frontmatter: Record<string, unknown>;
 }
 
+export interface PrdSaveResponse {
+  fileName: string;
+  content: string;
+  frontmatter: Record<string, unknown>;
+}
+
 /** PRD checkpoint 版本内容（来自 API） */
 export interface PrdCheckpointContentResponse {
   checkpointId: string;

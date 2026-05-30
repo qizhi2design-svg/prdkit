@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { message } from 'antd';
 import type { UseMarksOptions, UseMarksReturn } from '../../types/hooks';
 import type { Mark, MarkUpdatePatch, PendingMarkInfo } from '../../types';
+import { message } from '../../utils/message';
 
 export function useMarks(options: UseMarksOptions): UseMarksReturn {
   const { prototypePath, activeCheckpointPreview } = options;

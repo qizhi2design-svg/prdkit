@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import { message } from 'antd';
 import type { UsePublishReturn, PublishParams } from '../../types/hooks';
+import { message } from '../../utils/message';
 
 export function usePublish(): UsePublishReturn {
   const [drawerOpen, setDrawerOpen] = useState(false);

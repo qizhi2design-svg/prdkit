@@ -1,7 +1,8 @@
 import { CaretDownOutlined, CopyOutlined, DeleteOutlined, EditOutlined, FileAddOutlined, FileOutlined, FolderAddOutlined, FolderFilled, LeftOutlined, RightOutlined, SearchOutlined } from '@ant-design/icons';
-import { Input, Tooltip, Button, Popconfirm, Modal, message } from 'antd';
+import { Input, Tooltip, Button, Popconfirm, Modal } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
-import type { PrdFileInfo } from '../types/common';
+import type { PrdFileInfo, PrdFolderInfo } from '../types/common';
+import { message } from '../utils/message';
 import './FileTree.css';
 
 interface FileTreeProps {
@@ -11,6 +12,7 @@ interface FileTreeProps {
   totalFiles: number;
   viewMode?: 'prototype' | 'prd';
   prdFiles?: PrdFileInfo[];
+  prdFolders?: PrdFolderInfo[];
   onNavigate: (direction: 'prev' | 'next') => void;
   onDeletePrototype: (path: string) => Promise<void> | void;
   onDeleteFolder: (path: string) => Promise<void> | void;
@@ -19,8 +21,17 @@ interface FileTreeProps {
   onCreateFolder: (folderName: string) => Promise<void> | void;
   onMovePrototype: (prototypePath: string, targetFolderPath: string) => Promise<void> | void;
   onCreatePageWithAi: () => Promise<void> | void;
+  onPrdCreate?: (title: string) => Promise<void>;
+  onCreatePrdFolder?: (folderName: string) => Promise<void>;
+  onDeletePrdFolder?: (folderPath: string) => Promise<void>;
+  onMovePrdFile?: (fileName: string, targetFolderPath: string) => Promise<void>;
+  onRenamePrdFolder?: (folderPath: string, targetName: string) => Promise<void>;
   refreshVersion?: number;
   onFilesUpdate?: (files: string[]) => void;
+  // PRD 操作
+  onPrdRename?: (fileName: string, newTitle: string) => Promise<void>;
+  onPrdDuplicate?: (fileName: string) => Promise<void>;
+  onPrdDelete?: (fileName: string) => Promise<void>;
 }
 
 interface PrototypeNode {
@@ -38,6 +49,7 @@ export default function FileTree({
   totalFiles,
   viewMode = 'prototype',
   prdFiles,
+  prdFolders,
   onNavigate,
   onDeletePrototype,
   onDeleteFolder,
@@ -46,8 +58,16 @@ export default function FileTree({
   onCreateFolder,
   onMovePrototype,
   onCreatePageWithAi,
+  onPrdCreate,
+  onCreatePrdFolder,
+  onDeletePrdFolder,
+  onMovePrdFile,
+  onRenamePrdFolder,
   refreshVersion = 0,
   onFilesUpdate,
+  onPrdRename,
+  onPrdDuplicate,
+  onPrdDelete,
 }: FileTreeProps) {
   const [originalData, setOriginalData] = useState<PrototypeNode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,12 +79,21 @@ export default function FileTree({
   const [renameModalOpen, setRenameModalOpen] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const [renameSubmitting, setRenameSubmitting] = useState(false);
-  const [renameTarget, setRenameTarget] = useState<{ path: string; name: string; type: 'file' | 'folder' } | null>(null);
+  const [renameTarget, setRenameTarget] = useState<{ path: string; name: string; type: 'file' | 'folder'; mode: 'prototype' | 'prd' } | null>(null);
   const [draggingPrototypePath, setDraggingPrototypePath] = useState<string | null>(null);
-  const [, setRootDropActive] = useState(false);
+  const [rootDropActive, setRootDropActive] = useState(false);
   const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
   const [createPageModalOpen, setCreatePageModalOpen] = useState(false);
   const [createPageSubmitting, setCreatePageSubmitting] = useState(false);
+
+  // PRD rename state
+  const [prdRenameModalOpen, setPrdRenameModalOpen] = useState(false);
+  const [prdRenameValue, setPrdRenameValue] = useState('');
+  const [prdRenameSubmitting, setPrdRenameSubmitting] = useState(false);
+  const [prdRenameTarget, setPrdRenameTarget] = useState<string | null>(null);
+  const [prdCreateModalOpen, setPrdCreateModalOpen] = useState(false);
+  const [prdCreateValue, setPrdCreateValue] = useState('');
+  const [prdCreateSubmitting, setPrdCreateSubmitting] = useState(false);
 
   useEffect(() => {
     void fetchPrototypes();
@@ -78,6 +107,14 @@ export default function FileTree({
   const visibleNodes = useMemo(
     () => filterTreeNodes(originalData, normalizedSearch),
     [normalizedSearch, originalData]
+  );
+  const prdTreeNodes = useMemo(
+    () => buildPrdTree(prdFiles || [], prdFolders || []),
+    [prdFiles, prdFolders],
+  );
+  const visiblePrdNodes = useMemo(
+    () => filterTreeNodes(prdTreeNodes, normalizedSearch),
+    [normalizedSearch, prdTreeNodes],
   );
 
 
@@ -136,8 +173,12 @@ export default function FileTree({
 
     try {
       setFolderSubmitting(true);
-      await onCreateFolder(trimmedName);
-      await fetchPrototypes();
+      if (viewMode === 'prd') {
+        await onCreatePrdFolder?.(trimmedName);
+      } else {
+        await onCreateFolder(trimmedName);
+        await fetchPrototypes();
+      }
       setCreateFolderModalOpen(false);
       setNewFolderName('');
     } catch (error) {
@@ -148,8 +189,8 @@ export default function FileTree({
     }
   };
 
-  const handleStartRename = (path: string, name: string, type: 'file' | 'folder') => {
-    setRenameTarget({ path, name, type });
+  const handleStartRename = (path: string, name: string, type: 'file' | 'folder', mode: 'prototype' | 'prd' = 'prototype') => {
+    setRenameTarget({ path, name, type, mode });
     setRenameValue(name);
     setRenameModalOpen(true);
   };
@@ -165,8 +206,12 @@ export default function FileTree({
 
     try {
       setRenameSubmitting(true);
-      await onRenameNode(renameTarget.path, trimmedName);
-      await fetchPrototypes();
+      if (renameTarget.mode === 'prd' && renameTarget.type === 'folder') {
+        await onRenamePrdFolder?.(renameTarget.path, trimmedName);
+      } else {
+        await onRenameNode(renameTarget.path, trimmedName);
+        await fetchPrototypes();
+      }
       setRenameModalOpen(false);
       setRenameTarget(null);
       setRenameValue('');
@@ -187,6 +232,47 @@ export default function FileTree({
       message.error(error instanceof Error ? error.message : '复制失败');
     } finally {
       setCreatePageSubmitting(false);
+    }
+  };
+
+  const handlePrdRenameSubmit = async () => {
+    const trimmedTitle = prdRenameValue.trim();
+    if (!trimmedTitle || !prdRenameTarget) {
+      message.warning('请输入标题');
+      return;
+    }
+
+    try {
+      setPrdRenameSubmitting(true);
+      await onPrdRename?.(prdRenameTarget, trimmedTitle);
+      setPrdRenameModalOpen(false);
+      setPrdRenameTarget(null);
+      setPrdRenameValue('');
+    } catch (error) {
+      console.error('重命名 PRD 标题失败:', error);
+      message.error(error instanceof Error ? error.message : '重命名失败');
+    } finally {
+      setPrdRenameSubmitting(false);
+    }
+  };
+
+  const handlePrdCreateSubmit = async () => {
+    const trimmedTitle = prdCreateValue.trim();
+    if (!trimmedTitle) {
+      message.warning('请输入 PRD 标题');
+      return;
+    }
+
+    try {
+      setPrdCreateSubmitting(true);
+      await onPrdCreate?.(trimmedTitle);
+      setPrdCreateModalOpen(false);
+      setPrdCreateValue('');
+    } catch (error) {
+      console.error('新建 PRD 失败:', error);
+      message.error(error instanceof Error ? error.message : '新建 PRD 失败');
+    } finally {
+      setPrdCreateSubmitting(false);
     }
   };
 
@@ -221,21 +307,39 @@ export default function FileTree({
           size="small"
           className="file-tree-search-input"
         />
-        {viewMode !== 'prd' && (
-          <>
-            <ButtonIcon icon={<LeftOutlined />} onClick={() => onNavigate('prev')} aria-label="上一个页面" />
-            <ButtonIcon icon={<RightOutlined />} onClick={() => onNavigate('next')} aria-label="下一个页面" />
-          </>
-        )}
+        <ButtonIcon icon={<LeftOutlined />} onClick={() => onNavigate('prev')} aria-label="上一个页面" />
+        <ButtonIcon icon={<RightOutlined />} onClick={() => onNavigate('next')} aria-label="下一个页面" />
       </div>
 
       <div className="file-tree-project-name">
-        <div className="file-tree-project-header">
+        <div
+          className={`file-tree-project-header ${draggingPrototypePath && rootDropActive ? 'root-drop-active' : ''}`}
+          onDragOver={(event) => {
+            if (!draggingPrototypePath) return;
+            event.preventDefault();
+            setRootDropActive(true);
+            setDropTargetPath(null);
+          }}
+          onDragLeave={() => {
+            setRootDropActive(false);
+          }}
+          onDrop={() => {
+            if (!draggingPrototypePath) return;
+            if (viewMode === 'prd') {
+              void onMovePrdFile?.(draggingPrototypePath, '');
+            } else {
+              void onMovePrototype(draggingPrototypePath, '');
+            }
+            setDraggingPrototypePath(null);
+            setDropTargetPath(null);
+            setRootDropActive(false);
+          }}
+        >
           <div className="file-tree-project-heading">
             <h2 className="file-tree-project-title">{viewMode === 'prd' ? 'PRD 文档' : '页面'}</h2>
             <span className="file-tree-file-count">{currentIndex} / {totalFiles}</span>
           </div>
-          {viewMode !== 'prd' && (
+          {viewMode !== 'prd' ? (
             <div className="file-tree-project-actions">
               <Tooltip title="新建文件夹" getPopupContainer={() => document.body}>
                 <Button
@@ -256,32 +360,96 @@ export default function FileTree({
                 />
               </Tooltip>
             </div>
+          ) : (
+            <div className="file-tree-project-actions">
+              <Tooltip title="新建文件夹" getPopupContainer={() => document.body}>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<FolderAddOutlined />}
+                  className="file-tree-project-action"
+                  onClick={() => setCreateFolderModalOpen(true)}
+                />
+              </Tooltip>
+              <Tooltip title="新建 PRD" getPopupContainer={() => document.body}>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<FileAddOutlined />}
+                  className="file-tree-project-action"
+                  onClick={() => setPrdCreateModalOpen(true)}
+                />
+              </Tooltip>
+            </div>
           )}
         </div>
       </div>
 
-      <div className="file-tree-content custom-scrollbar">
+      <div
+        className="file-tree-content custom-scrollbar"
+        onDragOver={(event) => {
+          if (!draggingPrototypePath) return;
+          event.preventDefault();
+          setRootDropActive(true);
+          setDropTargetPath(null);
+        }}
+        onDragLeave={(event) => {
+          if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+          setRootDropActive(false);
+        }}
+        onDrop={() => {
+          if (!draggingPrototypePath) return;
+          if (viewMode === 'prd') {
+            void onMovePrdFile?.(draggingPrototypePath, '');
+          } else {
+            void onMovePrototype(draggingPrototypePath, '');
+          }
+          setDraggingPrototypePath(null);
+          setDropTargetPath(null);
+          setRootDropActive(false);
+        }}
+      >
         <div className="file-tree-list" role="tree">
           {viewMode === 'prd' ? (
-            prdFiles && prdFiles.length === 0 ? (
+            (!prdFiles || prdFiles.length === 0) && (!prdFolders || prdFolders.length === 0) ? (
               <div className="file-tree-empty">暂无 PRD 文档</div>
             ) : (
-              (prdFiles || []).map((prd) => (
-                <button
-                  key={prd.fileName}
-                  type="button"
-                  className={`file-tree-item file ${selectedFile === prd.fileName ? 'selected' : ''}`}
-                  style={{ paddingLeft: '12px' }}
-                  onClick={() => onSelect(prd.fileName)}
-                >
-                  <span className="file-tree-item-icon">
-                    <svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor">
-                      <path d="M854.6 288.6L639.4 73.4c-6-6-14.1-9.4-22.6-9.4H192c-17.7 0-32 14.3-32 32v832c0 17.7 14.3 32 32 32h640c17.7 0 32-14.3 32-32V311.3c0-8.5-3.4-16.7-9.4-22.7zM790.2 326H602V137.8L790.2 326zm1.8 562H232V136h302v216a42 42 0 0042 42h216v494z" />
-                    </svg>
-                  </span>
-                  <span className="file-tree-item-label">{prd.title || prd.fileName.replace(/\.md$/, '')}</span>
-                  {prd.status && <span className="file-tree-item-tag">{prd.status}</span>}
-                </button>
+              visiblePrdNodes.map((node) => (
+                <TreeBranch
+                  key={node.path || node.name}
+                  node={node}
+                  depth={0}
+                  selectedFile={selectedFile}
+                  searchValue={normalizedSearch}
+                  expandedFolders={expandedFolders}
+                  draggingPrototypePath={draggingPrototypePath}
+                  dropTargetPath={dropTargetPath}
+                  viewMode="prd"
+                  onToggleFolder={toggleFolder}
+                  onSelect={onSelect}
+                  onDeletePrototype={onDeletePrototype}
+                  onDuplicatePrototype={onDuplicatePrototype}
+                  onDeleteFolder={onDeleteFolder}
+                  onRenameNode={handleStartRename}
+                  onDragStart={setDraggingPrototypePath}
+                  onDragEnd={() => {
+                    setDraggingPrototypePath(null);
+                    setDropTargetPath(null);
+                    setRootDropActive(false);
+                  }}
+                  onFolderDropActiveChange={setDropTargetPath}
+                  onMovePrototype={handleFileDropToFolder}
+                  onPrdRenameStart={(fileName, title) => {
+                    setPrdRenameTarget(fileName);
+                    setPrdRenameValue(title);
+                    setPrdRenameModalOpen(true);
+                  }}
+                  onPrdFolderRenameStart={(folderPath, name) => handleStartRename(folderPath, name, 'folder', 'prd')}
+                  onPrdDuplicate={onPrdDuplicate}
+                  onPrdDelete={onPrdDelete}
+                  onPrdDeleteFolder={onDeletePrdFolder}
+                  onPrdMove={onMovePrdFile}
+                />
               ))
             )
           ) : visibleNodes.length === 0 ? (
@@ -420,6 +588,59 @@ export default function FileTree({
           </div>
         </div>
       </Modal>
+
+      <Modal
+        title="新建 PRD"
+        open={prdCreateModalOpen}
+        onCancel={() => {
+          if (prdCreateSubmitting) return;
+          setPrdCreateModalOpen(false);
+          setPrdCreateValue('');
+        }}
+        onOk={() => {
+          void handlePrdCreateSubmit();
+        }}
+        okText="创建"
+        cancelText="取消"
+        confirmLoading={prdCreateSubmitting}
+      >
+        <Input
+          value={prdCreateValue}
+          onChange={(e) => setPrdCreateValue(e.target.value)}
+          placeholder="请输入 PRD 标题"
+          onPressEnter={() => {
+            void handlePrdCreateSubmit();
+          }}
+          autoFocus
+        />
+      </Modal>
+
+      <Modal
+        title="重命名 PRD 标题"
+        open={prdRenameModalOpen}
+        onCancel={() => {
+          if (prdRenameSubmitting) return;
+          setPrdRenameModalOpen(false);
+          setPrdRenameTarget(null);
+          setPrdRenameValue('');
+        }}
+        onOk={() => {
+          void handlePrdRenameSubmit();
+        }}
+        okText="保存"
+        cancelText="取消"
+        confirmLoading={prdRenameSubmitting}
+      >
+        <Input
+          value={prdRenameValue}
+          onChange={(e) => setPrdRenameValue(e.target.value)}
+          placeholder="请输入新的 PRD 标题"
+          onPressEnter={() => {
+            void handlePrdRenameSubmit();
+          }}
+          autoFocus
+        />
+      </Modal>
     </div>
   );
 }
@@ -432,6 +653,7 @@ function TreeBranch({
   expandedFolders,
   draggingPrototypePath,
   dropTargetPath,
+  viewMode = 'prototype',
   onToggleFolder,
   onSelect,
   onDeletePrototype,
@@ -442,6 +664,12 @@ function TreeBranch({
   onDragEnd,
   onFolderDropActiveChange,
   onMovePrototype,
+  onPrdRenameStart,
+  onPrdFolderRenameStart,
+  onPrdDuplicate,
+  onPrdDelete,
+  onPrdDeleteFolder,
+  onPrdMove,
 }: {
   node: PrototypeNode;
   depth: number;
@@ -450,16 +678,23 @@ function TreeBranch({
   expandedFolders: Record<string, boolean>;
   draggingPrototypePath: string | null;
   dropTargetPath: string | null;
+  viewMode?: 'prototype' | 'prd';
   onToggleFolder: (path: string) => void;
   onSelect: (path: string | null) => void;
   onDeletePrototype: (path: string) => Promise<void> | void;
   onDuplicatePrototype: (path: string) => Promise<void> | void;
   onDeleteFolder: (path: string) => Promise<void> | void;
-  onRenameNode: (path: string, name: string, type: 'file' | 'folder') => void;
+  onRenameNode: (path: string, name: string, type: 'file' | 'folder', mode?: 'prototype' | 'prd') => void;
   onDragStart: (path: string | null) => void;
   onDragEnd: () => void;
   onFolderDropActiveChange: (path: string | null) => void;
   onMovePrototype: (prototypePath: string, targetFolderPath: string) => Promise<void>;
+  onPrdRenameStart?: (fileName: string, title: string) => void;
+  onPrdFolderRenameStart?: (folderPath: string, name: string) => void;
+  onPrdDuplicate?: (fileName: string) => Promise<void>;
+  onPrdDelete?: (fileName: string) => Promise<void>;
+  onPrdDeleteFolder?: (folderPath: string) => Promise<void>;
+  onPrdMove?: (fileName: string, targetFolderPath: string) => Promise<void>;
 }) {
   const isFolder = node.type === 'folder';
   const nodePath = node.path || `${node.name}-${depth}`;
@@ -496,6 +731,10 @@ function TreeBranch({
           }}
           onDrop={() => {
             if (!isFolder || !draggingPrototypePath || !node.path) return;
+            if (viewMode === 'prd') {
+              void onPrdMove?.(draggingPrototypePath, node.path);
+              return;
+            }
             void onMovePrototype(draggingPrototypePath, node.path);
           }}
           onClick={() => {
@@ -525,21 +764,37 @@ function TreeBranch({
           <span className="file-tree-item-actions">
             {isFolder ? (
               <>
-                <Tooltip title="重命名" getPopupContainer={() => document.body}>
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<EditOutlined />}
-                  className="file-tree-inline-action"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onRenameNode(node.path, node.name, 'folder');
-                  }}
-                />
-                </Tooltip>
+                {viewMode !== 'prd' ? (
+                  <Tooltip title="重命名" getPopupContainer={() => document.body}>
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<EditOutlined />}
+                    className="file-tree-inline-action"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onRenameNode(node.path, node.name, 'folder');
+                    }}
+                  />
+                  </Tooltip>
+                ) : null}
+                {viewMode === 'prd' ? (
+                  <Tooltip title="重命名文件夹" getPopupContainer={() => document.body}>
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<EditOutlined />}
+                    className="file-tree-inline-action"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onPrdFolderRenameStart?.(node.path, node.name);
+                    }}
+                  />
+                  </Tooltip>
+                ) : null}
                 <Popconfirm
-                  title="删除文件夹"
-                  description="将删除该文件夹以及下面的所有页面和标记文件，确认继续？"
+                  title={viewMode === 'prd' ? '删除 PRD 文件夹' : '删除文件夹'}
+                  description={viewMode === 'prd' ? '将删除该文件夹以及下面的所有 PRD 文档，确认继续？' : '将删除该文件夹以及下面的所有页面和标记文件，确认继续？'}
                   placement="rightTop"
                   overlayClassName="file-tree-popconfirm"
                   okText="删除"
@@ -547,10 +802,13 @@ function TreeBranch({
                   okButtonProps={{ danger: true }}
                   onConfirm={(event) => {
                     event?.stopPropagation();
+                    if (viewMode === 'prd') {
+                      return onPrdDeleteFolder?.(node.path);
+                    }
                     return onDeleteFolder(node.path);
                   }}
                 >
-                  <Tooltip title="删除文件夹" getPopupContainer={() => document.body}>
+                  <Tooltip title={viewMode === 'prd' ? '删除文件夹' : '删除文件夹'} getPopupContainer={() => document.body}>
                   <Button
                     type="text"
                     danger
@@ -564,7 +822,7 @@ function TreeBranch({
               </>
             ) : (
               <>
-                <Tooltip title="重命名" getPopupContainer={() => document.body}>
+                <Tooltip title={viewMode === 'prd' ? '重命名标题' : '重命名'} getPopupContainer={() => document.body}>
                 <Button
                   type="text"
                   size="small"
@@ -572,11 +830,15 @@ function TreeBranch({
                   className="file-tree-inline-action"
                   onClick={(event) => {
                     event.stopPropagation();
+                    if (viewMode === 'prd') {
+                      onPrdRenameStart?.(node.path, node.name);
+                      return;
+                    }
                     onRenameNode(node.path, node.name, 'file');
                   }}
                 />
                 </Tooltip>
-                <Tooltip title="复制页面" getPopupContainer={() => document.body}>
+                <Tooltip title={viewMode === 'prd' ? '复制文档' : '复制页面'} getPopupContainer={() => document.body}>
                 <Button
                   type="text"
                   size="small"
@@ -584,13 +846,17 @@ function TreeBranch({
                   className="file-tree-inline-action file-tree-inline-copy"
                   onClick={(event) => {
                     event.stopPropagation();
+                    if (viewMode === 'prd') {
+                      void onPrdDuplicate?.(node.path);
+                      return;
+                    }
                     void onDuplicatePrototype(node.path);
                   }}
                 />
                 </Tooltip>
                 <Popconfirm
-                  title="删除页面"
-                  description="将删除页面目录及页面下的标记文件，确认继续？"
+                  title={viewMode === 'prd' ? '删除 PRD 文档' : '删除页面'}
+                  description={viewMode === 'prd' ? '将永久删除该 PRD 文档，确认继续？' : '将删除页面目录及页面下的标记文件，确认继续？'}
                   placement="rightTop"
                   overlayClassName="file-tree-popconfirm"
                   okText="删除"
@@ -598,10 +864,13 @@ function TreeBranch({
                   okButtonProps={{ danger: true }}
                   onConfirm={(event) => {
                     event?.stopPropagation();
+                    if (viewMode === 'prd') {
+                      return onPrdDelete?.(node.path);
+                    }
                     return onDeletePrototype(node.path);
                   }}
                 >
-                  <Tooltip title="删除页面" getPopupContainer={() => document.body}>
+                  <Tooltip title={viewMode === 'prd' ? '删除文档' : '删除页面'} getPopupContainer={() => document.body}>
                   <Button
                     type="text"
                     danger
@@ -631,6 +900,7 @@ function TreeBranch({
                 expandedFolders={expandedFolders}
                 draggingPrototypePath={draggingPrototypePath}
                 dropTargetPath={dropTargetPath}
+                viewMode={viewMode}
                 onToggleFolder={onToggleFolder}
                 onSelect={onSelect}
                 onDeletePrototype={onDeletePrototype}
@@ -641,6 +911,12 @@ function TreeBranch({
                 onDragEnd={onDragEnd}
                 onFolderDropActiveChange={onFolderDropActiveChange}
                 onMovePrototype={onMovePrototype}
+                onPrdRenameStart={onPrdRenameStart}
+                onPrdFolderRenameStart={onPrdFolderRenameStart}
+                onPrdDuplicate={onPrdDuplicate}
+                onPrdDelete={onPrdDelete}
+                onPrdDeleteFolder={onPrdDeleteFolder}
+                onPrdMove={onPrdMove}
               />
             ))}
         </div>
@@ -657,6 +933,77 @@ function matchesNode(node: PrototypeNode, searchValue: string): boolean {
 
 function filterTreeNodes(nodes: PrototypeNode[], searchValue: string): PrototypeNode[] {
   return nodes.filter((node) => matchesNode(node, searchValue));
+}
+
+function buildPrdTree(prdFiles: PrdFileInfo[], prdFolders: PrdFolderInfo[]): PrototypeNode[] {
+  const root: PrototypeNode[] = [];
+  const folderMap = new Map<string, PrototypeNode>();
+
+  const ensureFolder = (folderPath: string) => {
+    if (folderMap.has(folderPath)) {
+      return folderMap.get(folderPath)!;
+    }
+
+    const segments = folderPath.split('/').filter(Boolean);
+    const folderName = segments[segments.length - 1] || folderPath;
+    const parentPath = segments.length > 1 ? segments.slice(0, -1).join('/') : '';
+    const folderNode: PrototypeNode = {
+      id: `prd-folder:${folderPath}`,
+      name: folderName,
+      type: 'folder',
+      path: folderPath,
+      children: [],
+    };
+
+    folderMap.set(folderPath, folderNode);
+    if (parentPath) {
+      ensureFolder(parentPath).children!.push(folderNode);
+    } else {
+      root.push(folderNode);
+    }
+
+    return folderNode;
+  };
+
+  for (const folder of prdFolders) {
+    ensureFolder(folder.folderPath);
+  }
+
+  for (const file of prdFiles) {
+    const normalizedPath = file.fileName.replace(/\\/g, '/');
+    const segments = normalizedPath.split('/').filter(Boolean);
+    const fileName = segments.pop() || normalizedPath;
+    const parentPath = segments.join('/');
+    const fileNode: PrototypeNode = {
+      id: `prd-file:${normalizedPath}`,
+      name: file.name || fileName.replace(/\.md$/, ''),
+      type: 'file',
+      path: normalizedPath,
+    };
+
+    if (parentPath) {
+      ensureFolder(parentPath).children!.push(fileNode);
+    } else {
+      root.push(fileNode);
+    }
+  }
+
+  const sortNodes = (nodes: PrototypeNode[]) => {
+    nodes.sort((a, b) => {
+      if (a.type !== b.type) {
+        return a.type === 'folder' ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name, 'zh-CN');
+    });
+    nodes.forEach((node) => {
+      if (node.children) {
+        sortNodes(node.children);
+      }
+    });
+  };
+
+  sortNodes(root);
+  return root;
 }
 
 function ButtonIcon({ icon, onClick, 'aria-label': ariaLabel }: { icon: React.ReactNode; onClick: () => void; 'aria-label'?: string }) {

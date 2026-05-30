@@ -8,6 +8,7 @@ import type { CheckpointEvent } from '../checkpoints/prototype/types.js';
 
 export interface WatcherOptions {
   prototypesDir: string;
+  prdsDir?: string;
   onReload: () => void;
   checkpointEventsFile?: string;
   checkpointRootDir?: string;
@@ -104,14 +105,19 @@ export function resolvePrototypePathFromWatchEvent(prototypesDir: string, target
 export function createWatcher(options: WatcherOptions) {
   const {
     prototypesDir,
+    prdsDir,
     onReload,
     checkpointEventsFile,
     checkpointRootDir,
     onCheckpointEvent,
   } = options;
-  const contentTracker = new WatchContentTracker(prototypesDir);
+  const watchRoots = [prototypesDir, prdsDir].filter((value): value is string => Boolean(value));
+  const contentTrackers = watchRoots.map((rootDir) => ({
+    rootDir: path.resolve(rootDir),
+    tracker: new WatchContentTracker(rootDir),
+  }));
 
-  const watcher = chokidar.watch(prototypesDir, {
+  const watcher = chokidar.watch(watchRoots, {
     ignored: (watchedPath) => shouldIgnoreWatchPath(watchedPath), // 忽略隐藏文件
     persistent: true,
     ignoreInitial: true,
@@ -124,14 +130,20 @@ export function createWatcher(options: WatcherOptions) {
     onReload();
   };
 
+  const getTrackerForPath = (targetPath: string) => {
+    const absolutePath = normalizeWatchedPath(targetPath);
+    return contentTrackers.find(({ rootDir }) => absolutePath.startsWith(rootDir));
+  };
+
   watcher
     .on('add', (path: string) => {
       console.log(chalk.green('  ✓ 文件已添加:'), chalk.gray(path));
-      contentTracker.onFileAdd(path);
+      getTrackerForPath(path)?.tracker.onFileAdd(path);
       handleChange(path);
     })
     .on('change', (path: string) => {
-      if (!contentTracker.onFileChange(path)) {
+      const trackerEntry = getTrackerForPath(path);
+      if (trackerEntry && !trackerEntry.tracker.onFileChange(path)) {
         return;
       }
       console.log(chalk.yellow('  ⟳ 文件已修改:'), chalk.gray(path));
@@ -139,7 +151,7 @@ export function createWatcher(options: WatcherOptions) {
     })
     .on('unlink', (path: string) => {
       console.log(chalk.red('  ✗ 文件已删除:'), chalk.gray(path));
-      contentTracker.onFileUnlink(path);
+      getTrackerForPath(path)?.tracker.onFileUnlink(path);
       handleChange(path);
     })
     .on('addDir', (path: string) => {
