@@ -29,8 +29,8 @@ interface HistoryDrawerProps {
   onIterationChange?: (iterationId: string | null) => void;
   onIterationsRefresh?: () => Promise<void>;
   onClose: () => void;
-  onPreview?: (detail: CheckpointDetail) => void;
-  onPreviewGroup?: (details: CheckpointDetail[]) => void;
+  onPreview?: (detail: CheckpointDetail, versionLabel?: string | null) => void;
+  onPreviewGroup?: (details: CheckpointDetail[], versionLabel?: string | null) => void;
   onRestore?: (detail: CheckpointDetail, versionLabel: string) => Promise<void>;
   // PRD 模式 props
   viewMode?: 'prototype' | 'prd';
@@ -192,7 +192,9 @@ export default function HistoryDrawer({
     setSelectedCheckpointId(focusCheckpointId);
     void loadDetail(focusCheckpointId)
       .then((detail) => {
-        onPreview(detail);
+        const entryIndex = versionEntries.findIndex((item) => item.records.some((record) => record.id === focusCheckpointId));
+        const versionLabel = entryIndex >= 0 ? `版本${versionEntries.length - entryIndex}` : null;
+        onPreview(detail, versionLabel);
       })
       .catch((error) => {
         console.error('切换到目标 checkpoint 失败:', error);
@@ -204,7 +206,9 @@ export default function HistoryDrawer({
       const record = pickRecordForEntry(entry);
       setSelectedCheckpointId(record.id);
       const details = await Promise.all(entry.records.map((item) => loadDetail(item.id)));
-      onPreviewGroup(details);
+      const entryIndex = versionEntries.findIndex((item) => item.key === entry.key);
+      const versionLabel = entryIndex >= 0 ? `版本${versionEntries.length - entryIndex}` : null;
+      onPreviewGroup(details, versionLabel);
     } catch (error) {
       console.error('预览 checkpoint 失败:', error);
     }

@@ -11,7 +11,8 @@ interface FileTreeProps {
   currentIndex: number;
   totalFiles: number;
   viewMode?: 'prototype' | 'prd';
-  readonly?: boolean;
+  /** 只读模式, 隐藏操作按钮 */
+  hideActions?: boolean;
   prdFiles?: PrdFileInfo[];
   prdFolders?: PrdFolderInfo[];
   onNavigate: (direction: 'prev' | 'next') => void;
@@ -69,7 +70,7 @@ export default function FileTree({
   onPrdRename,
   onPrdDuplicate,
   onPrdDelete,
-  readonly = false,
+  hideActions: treeReadOnly = false,
 }: FileTreeProps) {
   const [originalData, setOriginalData] = useState<PrototypeNode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -341,7 +342,7 @@ export default function FileTree({
             <h2 className="file-tree-project-title">{viewMode === 'prd' ? 'PRD 文档' : '页面'}</h2>
             <span className="file-tree-file-count">{currentIndex} / {totalFiles}</span>
           </div>
-          {!readonly && viewMode !== 'prd' ? (
+          {!treeReadOnly && viewMode !== 'prd' ? (
             <div className="file-tree-project-actions">
               <Tooltip title="新建文件夹" getPopupContainer={() => document.body}>
                 <Button
@@ -362,7 +363,7 @@ export default function FileTree({
                 />
               </Tooltip>
             </div>
-          ) : !readonly ? (
+          ) : !treeReadOnly ? (
             <div className="file-tree-project-actions">
               <Tooltip title="新建文件夹" getPopupContainer={() => document.body}>
                 <Button
@@ -383,7 +384,7 @@ export default function FileTree({
                 />
               </Tooltip>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -421,6 +422,7 @@ export default function FileTree({
                   key={node.path || node.name}
                   node={node}
                   depth={0}
+                  hideActions={treeReadOnly}
                   selectedFile={selectedFile}
                   searchValue={normalizedSearch}
                   expandedFolders={expandedFolders}
@@ -462,6 +464,7 @@ export default function FileTree({
                 key={node.path || node.name}
                 node={node}
                 depth={0}
+                hideActions={treeReadOnly}
                 selectedFile={selectedFile}
                 searchValue={normalizedSearch}
                 expandedFolders={expandedFolders}
@@ -650,6 +653,7 @@ export default function FileTree({
 function TreeBranch({
   node,
   depth,
+  hideActions = false,
   selectedFile,
   searchValue,
   expandedFolders,
@@ -675,6 +679,7 @@ function TreeBranch({
 }: {
   node: PrototypeNode;
   depth: number;
+  hideActions?: boolean;
   selectedFile: string | null;
   searchValue: string;
   expandedFolders: Record<string, boolean>;
@@ -763,7 +768,7 @@ function TreeBranch({
             {isFolder ? <FolderFilled /> : <FileOutlined />}
           </span>
           <span className="file-tree-item-label">{node.name}</span>
-          {!readonly && <span className="file-tree-item-actions">
+          <span className="file-tree-item-actions" style={{ display: hideActions ? 'none' : undefined }}>
             {isFolder ? (
               <>
                 {viewMode !== 'prd' ? (
@@ -885,7 +890,7 @@ function TreeBranch({
                 </Popconfirm>
               </>
             )}
-          </span>}
+          </span>
         </div>
       </Tooltip>
       {isFolder && expanded && hasChildren ? (
@@ -897,6 +902,7 @@ function TreeBranch({
                 key={child.path || `${nodePath}-${child.name}`}
                 node={child}
                 depth={depth + 1}
+                hideActions={hideActions}
                 selectedFile={selectedFile}
                 searchValue={searchValue}
                 expandedFolders={expandedFolders}

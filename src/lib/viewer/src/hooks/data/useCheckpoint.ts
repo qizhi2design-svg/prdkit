@@ -46,6 +46,7 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
 
   const [status, setStatus] = useState<CheckpointStatus | null>(null);
   const [manualPreview, setManualPreview] = useState<ActiveCheckpointPreview | null>(null);
+  const [activeVersionLabel, setActiveVersionLabel] = useState<string | null>(null);
   const [groupPreviewMap, setGroupPreviewMap] = useState<Record<string, ActiveCheckpointPreview> | null>(null);
   const [groupPreviewPages, setGroupPreviewPages] = useState<string[]>([]);
   const [detailCache, setDetailCache] = useState<Record<string, CheckpointDetail>>({});
@@ -172,7 +173,7 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
     setActiveIterationId(null);
   }, [activeIterationId, iterations]);
 
-  const preview = useCallback((detail: CheckpointDetail) => {
+  const preview = useCallback((detail: CheckpointDetail, versionLabel?: string | null) => {
     const nextPreview = toActivePreview(detail);
     if (!nextPreview) {
       message.error('该 checkpoint 暂时无法预览');
@@ -183,10 +184,11 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
     setGroupPreviewMap(null);
     setGroupPreviewPages([]);
     setManualPreview(nextPreview);
+    setActiveVersionLabel(versionLabel ?? null);
     setDetailCache((prev) => ({ ...prev, [detail.checkpoint.id]: detail }));
   }, []);
 
-  const previewGroup = useCallback((details: CheckpointDetail[]) => {
+  const previewGroup = useCallback((details: CheckpointDetail[], versionLabel?: string | null) => {
     const previews = details
       .map((detail) => toActivePreview(detail))
       .filter((preview): preview is ActiveCheckpointPreview => Boolean(preview));
@@ -208,6 +210,7 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
     setManualPreview(null);
     setGroupPreviewMap(nextGroupMap);
     setGroupPreviewPages(nextGroupPages);
+    setActiveVersionLabel(versionLabel ?? null);
     setDetailCache((prev) => ({
       ...prev,
       ...details.reduce<Record<string, CheckpointDetail>>((acc, detail) => {
@@ -238,8 +241,10 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
     }
 
     const details = await Promise.all(targetGroup.map((record) => loadDetail(record.id)));
+    const targetIndex = groups.findIndex((group) => group === targetGroup);
+    const versionLabel = targetIndex >= 0 ? `版本${groups.length - targetIndex}` : null;
     setHistoryTargetCheckpointId(targetGroup[0]?.id ?? null);
-    previewGroup(details);
+    previewGroup(details, versionLabel);
     await Promise.all([loadStatus(), loadIterations()]);
   }, [loadDetail, loadIterations, loadStatus, previewGroup]);
 
@@ -306,6 +311,7 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
         setManualPreview(null);
         setGroupPreviewMap(null);
         setGroupPreviewPages([]);
+        setActiveVersionLabel(null);
         setActiveIterationId(null);
         setHistoryTargetCheckpointId(detail.checkpoint.id);
         setHistoryRefreshVersion((prev) => prev + 1);
@@ -323,6 +329,7 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
     setManualPreview(null);
     setGroupPreviewMap(null);
     setGroupPreviewPages([]);
+    setActiveVersionLabel(null);
     setActiveIterationId(null);
   }, []);
 
@@ -330,6 +337,7 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
     setManualPreview(null);
     setGroupPreviewMap(null);
     setGroupPreviewPages([]);
+    setActiveVersionLabel(null);
     setActiveIterationId(iterationId);
   }, []);
 
@@ -340,11 +348,13 @@ export function useCheckpoint(options: UseCheckpointOptions): UseCheckpointRetur
   const closeHistory = useCallback(() => {
     setHistoryDrawerOpen(false);
     setManualPreview(null);
+    setActiveVersionLabel(null);
   }, []);
 
   return {
     status,
     activePreview,
+    activeVersionLabel,
     activeIterationId,
     iterations,
     historyDrawerOpen,

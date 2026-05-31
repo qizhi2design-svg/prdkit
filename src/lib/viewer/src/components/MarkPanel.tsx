@@ -35,6 +35,7 @@ interface MarkPanelProps {
   projectName?: string;
   filePath?: string | null;
   prototypesDir?: string;
+  readonly?: boolean;
 }
 
 export default function MarkPanel({
@@ -57,6 +58,7 @@ export default function MarkPanel({
   projectName = '',
   filePath = null,
   prototypesDir = '',
+  readonly = false,
 }: MarkPanelProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
@@ -154,6 +156,11 @@ DOM 路径: ${domPath}`;
 
   // ESC 键监听：退出编辑模式
   useEffect(() => {
+    if (!readonly) return;
+    setIsEditing(false);
+  }, [readonly]);
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isEditing) {
         e.preventDefault();
@@ -188,7 +195,7 @@ DOM 路径: ${domPath}`;
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [viewMode, selectedMarkId]);
+  }, [viewMode, selectedMarkId, readonly]);
 
   // Ctrl/Cmd+C 键监听：复制 DOM 信息
   useEffect(() => {
@@ -227,6 +234,10 @@ DOM 路径: ${domPath}`;
   };
 
   const handleStartEdit = () => {
+    if (readonly) {
+      message.info('历史版本预览中不可编辑标记，请先还原到该版本');
+      return;
+    }
     if (selectedMark) {
       setIsEditing(true);
       setEditTitle(selectedMark.title);
@@ -235,6 +246,10 @@ DOM 路径: ${domPath}`;
   };
 
   const handleSaveEdit = () => {
+    if (readonly) {
+      message.info('历史版本预览中不可编辑标记，请先还原到该版本');
+      return;
+    }
     if (selectedMarkId && editContent.trim()) {
       // 如果标题为空，使用原标题
       const finalTitle = editTitle.trim() || selectedMark?.title || '标记';
@@ -255,6 +270,10 @@ DOM 路径: ${domPath}`;
   };
 
   const handleCreateMark = () => {
+    if (readonly) {
+      message.info('历史版本预览中不可新增标记，请先还原到该版本');
+      return;
+    }
     if (!pendingMarkInfo || !newMarkDescription.trim()) {
       return;
     }
@@ -280,6 +299,10 @@ DOM 路径: ${domPath}`;
   };
 
   const handleDeleteMark = () => {
+    if (readonly) {
+      message.info('历史版本预览中不可删除标记，请先还原到该版本');
+      return;
+    }
     if (selectedMarkId) {
       onMarkDelete(selectedMarkId);
       handleBackToList();
@@ -428,45 +451,49 @@ DOM 路径: ${domPath}`;
                     </div>
                     {missingMarkIdSet.has(mark.id) && (
                       <div className="mark-list-missing-row">
-                        <Button
-                          type="link"
-                          size="small"
-                          icon={<NodeIndexOutlined />}
-                          className="mark-relink-link"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onMarkSelect(mark.id);
-                            onMarkRelinkStart(mark.id);
-                          }}
-                        >
-                          重新绑定
-                        </Button>
+                        {!readonly ? (
+                          <Button
+                            type="link"
+                            size="small"
+                            icon={<NodeIndexOutlined />}
+                            className="mark-relink-link"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onMarkSelect(mark.id);
+                              onMarkRelinkStart(mark.id);
+                            }}
+                          >
+                            重新绑定
+                          </Button>
+                        ) : null}
                       </div>
                     )}
                   </div>
-                  <Popconfirm
-                    key="delete"
-                    title="删除标记"
-                    description="将删除当前标记文件，确认继续？"
-                    okText="删除"
-                    cancelText="取消"
-                    okButtonProps={{ danger: true }}
-                    onConfirm={(e) => {
-                      e?.stopPropagation();
-                      onMarkDelete(mark.id);
-                    }}
-                  >
-                    <Button
-                      type="text"
-                      danger
-                      size="small"
-                      icon={<DeleteOutlined />}
-                      className="mark-list-delete-button"
-                      onClick={(e) => {
-                        e.stopPropagation();
+                  {!readonly ? (
+                    <Popconfirm
+                      key="delete"
+                      title="删除标记"
+                      description="将删除当前标记文件，确认继续？"
+                      okText="删除"
+                      cancelText="取消"
+                      okButtonProps={{ danger: true }}
+                      onConfirm={(e) => {
+                        e?.stopPropagation();
+                        onMarkDelete(mark.id);
                       }}
-                    />
-                  </Popconfirm>
+                    >
+                      <Button
+                        type="text"
+                        danger
+                        size="small"
+                        icon={<DeleteOutlined />}
+                        className="mark-list-delete-button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                        }}
+                      />
+                    </Popconfirm>
+                  ) : null}
                 </div>
               ))}
             </>
@@ -487,7 +514,7 @@ DOM 路径: ${domPath}`;
               onClick={handleBackToList}
               className="mark-panel-back-btn"
             />
-            <span className="mark-panel-label">创建标记</span>
+            <span className="mark-panel-label">{readonly ? '标记详情' : '创建标记'}</span>
           </div>
         </div>
         <div className="mark-panel-view">
@@ -498,8 +525,9 @@ DOM 路径: ${domPath}`;
               <Input
                 value={newMarkTitle}
                 onChange={(e) => setNewMarkTitle(e.target.value)}
-                placeholder="例如：登录按钮、用户头像等"
+                placeholder={readonly ? '历史版本预览中不可新增标记' : '例如：登录按钮、用户头像等'}
                 variant="borderless"
+                readOnly={readonly}
               />
               <div className="mark-create-header-actions">
                 <Button
@@ -515,7 +543,7 @@ DOM 路径: ${domPath}`;
                   size="small"
                   icon={<CheckOutlined />}
                   onClick={handleCreateMark}
-                  disabled={!newMarkDescription.trim()}
+                  disabled={readonly || !newMarkDescription.trim()}
                   title="创建标记"
                   className="mark-ghost-icon-button mark-ghost-icon-button-primary"
                 />
@@ -525,9 +553,10 @@ DOM 路径: ${domPath}`;
             <TextArea
               value={newMarkDescription}
               onChange={(e) => setNewMarkDescription(e.target.value)}
-              placeholder="输入标记描述..."
+              placeholder={readonly ? '历史版本预览中不可新增标记' : '输入标记描述...'}
               variant="borderless"
               autoFocus
+              readOnly={readonly}
             />
           </div>
         </div>
@@ -605,6 +634,7 @@ DOM 路径: ${domPath}`;
                 icon={<NodeIndexOutlined />}
                 onClick={() => onMarkRelinkStart(selectedMark.id)}
                 title="修改绑定"
+                disabled={readonly}
               />
             </div>
           ) : null}
@@ -618,14 +648,16 @@ DOM 路径: ${domPath}`;
                 当前保存的元素路径已经无法在页面中找到，请重新选择页面中的目标元素。
               </div>
               <div className="mark-missing-card-actions">
-                <Button
-                  type="primary"
-                  size="small"
-                  icon={<NodeIndexOutlined />}
-                  onClick={() => onMarkRelinkStart(selectedMark.id)}
-                >
-                  重新绑定
-                </Button>
+                {!readonly ? (
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<NodeIndexOutlined />}
+                    onClick={() => onMarkRelinkStart(selectedMark.id)}
+                  >
+                    重新绑定
+                  </Button>
+                ) : null}
                 {relinkingMarkId === selectedMark.id ? (
                   <Button size="small" onClick={onMarkRelinkCancel}>
                     取消
@@ -664,6 +696,7 @@ DOM 路径: ${domPath}`;
                   onChange={(e) => setEditTitle(e.target.value)}
                   placeholder="输入标记标题..."
                   variant="borderless"
+                  readOnly={readonly}
                 />
                 <div className="mark-editor-divider" />
                 <TextArea
@@ -672,6 +705,7 @@ DOM 路径: ${domPath}`;
                   placeholder="输入 Markdown 描述..."
                   variant="borderless"
                   autoFocus
+                  readOnly={readonly}
                 />
               </div>
             ) : (
@@ -681,23 +715,27 @@ DOM 路径: ${domPath}`;
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%' }}>
                     <div className="mark-detail-title">{selectedMark.title}</div>
                     <div className="mark-detail-header-actions">
-                      <Button
-                        type="text"
-                        size="small"
-                        icon={<EditOutlined />}
-                        onClick={handleStartEdit}
-                        title="编辑"
-                        className="mark-detail-icon-button"
-                      />
-                      <Button
-                        type="text"
-                        size="small"
-                        danger
-                        icon={<DeleteOutlined />}
-                        onClick={handleDeleteMark}
-                        title="删除"
-                        className="mark-detail-icon-button"
-                      />
+                      {!readonly ? (
+                        <>
+                          <Button
+                            type="text"
+                            size="small"
+                            icon={<EditOutlined />}
+                            onClick={handleStartEdit}
+                            title="编辑"
+                            className="mark-detail-icon-button"
+                          />
+                          <Button
+                            type="text"
+                            size="small"
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={handleDeleteMark}
+                            title="删除"
+                            className="mark-detail-icon-button"
+                          />
+                        </>
+                      ) : null}
                     </div>
                   </div>
                 </div>

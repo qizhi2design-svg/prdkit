@@ -25,6 +25,8 @@ interface PrdPreviewProps {
   onModeChange?: (mode: 'preview' | 'edit' | 'block-select') => void;
   editDisabled?: boolean;
   viewingHistory?: boolean;
+  versionLabel?: string;
+  iterationName?: string | null;
   onReturnToCurrent?: () => void;
   diffLines?: DiffLine[];
   diffSummary?: { lineAdded: number; lineDeleted: number; changed: boolean } | null;
@@ -70,6 +72,8 @@ export default function PrdPreview({
   onModeChange,
   editDisabled = false,
   viewingHistory = false,
+  versionLabel,
+  iterationName,
   onReturnToCurrent,
   diffLines,
   diffSummary,
@@ -265,7 +269,7 @@ export default function PrdPreview({
       <div className={`prd-preview${editing ? ' prd-preview--editing' : ''}${viewingHistory ? ' prd-preview--history' : ''}`}>
         {viewingHistory && (
           <div className="prd-preview-history-banner">
-            <span>正在查看历史版本</span>
+            <span>当前正在浏览{versionLabel || '历史版本'}{iterationName ? `，${iterationName}` : ''}</span>
             {diffSummary && (
               <span className="prd-preview-diff-summary">
                 {diffSummary.lineDeleted > 0 && <span className="diff-removed-count">-{diffSummary.lineDeleted}</span>}

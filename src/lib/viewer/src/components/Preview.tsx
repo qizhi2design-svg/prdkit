@@ -69,6 +69,7 @@ interface PreviewProps {
   fileList?: string[];
   onLinkNavigation?: (filePath: string) => void;
   versionLabel?: string;
+  iterationName?: string | null;
   onReturnToCurrent?: () => void;
 }
 
@@ -162,6 +163,7 @@ export default function Preview({
   fileList,
   onLinkNavigation,
   versionLabel,
+  iterationName,
   onReturnToCurrent,
 }: PreviewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -1159,7 +1161,7 @@ export default function Preview({
 {previewReadonly ? (
                 <div className="preview-version-bar">
                   <span className="preview-version-label">
-                    浏览版本 <strong>{versionLabel || ''}</strong>
+                    当前正在浏览{versionLabel || ''}{iterationName ? `，${iterationName}` : ''}
                   </span>
                   {onReturnToCurrent ? (
                     <button type="button" className="preview-version-return" onClick={onReturnToCurrent}>
@@ -1505,6 +1507,7 @@ export default function Preview({
               projectName={projectName}
               filePath={filePath}
               prototypesDir={prototypesDir}
+              readonly={previewReadonly}
             />
           </div>
         ) : null}

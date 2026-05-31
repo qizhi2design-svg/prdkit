@@ -144,6 +144,11 @@ function AppContent() {
   const [prdSaveSubmitting, setPrdSaveSubmitting] = useState(false);
   const [selectedPrdContextBlocks, setSelectedPrdContextBlocks] = useState<PrdContextBlock[]>([]);
   const prdDirty = !prdViewingHistory && prdContent !== null && prdDraftContent !== prdContent;
+  const prdActiveVersionLabel = useMemo(() => {
+    if (!prdViewingHistory || !prdActiveCheckpointId) return null;
+    const index = prdCheckpoints.findIndex((item) => item.id === prdActiveCheckpointId);
+    return index >= 0 ? `版本${prdCheckpoints.length - index}` : null;
+  }, [prdActiveCheckpointId, prdCheckpoints, prdViewingHistory]);
 
   const resetPrdContextCapture = useCallback(() => {
     setPrdViewMode('preview');
@@ -1200,7 +1205,7 @@ function AppContent() {
                 onPrdRename={handlePrdRename}
                 onPrdDuplicate={handlePrdDuplicate}
                 onPrdDelete={handlePrdDelete}
-                readonly={Boolean(checkpoint.activePreview)}
+                hideActions={Boolean(checkpoint.activePreview)}
               />
             </Sider>
             {!siderCollapsed && (
@@ -1229,6 +1234,7 @@ function AppContent() {
                       onModeChange={handlePrdModeChange}
                       editDisabled={prdViewingHistory || !selectedPrdFile}
                       viewingHistory={prdViewingHistory}
+                      versionLabel={prdActiveVersionLabel || undefined}
                       onReturnToCurrent={handleReturnToCurrentPrdVersion}
                       diffLines={prdDiffLines ?? undefined}
                       diffSummary={prdDiffSummary ?? undefined}
@@ -1307,7 +1313,7 @@ function AppContent() {
                 onZoomChange={viewport.setZoomPercent}
                 previewUrlOverride={checkpoint.activePreview?.previewUrl ?? null}
                 previewReadonly={Boolean(checkpoint.activePreview)}
-                versionLabel={checkpoint.activePreview?.message ? `"${checkpoint.activePreview.message}"` : undefined}
+                versionLabel={checkpoint.activeVersionLabel || undefined}
                 onReturnToCurrent={checkpoint.activePreview ? () => checkpoint.exitPreview() : undefined}
                 fileList={visibleFileList}
               />

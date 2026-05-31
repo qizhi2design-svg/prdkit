@@ -129,6 +129,7 @@ export interface UseCheckpointReturn {
   // 状态
   status: CheckpointStatus | null;
   activePreview: ActiveCheckpointPreview | null;
+  activeVersionLabel: string | null;
   activeIterationId: string | null;
   iterations: IterationSummary[];
   historyDrawerOpen: boolean;
@@ -145,8 +146,8 @@ export interface UseCheckpointReturn {
   activateVersionGroup: (checkpointId?: string | null) => Promise<void>;
   notifyCheckpointCreated: (checkpointId?: string | null) => Promise<void>;
   saveVersion: () => Promise<void>;
-  preview: (detail: CheckpointDetail) => void;
-  previewGroup: (details: CheckpointDetail[]) => void;
+  preview: (detail: CheckpointDetail, versionLabel?: string | null) => void;
+  previewGroup: (details: CheckpointDetail[], versionLabel?: string | null) => void;
   restore: (detail: CheckpointDetail, versionLabel: string) => Promise<void>;
   exitPreview: () => void;
   selectIteration: (iterationId: string | null) => void;

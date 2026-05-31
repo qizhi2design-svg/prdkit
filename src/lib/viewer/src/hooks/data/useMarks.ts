@@ -50,6 +50,12 @@ export function useMarks(options: UseMarksOptions): UseMarksReturn {
     setHiddenMarkIds([]);
   }, [prototypePath]);
 
+  useEffect(() => {
+    if (!activeCheckpointPreview) return;
+    setPendingMarkInfo(null);
+    setRelinkingMarkId(null);
+  }, [activeCheckpointPreview]);
+
   // 计算有效标记（考虑 checkpoint 预览）
   const effectiveMarks = useMemo(() => {
     if (activeCheckpointPreview?.prototypePath === prototypePath) {
