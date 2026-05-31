@@ -88,8 +88,6 @@ const viewerTheme = EditorView.theme({
     padding: '0 2px',
   },
   '.cm-md-heading': {
-    color: 'var(--color-prd-text)',
-    fontWeight: 'var(--font-weight-bold)',
     fontSize: 'var(--font-size-md)',
     lineHeight: 'var(--line-height-loose)',
     letterSpacing: '0',
@@ -98,16 +96,15 @@ const viewerTheme = EditorView.theme({
     boxShadow: 'inset 0 -1px 0 rgb(var(--color-prd-accent-rgb) / 0.16)',
   },
   '.cm-md-heading-2': {
-    color: 'var(--color-prd-heading-2)',
+    fontWeight: 'var(--font-weight-bold)',
   },
   '.cm-md-heading-3': {
-    color: 'var(--color-prd-heading-3)',
+    fontWeight: 'var(--font-weight-semibold)',
   },
   '.cm-md-blockquote': {
     paddingLeft: 'var(--spacing-3)',
     borderLeft: '3px solid rgb(var(--color-prd-accent-rgb) / 0.22)',
     backgroundColor: 'rgb(var(--color-prd-accent-rgb) / 0.06)',
-    color: 'var(--color-prd-text-muted)',
   },
   '.cm-md-list-line': {
     paddingLeft: '6px',
@@ -184,6 +181,10 @@ const viewerTheme = EditorView.theme({
 const viewerSyntaxHighlight = syntaxHighlighting(
   HighlightStyle.define([
     { tag: t.heading, color: 'var(--color-prd-text)', fontWeight: 'var(--font-weight-bold)' },
+    { tag: t.heading1, color: 'var(--color-prd-text)', fontWeight: 'var(--font-weight-bold)' },
+    { tag: t.heading2, color: 'var(--color-prd-heading-2)', fontWeight: 'var(--font-weight-bold)' },
+    { tag: t.heading3, color: 'var(--color-prd-heading-3)', fontWeight: 'var(--font-weight-semibold)' },
+    { tag: t.heading4, color: 'var(--color-prd-heading-3)', fontWeight: 'var(--font-weight-semibold)' },
     { tag: t.emphasis, fontStyle: 'italic', color: 'var(--color-prd-text-dim)' },
     { tag: t.strong, fontWeight: 'var(--font-weight-bold)', color: 'var(--color-prd-text)' },
     { tag: t.strikethrough, color: 'var(--color-prd-text-placeholder)', textDecoration: 'line-through' },
@@ -191,14 +192,17 @@ const viewerSyntaxHighlight = syntaxHighlighting(
     { tag: t.url, color: 'var(--color-prd-text-dim)', textDecoration: 'underline' },
     { tag: t.monospace, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-family-code)' },
     { tag: t.list, color: 'var(--color-prd-text-dim)' },
-    { tag: t.quote, color: 'var(--color-prd-text-dim)', fontStyle: 'italic' },
-    { tag: t.contentSeparator, color: 'var(--color-prd-separator)' },
+    { tag: t.quote, color: 'var(--color-prd-text-muted)', fontStyle: 'italic' },
+    { tag: t.contentSeparator, color: 'var(--color-prd-table-divider)' },
     { tag: t.separator, color: 'var(--color-prd-separator)' },
     { tag: t.escape, color: 'var(--color-prd-accent)' },
     { tag: t.comment, color: 'var(--color-prd-text-gutter)' },
     { tag: t.processingInstruction, color: 'var(--color-prd-text-gutter)' },
     { tag: t.meta, color: 'var(--color-prd-text-gutter)' },
     { tag: t.keyword, color: 'var(--color-prd-accent)', fontWeight: 'var(--font-weight-semibold)' },
+    { tag: t.atom, color: 'var(--color-prd-accent)', fontWeight: 'var(--font-weight-medium)' },
+    { tag: t.literal, color: 'var(--color-prd-heading-3)' },
+    { tag: t.string, color: 'var(--color-prd-heading-2)' },
   ]),
 );
 

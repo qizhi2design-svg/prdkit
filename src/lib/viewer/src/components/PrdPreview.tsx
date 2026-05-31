@@ -1,7 +1,8 @@
-import { Children, isValidElement, lazy, Suspense, useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { Children, isValidElement, lazy, Suspense, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Components } from 'react-markdown';
+import { Tooltip } from 'antd';
 import MermaidRenderer from './MermaidRenderer';
 import Hotkey from './Hotkey';
 import PrdDiffViewer from './PrdDiffViewer';
@@ -32,6 +33,15 @@ interface PrdPreviewProps {
   onContextCaptureChange?: (active: boolean, blocks: PrdContextBlock[]) => void;
   onCopyContextBlocks?: (blocks?: PrdContextBlock[]) => void;
 }
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  const element = target as HTMLElement | null;
+  if (!element || typeof element.tagName !== 'string') return false;
+  const tagName = element.tagName;
+  return tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT' || element.isContentEditable;
+}
+
+const MODE_CYCLE: Array<'preview' | 'edit' | 'block-select'> = ['preview', 'edit', 'block-select'];
 
 /** react-markdown 自定义组件，拦截 mermaid 代码块 */
 const markdownComponents: Components = {
@@ -70,6 +80,11 @@ export default function PrdPreview({
   const renderedContent = viewingHistory ? content : (draftContent ?? content);
   const editing = !viewingHistory && mode === 'edit';
   const [selectionMode, setSelectionMode] = useState<'single' | 'multiple'>('single');
+
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+  const onModeChangeRef = useRef(onModeChange);
+  onModeChangeRef.current = onModeChange;
   const previewBlocks = useMemo(() => parseMarkdownBlocksFromText(renderedContent), [renderedContent]);
   const selectedBlockIds = useMemo(() => new Set(selectedContextBlocks.map((block) => block.id)), [selectedContextBlocks]);
 
@@ -79,6 +94,23 @@ export default function PrdPreview({
       setSelectionMode('single');
     }
   }, [mode]);
+
+  // Shift+Tab 切换预览/编辑/块选择模式
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!event.shiftKey || event.key !== 'Tab') return;
+      if (isEditableTarget(event.target)) return;
+
+      event.preventDefault();
+      const currentMode = modeRef.current;
+      const currentIndex = MODE_CYCLE.indexOf(currentMode);
+      const nextIndex = (currentIndex + 1) % MODE_CYCLE.length;
+      onModeChangeRef.current?.(MODE_CYCLE[nextIndex]);
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, []);
 
   useEffect(() => {
     if (viewingHistory || mode !== 'block-select') {
@@ -135,28 +167,34 @@ export default function PrdPreview({
         <div className="prd-preview-topbar">
           <div className="prd-context-capture-banner-copy">
             <div className="prd-context-capture-toggle-group" aria-label="PRD 工具切换">
-              <button
-                type="button"
-                className={`prd-context-capture-toggle-pill${mode === 'preview' ? ' active' : ''}`}
-                onClick={() => onModeChange?.('preview')}
-              >
-                预览
-              </button>
-              <button
-                type="button"
-                className={`prd-context-capture-toggle-pill${mode === 'edit' ? ' active' : ''}`}
-                onClick={() => !editDisabled && onModeChange?.('edit')}
-                disabled={editDisabled}
-              >
-                编辑
-              </button>
-              <button
-                type="button"
-                className={`prd-context-capture-toggle-pill${mode === 'block-select' ? ' active' : ''}`}
-                onClick={() => onModeChange?.('block-select')}
-              >
-                块选择
-              </button>
+              <Tooltip title="预览模式" getPopupContainer={() => document.body}>
+                <button
+                  type="button"
+                  className={`prd-context-capture-toggle-pill${mode === 'preview' ? ' active' : ''}`}
+                  onClick={() => onModeChange?.('preview')}
+                >
+                  预览
+                </button>
+              </Tooltip>
+              <Tooltip title="编辑模式 (Shift+Tab 切换)" getPopupContainer={() => document.body}>
+                <button
+                  type="button"
+                  className={`prd-context-capture-toggle-pill${mode === 'edit' ? ' active' : ''}`}
+                  onClick={() => !editDisabled && onModeChange?.('edit')}
+                  disabled={editDisabled}
+                >
+                  编辑
+                </button>
+              </Tooltip>
+              <Tooltip title="块选择模式 (Shift+Tab 切换)" getPopupContainer={() => document.body}>
+                <button
+                  type="button"
+                  className={`prd-context-capture-toggle-pill${mode === 'block-select' ? ' active' : ''}`}
+                  onClick={() => onModeChange?.('block-select')}
+                >
+                  块选择
+                </button>
+              </Tooltip>
             </div>
             {(mode === 'preview' || mode === 'block-select') ? (
               <>
