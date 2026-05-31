@@ -73,7 +73,8 @@ interface PreviewProps {
 }
 
 type SelectedElement = ElementInfo;
-const TOOL_CYCLE_ORDER: ActiveTool[] = ['none', 'inspect', 'mark'];
+const TOOL_CYCLE_DEFAULT: ActiveTool[] = ['none', 'inspect', 'mark'];
+const TOOL_CYCLE_READONLY: ActiveTool[] = ['none', 'mark'];
 
 function isEditableTarget(target: EventTarget | null) {
   const element = target as HTMLElement | null;
@@ -256,9 +257,10 @@ export default function Preview({
   };
 
   const cycleTool = (currentTool: ActiveTool) => {
-    const currentIndex = TOOL_CYCLE_ORDER.indexOf(currentTool);
-    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % TOOL_CYCLE_ORDER.length;
-    return TOOL_CYCLE_ORDER[nextIndex];
+    const order = previewReadonlyRef.current ? TOOL_CYCLE_READONLY : TOOL_CYCLE_DEFAULT;
+    const currentIndex = order.indexOf(currentTool);
+    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % order.length;
+    return order[nextIndex];
   };
 
   useEffect(() => {
@@ -283,6 +285,12 @@ export default function Preview({
       onCanvasPanEndRef.current();
     }
   }, [isDraggingCanvas, isPanModeActive]);
+
+  useEffect(() => {
+    if (previewReadonly && activeTool === 'inspect') {
+      onToolChange('none');
+    }
+  }, [previewReadonly, activeTool, onToolChange]);
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -1127,6 +1135,7 @@ export default function Preview({
                   预览
                 </Button>
                 </Tooltip>
+                {!previewReadonly && (
                 <Tooltip title="编辑模式 (Shift+Tab 切换)" getPopupContainer={() => document.body}>
                 <Button
                   type="text"
@@ -1136,6 +1145,7 @@ export default function Preview({
                   编辑
                 </Button>
                 </Tooltip>
+                )}
                 <Tooltip title="标记模式 (Shift+Tab 切换)" getPopupContainer={() => document.body}>
                 <Button
                   type="text"
