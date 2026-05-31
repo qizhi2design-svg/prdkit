@@ -11,6 +11,7 @@ interface FileTreeProps {
   currentIndex: number;
   totalFiles: number;
   viewMode?: 'prototype' | 'prd';
+  readonly?: boolean;
   prdFiles?: PrdFileInfo[];
   prdFolders?: PrdFolderInfo[];
   onNavigate: (direction: 'prev' | 'next') => void;
@@ -68,6 +69,7 @@ export default function FileTree({
   onPrdRename,
   onPrdDuplicate,
   onPrdDelete,
+  readonly = false,
 }: FileTreeProps) {
   const [originalData, setOriginalData] = useState<PrototypeNode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -339,7 +341,7 @@ export default function FileTree({
             <h2 className="file-tree-project-title">{viewMode === 'prd' ? 'PRD 文档' : '页面'}</h2>
             <span className="file-tree-file-count">{currentIndex} / {totalFiles}</span>
           </div>
-          {viewMode !== 'prd' ? (
+          {!readonly && viewMode !== 'prd' ? (
             <div className="file-tree-project-actions">
               <Tooltip title="新建文件夹" getPopupContainer={() => document.body}>
                 <Button
@@ -360,7 +362,7 @@ export default function FileTree({
                 />
               </Tooltip>
             </div>
-          ) : (
+          ) : !readonly ? (
             <div className="file-tree-project-actions">
               <Tooltip title="新建文件夹" getPopupContainer={() => document.body}>
                 <Button
@@ -761,7 +763,7 @@ function TreeBranch({
             {isFolder ? <FolderFilled /> : <FileOutlined />}
           </span>
           <span className="file-tree-item-label">{node.name}</span>
-          <span className="file-tree-item-actions">
+          {!readonly && <span className="file-tree-item-actions">
             {isFolder ? (
               <>
                 {viewMode !== 'prd' ? (
@@ -883,7 +885,7 @@ function TreeBranch({
                 </Popconfirm>
               </>
             )}
-          </span>
+          </span>}
         </div>
       </Tooltip>
       {isFolder && expanded && hasChildren ? (
