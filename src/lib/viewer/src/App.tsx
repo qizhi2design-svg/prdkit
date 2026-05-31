@@ -1306,6 +1306,8 @@ function AppContent() {
                 onZoomChange={viewport.setZoomPercent}
                 previewUrlOverride={checkpoint.activePreview?.previewUrl ?? null}
                 previewReadonly={Boolean(checkpoint.activePreview)}
+                versionLabel={checkpoint.activePreview?.message ? `"${checkpoint.activePreview.message}"` : undefined}
+                onReturnToCurrent={checkpoint.activePreview ? () => checkpoint.exitPreview() : undefined}
                 fileList={visibleFileList}
               />
               )}

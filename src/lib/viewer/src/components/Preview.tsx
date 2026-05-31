@@ -68,6 +68,8 @@ interface PreviewProps {
   previewReadonly?: boolean;
   fileList?: string[];
   onLinkNavigation?: (filePath: string) => void;
+  versionLabel?: string;
+  onReturnToCurrent?: () => void;
 }
 
 type SelectedElement = ElementInfo;
@@ -1164,9 +1166,22 @@ export default function Preview({
               </>
             ) : (
               <>
-                <span className="preview-inspect-banner-status">
-                  只读预览画布，支持缩放与平移浏览 · <Hotkey keys={['空格']} inline />拖拽画布
-                </span>
+                {previewReadonly ? (
+                  <div className="preview-version-bar">
+                    <span className="preview-version-label">
+                      浏览版本 <strong>{versionLabel || ''}</strong>
+                    </span>
+                    {onReturnToCurrent ? (
+                      <button type="button" className="preview-version-return" onClick={onReturnToCurrent}>
+                        返回当前版本
+                      </button>
+                    ) : null}
+                  </div>
+                ) : (
+                  <span className="preview-inspect-banner-status">
+                    只读预览画布，支持缩放与平移浏览 · <Hotkey keys={['空格']} inline />拖拽画布
+                  </span>
+                )}
               </>
             )}
           </div>
