@@ -136,8 +136,8 @@
 /* CodeMirror 滚动区字体匹配设计语言 */
 .prd-preview-editor .cm-scroller {
   font-family: var(--font-family-base);
-  font-size: 14px;
-  line-height: 1.75;
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-loose);
 }
 
 .prd-preview-editor .cm-gutters {
@@ -150,7 +150,7 @@
 
 .prd-preview-editor .cm-content,
 .prd-preview-editor .cm-gutter {
-  padding-bottom: 20px;
+  padding-bottom: var(--spacing-5);
 }
 
 .prd-preview-editor .cm-gutterElement {
@@ -169,7 +169,7 @@
 
 .prd-preview-editor .cm-line {
   color: var(--color-text-primary);
-  line-height: 1.75;
+  line-height: var(--line-height-loose);
 }
 
 .prd-preview-editor .cm-md-heading .tok-heading,

@@ -16,9 +16,9 @@ const viewerTheme = EditorView.theme({
   '&.cm-focused': { outline: 'none' },
   '.cm-scroller': {
     fontFamily: 'var(--font-family-base)',
-    fontSize: '14px',
-    lineHeight: '1.75',
-    paddingTop: '24px',
+    fontSize: 'var(--font-size-md)',
+    lineHeight: 'var(--line-height-loose)',
+    paddingTop: 'var(--spacing-6)',
   },
   '.cm-editor': {
     height: '100%',
@@ -38,7 +38,7 @@ const viewerTheme = EditorView.theme({
   },
   '.cm-activeLine': {
     backgroundColor: 'rgba(167, 181, 161, 0.12)',
-    borderRadius: '8px',
+    borderRadius: 'var(--radius-lg)',
   },
   '.cm-activeLineGutter': {
     backgroundColor: 'rgba(167, 181, 161, 0.18)',
@@ -58,11 +58,11 @@ const viewerTheme = EditorView.theme({
     alignItems: 'center',
     justifyContent: 'center',
     boxSizing: 'border-box',
-    padding: '0 8px',
+    padding: '0 var(--spacing-2)',
     color: '#938879',
     cursor: 'pointer',
-    transition: 'color 0.16s ease, background-color 0.16s ease',
-    borderRadius: '6px',
+    transition: 'color var(--transition-fast), background-color var(--transition-fast)',
+    borderRadius: 'var(--radius-base)',
   },
   '.cm-foldGutter .cm-gutterElement:hover': {
     color: '#2f7a72',
@@ -74,24 +74,24 @@ const viewerTheme = EditorView.theme({
     justifyContent: 'flex-end',
     boxSizing: 'border-box',
     color: 'inherit',
-    fontSize: '12px',
+    fontSize: 'var(--font-size-sm)',
     padding: '0 6px 0 10px',
     minWidth: '28px',
   },
   '.cm-content': {
-    padding: '0 16px 24px 10px',
+    padding: '0 var(--spacing-4) var(--spacing-6) 10px',
     caretColor: '#2f7a72',
     fontFamily: 'var(--font-family-base)',
-    fontSize: '14px',
+    fontSize: 'var(--font-size-md)',
   },
   '.cm-line': {
     padding: '0 2px',
   },
   '.cm-md-heading': {
     color: '#2f2a24',
-    fontWeight: '700',
-    fontSize: '14px',
-    lineHeight: '1.75',
+    fontWeight: 'var(--font-weight-bold)',
+    fontSize: 'var(--font-size-md)',
+    lineHeight: 'var(--line-height-loose)',
     letterSpacing: '0',
   },
   '.cm-md-heading-1': {
@@ -104,7 +104,7 @@ const viewerTheme = EditorView.theme({
     color: '#4d625f',
   },
   '.cm-md-blockquote': {
-    paddingLeft: '12px',
+    paddingLeft: 'var(--spacing-3)',
     borderLeft: '3px solid rgba(47, 122, 114, 0.22)',
     backgroundColor: 'rgba(47, 122, 114, 0.06)',
     color: '#5f6f65',
@@ -119,7 +119,7 @@ const viewerTheme = EditorView.theme({
     backgroundColor: 'rgba(246, 241, 232, 0.72)',
   },
   '.cm-md-table-header': {
-    fontWeight: '600',
+    fontWeight: 'var(--font-weight-semibold)',
     color: '#2f2a24',
     backgroundColor: 'rgba(232, 224, 213, 0.88)',
   },
@@ -130,8 +130,8 @@ const viewerTheme = EditorView.theme({
     backgroundColor: '#f3ede2',
     border: '1px solid #dfd2c0',
     color: '#7f7468',
-    borderRadius: '999px',
-    padding: '0 8px',
+    borderRadius: 'var(--radius-full)',
+    padding: '0 var(--spacing-2)',
   },
   '.cm-md-codeblock-line': {
     backgroundColor: '#f4efe7',
@@ -140,12 +140,12 @@ const viewerTheme = EditorView.theme({
     lineHeight: 'inherit',
   },
   '.cm-md-codeblock-start': {
-    borderTopLeftRadius: '8px',
-    borderTopRightRadius: '8px',
+    borderTopLeftRadius: 'var(--radius-lg)',
+    borderTopRightRadius: 'var(--radius-lg)',
   },
   '.cm-md-codeblock-end': {
-    borderBottomLeftRadius: '8px',
-    borderBottomRightRadius: '8px',
+    borderBottomLeftRadius: 'var(--radius-lg)',
+    borderBottomRightRadius: 'var(--radius-lg)',
   },
   '.cm-md-context-hover': {
     backgroundColor: 'rgba(47, 122, 114, 0.08)',
@@ -156,12 +156,12 @@ const viewerTheme = EditorView.theme({
     boxShadow: 'inset 4px 0 0 #2f7a72, inset 0 0 0 1px rgba(47, 122, 114, 0.2)',
   },
   '.cm-md-context-start': {
-    borderTopLeftRadius: '8px',
-    borderTopRightRadius: '8px',
+    borderTopLeftRadius: 'var(--radius-lg)',
+    borderTopRightRadius: 'var(--radius-lg)',
   },
   '.cm-md-context-end': {
-    borderBottomLeftRadius: '8px',
-    borderBottomRightRadius: '8px',
+    borderBottomLeftRadius: 'var(--radius-lg)',
+    borderBottomRightRadius: 'var(--radius-lg)',
   },
   '.cm-md-context-selected.cm-md-context-start': {
     boxShadow: 'inset 4px 0 0 #2f7a72, inset 0 1px 0 rgba(47, 122, 114, 0.28), inset 0 0 0 1px rgba(47, 122, 114, 0.2)',
@@ -170,7 +170,7 @@ const viewerTheme = EditorView.theme({
     boxShadow: 'inset 4px 0 0 #2f7a72, inset 0 -1px 0 rgba(47, 122, 114, 0.28), inset 0 0 0 1px rgba(47, 122, 114, 0.2)',
   },
   '.cm-placeholder': {
-    color: '#b2a79a',
+    color: 'var(--color-text-quaternary)',
   },
   '.cm-panels': {
     backgroundColor: '#fffdf9',
@@ -183,9 +183,9 @@ const viewerTheme = EditorView.theme({
 
 const viewerSyntaxHighlight = syntaxHighlighting(
   HighlightStyle.define([
-    { tag: t.heading, color: '#2f2a24', fontWeight: '700' },
+    { tag: t.heading, color: '#2f2a24', fontWeight: 'var(--font-weight-bold)' },
     { tag: t.emphasis, fontStyle: 'italic', color: '#6f665c' },
-    { tag: t.strong, fontWeight: '700', color: '#2f2a24' },
+    { tag: t.strong, fontWeight: 'var(--font-weight-bold)', color: '#2f2a24' },
     { tag: t.strikethrough, color: '#b2a79a', textDecoration: 'line-through' },
     { tag: t.link, color: '#2f7a72' },
     { tag: t.url, color: '#8c7f73', textDecoration: 'underline' },
