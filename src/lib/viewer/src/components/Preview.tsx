@@ -160,6 +160,8 @@ export default function Preview({
   previewReadonly = false,
   fileList,
   onLinkNavigation,
+  versionLabel,
+  onReturnToCurrent,
 }: PreviewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
