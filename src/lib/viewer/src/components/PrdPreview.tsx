@@ -44,19 +44,21 @@ function isEditableTarget(target: EventTarget | null): boolean {
 const MODE_CYCLE: Array<'preview' | 'edit' | 'block-select'> = ['preview', 'edit', 'block-select'];
 
 /** react-markdown 自定义组件，拦截 mermaid 代码块 */
-const markdownComponents: Components = {
-  pre({ children }) {
-    const child = Children.only(children);
-    if (
-      isValidElement<{ className?: string; children?: string }>(child) &&
-      child.props?.className === 'language-mermaid'
-    ) {
-      const code = String(child.props.children).replace(/\n$/, '');
-      return <MermaidRenderer code={code} />;
-    }
-    return <pre>{children}</pre>;
-  },
-};
+function createMarkdownComponents(previewable: boolean): Components {
+  return {
+    pre({ children }) {
+      const child = Children.only(children);
+      if (
+        isValidElement<{ className?: string; children?: string }>(child) &&
+        child.props?.className === 'language-mermaid'
+      ) {
+        const code = String(child.props.children).replace(/\n$/, '');
+        return <MermaidRenderer code={code} previewable={previewable} />;
+      }
+      return <pre>{children}</pre>;
+    },
+  };
+}
 
 export default function PrdPreview({
   content,
@@ -87,6 +89,7 @@ export default function PrdPreview({
   onModeChangeRef.current = onModeChange;
   const previewBlocks = useMemo(() => parseMarkdownBlocksFromText(renderedContent), [renderedContent]);
   const selectedBlockIds = useMemo(() => new Set(selectedContextBlocks.map((block) => block.id)), [selectedContextBlocks]);
+  const markdownComponents = useMemo(() => createMarkdownComponents(!contextCaptureActive), [contextCaptureActive]);
 
   // 进入块选择模式时重置为单选
   useEffect(() => {

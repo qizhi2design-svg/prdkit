@@ -252,6 +252,8 @@
 
 .prd-preview-block.is-selectable {
   cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .prd-preview-block.is-selectable:hover {

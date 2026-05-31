@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 interface MermaidRendererProps {
   code: string;
+  previewable?: boolean;
 }
 
 const KNOWN_DIAGRAM_PREFIXES = [
@@ -66,7 +67,7 @@ type RenderState =
   | { status: "ready"; svg: string }
   | { status: "error"; message: string };
 
-export default function MermaidRenderer({ code }: MermaidRendererProps) {
+export default function MermaidRenderer({ code, previewable = true }: MermaidRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<RenderState>({ status: "loading" });
   const svgRef = useRef("");
@@ -146,8 +147,8 @@ export default function MermaidRenderer({ code }: MermaidRendererProps) {
         className="mermaid-container"
         ref={containerRef}
         dangerouslySetInnerHTML={{ __html: state.svg }}
-        onClick={() => setPreviewOpen(true)}
-        style={{ cursor: "pointer" }}
+        onClick={previewable ? (e) => { e.stopPropagation(); setPreviewOpen(true); } : undefined}
+        style={{ cursor: previewable ? "pointer" : "default" }}
       />
       {dataUrl ? (
         <Image
