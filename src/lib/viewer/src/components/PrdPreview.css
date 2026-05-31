@@ -97,7 +97,7 @@
   box-sizing: border-box;
   background:
     linear-gradient(180deg, rgba(255, 253, 249, 0.98) 0%, rgba(247, 242, 235, 0.98) 100%);
-  border: 1px solid #e6d9c9;
+  border: 1px solid var(--color-prd-editor-border);
   border-radius: var(--radius-lg);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.85),
@@ -106,11 +106,11 @@
 }
 
 .prd-preview-editor:focus-within {
-  border-color: #9eb8b1;
+  border-color: var(--color-prd-editor-border-focus);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.92),
-    0 0 0 3px rgba(47, 122, 114, 0.1),
-    0 16px 38px rgba(47, 122, 114, 0.08);
+    0 0 0 3px rgb(var(--color-prd-accent-rgb) / 0.1),
+    0 16px 38px rgb(var(--color-prd-accent-rgb) / 0.08);
 }
 
 /* 编辑模式下 flex 撑满 */
@@ -270,13 +270,13 @@
 }
 
 .prd-preview-block.is-selectable:hover {
-  background: rgba(47, 122, 114, 0.06);
-  box-shadow: inset 2px 0 0 rgba(47, 122, 114, 0.18), inset 0 0 0 1px rgba(47, 122, 114, 0.12);
+  background: rgb(var(--color-prd-accent-rgb) / 0.06);
+  box-shadow: inset 2px 0 0 rgb(var(--color-prd-accent-rgb) / 0.18), inset 0 0 0 1px rgb(var(--color-prd-accent-rgb) / 0.12);
 }
 
 .prd-preview-block.is-selected {
-  background: rgba(47, 122, 114, 0.1);
-  box-shadow: inset 4px 0 0 #2f7a72, inset 0 0 0 1px rgba(47, 122, 114, 0.16);
+  background: rgb(var(--color-prd-accent-rgb) / 0.1);
+  box-shadow: inset 4px 0 0 var(--color-prd-accent), inset 0 0 0 1px rgb(var(--color-prd-accent-rgb) / 0.16);
 }
 
 .prd-preview-block > :first-child {

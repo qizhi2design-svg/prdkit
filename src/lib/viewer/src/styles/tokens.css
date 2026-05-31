@@ -165,4 +165,34 @@
   --breakpoint-tablet: 768px;
   --breakpoint-desktop: 1024px;
   --breakpoint-wide: 1280px;
+
+  /* ======== PRD 编辑器暖色系统 ======== */
+  --color-prd-bg: #fffdf9;                  /* 编辑器主背景（暖白） */
+  --color-prd-text: #2f2a24;                /* 编辑器主文本（暖黑） */
+  --color-prd-accent: var(--color-primary); /* 编辑器强调色（品牌蓝） */
+  --color-prd-accent-rgb: 22, 119, 255;     /* 强调色 RGB 分量（用于 alpha 合成） */
+  --color-prd-text-muted: #5f6f65;          /* 辅助文本（灰绿） */
+  --color-prd-text-gutter: #a59a8b;         /* 行号文本 */
+  --color-prd-text-dim: #8c7f73;            /* 弱化文本（引用/列表） */
+  --color-prd-text-panel: #6e6459;          /* 面板文本 */
+  --color-prd-text-placeholder: #b2a79a;    /* 占位文本 */
+  --color-prd-separator: #ddd2c4;           /* 分隔符/分割线 */
+  --color-prd-gutter-bg: #f6f1e8;           /* 行号区背景 */
+  --color-prd-gutter-border: #e7ded0;       /* 行号区右边框 */
+  --color-prd-codeblock-bg: #f4efe7;        /* 代码块背景 */
+  --color-prd-fold-bg: #f3ede2;             /* 折叠占位背景 */
+  --color-prd-fold-border: #dfd2c0;         /* 折叠占位边框 */
+  --color-prd-fold-text: #7f7468;           /* 折叠占位文本 */
+  --color-prd-table-header-bg: rgba(232, 224, 213, 0.88); /* 表格表头背景 */
+  --color-prd-table-line-bg: rgba(246, 241, 232, 0.72);   /* 表格行背景 */
+  --color-prd-active-line-bg: rgba(167, 181, 161, 0.12);  /* 激活行背景 */
+  --color-prd-active-line-gutter-bg: rgba(167, 181, 161, 0.18); /* 激活行号背景 */
+  --color-prd-selection-match-bg: rgba(196, 164, 132, 0.18);    /* 选中匹配背景 */
+  --color-prd-matching-bracket-bg: rgba(196, 164, 132, 0.22);   /* 括号匹配背景 */
+  --color-prd-heading-2: #30508a;           /* H2 色（深蓝） */
+  --color-prd-heading-3: #4a6fa5;           /* H3 色（中蓝） */
+  --color-prd-table-divider: #b6a894;       /* 表格分隔线 */
+  --color-prd-gutter-element: #938879;      /* 折叠图标 */
+  --color-prd-editor-border: #e6d9c9;       /* 编辑器边框 */
+  --color-prd-editor-border-focus: #91b3e8; /* 编辑器聚焦边框 */
 }
