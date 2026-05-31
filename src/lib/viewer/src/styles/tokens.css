@@ -10,7 +10,7 @@
   --color-primary-lighter: #f7fbff;
 
   /* 主色调透明度变体 */
-  --color-primary-rgb: 22, 119, 255;          /* 主色 RGB 分量 */
+  --color-primary-rgb: 22 119 255;            /* 主色 RGB 分量（空格分隔，用于 rgb() 斜杠语法） */
   --color-primary-alpha-4: rgba(22, 119, 255, 0.04);
   --color-primary-alpha-5: rgba(22, 119, 255, 0.05);
   --color-primary-alpha-8: rgba(22, 119, 255, 0.08);
