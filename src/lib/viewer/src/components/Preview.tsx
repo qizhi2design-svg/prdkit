@@ -1146,7 +1146,18 @@ export default function Preview({
                 </Button>
                 </Tooltip>
               </div>
-{inspectToolActive ? (
+{previewReadonly ? (
+                <div className="preview-version-bar">
+                  <span className="preview-version-label">
+                    浏览版本 <strong>{versionLabel || ''}</strong>
+                  </span>
+                  {onReturnToCurrent ? (
+                    <button type="button" className="preview-version-return" onClick={onReturnToCurrent}>
+                      返回当前版本
+                    </button>
+                  ) : null}
+                </div>
+              ) : inspectToolActive ? (
               <>
                 {selectionMode === 'multiple' && selectedElements.length > 0 ? (
                   <span className="preview-inspect-banner-count">已选 {selectedElements.length} 个元素</span>
@@ -1168,22 +1179,9 @@ export default function Preview({
               </>
             ) : (
               <>
-                {previewReadonly ? (
-                  <div className="preview-version-bar">
-                    <span className="preview-version-label">
-                      浏览版本 <strong>{versionLabel || ''}</strong>
-                    </span>
-                    {onReturnToCurrent ? (
-                      <button type="button" className="preview-version-return" onClick={onReturnToCurrent}>
-                        返回当前版本
-                      </button>
-                    ) : null}
-                  </div>
-                ) : (
-                  <span className="preview-inspect-banner-status">
-                    只读预览画布，支持缩放与平移浏览 · <Hotkey keys={['空格']} inline />拖拽画布
-                  </span>
-                )}
+                <span className="preview-inspect-banner-status">
+                  只读预览画布，支持缩放与平移浏览 · <Hotkey keys={['空格']} inline />拖拽画布
+                </span>
               </>
             )}
           </div>
