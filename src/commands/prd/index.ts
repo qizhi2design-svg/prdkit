@@ -4,6 +4,7 @@ import { registerPrdCreate } from "./create.js";
 import { registerPrdCheck } from "./check.js";
 import { registerPrdList } from "./list.js";
 import { registerPrdCheckpoint } from "./checkpoint.js";
+import { registerPrdPublish } from "./publish.js";
 
 export function registerPrd(program: Command): void {
   const prd = program.command("prd").description(COPY.prdDescription);
@@ -12,4 +13,5 @@ export function registerPrd(program: Command): void {
   registerPrdCheck(prd);
   registerPrdList(prd);
   registerPrdCheckpoint(prd);
+  registerPrdPublish(prd);
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Button, Input, Empty, Avatar, Tag, Popconfirm, Modal } from 'antd';
+import { Button, Input, Empty, Avatar, Tag, Popconfirm, Modal, Tooltip } from 'antd';
 import { DeleteOutlined, EditOutlined, ArrowLeftOutlined, UpOutlined, DownOutlined, DoubleRightOutlined, DoubleLeftOutlined, SearchOutlined, CopyOutlined, CheckOutlined, CloseOutlined, NodeIndexOutlined, DisconnectOutlined, FullscreenOutlined, FullscreenExitOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -310,16 +310,17 @@ DOM 路径: ${domPath}`;
   };
 
   const renderAiFooterButton = () => (
-    <Button
-      type="primary"
-      size="small"
-      icon={<CopyOutlined />}
-      onClick={copyDomInfo}
-      title="复制给 AI (Ctrl/Cmd+C)"
-      className="mark-ai-footer-button"
-    >
-      复制给 AI
-    </Button>
+    <Tooltip title="复制给 AI (Ctrl/Cmd+C)">
+      <Button
+        type="primary"
+        size="small"
+        icon={<CopyOutlined />}
+        onClick={copyDomInfo}
+        className="mark-ai-footer-button"
+      >
+        复制给 AI
+      </Button>
+    </Tooltip>
   );
 
   // 导航到上一个/下一个标记
@@ -349,39 +350,43 @@ DOM 路径: ${domPath}`;
     <div className="mark-header-actions">
       {showNavigate ? (
         <>
-          <Button
-            type="text"
-            size="small"
-            icon={<UpOutlined />}
-            onClick={() => handleNavigateMark('prev')}
-            disabled={marks.length <= 1}
-            title="上一个 (↑)"
-          />
-          <Button
-            type="text"
-            size="small"
-            icon={<DownOutlined />}
-            onClick={() => handleNavigateMark('next')}
-            disabled={marks.length <= 1}
-            title="下一个 (↓)"
-          />
+          <Tooltip title="上一个 (↑)">
+            <Button
+              type="text"
+              size="small"
+              icon={<UpOutlined />}
+              onClick={() => handleNavigateMark('prev')}
+              disabled={marks.length <= 1}
+            />
+          </Tooltip>
+          <Tooltip title="下一个 (↓)">
+            <Button
+              type="text"
+              size="small"
+              icon={<DownOutlined />}
+              onClick={() => handleNavigateMark('next')}
+              disabled={marks.length <= 1}
+            />
+          </Tooltip>
         </>
       ) : null}
-      <Button
-        type="text"
-        size="small"
-        icon={fullscreenOpen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
-        onClick={() => setFullscreenOpen((value) => !value)}
-        title={fullscreenOpen ? '退出全屏' : '全屏查看'}
-      />
-      {!fullscreenOpen && showCollapse ? (
+      <Tooltip title={fullscreenOpen ? '退出全屏' : '全屏查看'}>
         <Button
           type="text"
           size="small"
-          icon={<DoubleLeftOutlined />}
-          onClick={() => onCollapsedChange?.(true)}
-          title="折叠面板 (H)"
+          icon={fullscreenOpen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
+          onClick={() => setFullscreenOpen((value) => !value)}
         />
+      </Tooltip>
+      {!fullscreenOpen && showCollapse ? (
+        <Tooltip title="折叠面板 (H)">
+          <Button
+            type="text"
+            size="small"
+            icon={<DoubleLeftOutlined />}
+            onClick={() => onCollapsedChange?.(true)}
+          />
+        </Tooltip>
       ) : null}
     </div>
   );
@@ -482,16 +487,18 @@ DOM 路径: ${domPath}`;
                         onMarkDelete(mark.id);
                       }}
                     >
-                      <Button
-                        type="text"
-                        danger
-                        size="small"
-                        icon={<DeleteOutlined />}
-                        className="mark-list-delete-button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                        }}
-                      />
+                      <Tooltip title="删除">
+                        <Button
+                          type="text"
+                          danger
+                          size="small"
+                          icon={<DeleteOutlined />}
+                          className="mark-list-delete-button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                        />
+                      </Tooltip>
                     </Popconfirm>
                   ) : null}
                 </div>
@@ -508,12 +515,14 @@ DOM 路径: ${domPath}`;
       <>
         <div className="mark-panel-header">
           <div className="mark-panel-header-left">
-            <Button
-              type="text"
-              icon={<ArrowLeftOutlined />}
-              onClick={handleBackToList}
-              className="mark-panel-back-btn"
-            />
+            <Tooltip title="返回列表">
+              <Button
+                type="text"
+                icon={<ArrowLeftOutlined />}
+                onClick={handleBackToList}
+                className="mark-panel-back-btn"
+              />
+            </Tooltip>
             <span className="mark-panel-label">{readonly ? '标记详情' : '创建标记'}</span>
           </div>
         </div>
@@ -530,23 +539,25 @@ DOM 路径: ${domPath}`;
                 readOnly={readonly}
               />
               <div className="mark-create-header-actions">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<CloseOutlined />}
-                  onClick={handleBackToList}
-                  title="取消"
-                  className="mark-ghost-icon-button"
-                />
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<CheckOutlined />}
-                  onClick={handleCreateMark}
-                  disabled={readonly || !newMarkDescription.trim()}
-                  title="创建标记"
-                  className="mark-ghost-icon-button mark-ghost-icon-button-primary"
-                />
+                <Tooltip title="取消">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<CloseOutlined />}
+                    onClick={handleBackToList}
+                    className="mark-ghost-icon-button"
+                  />
+                </Tooltip>
+                <Tooltip title="创建标记">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<CheckOutlined />}
+                    onClick={handleCreateMark}
+                    disabled={readonly || !newMarkDescription.trim()}
+                    className="mark-ghost-icon-button mark-ghost-icon-button-primary"
+                  />
+                </Tooltip>
               </div>
             </div>
             <div className="mark-editor-divider" />
@@ -612,12 +623,14 @@ DOM 路径: ${domPath}`;
       <>
         <div className="mark-panel-header">
           <div className="mark-panel-header-left">
-            <Button
-              type="text"
-              icon={<ArrowLeftOutlined />}
-              onClick={handleBackToList}
-              className="mark-panel-back-btn"
-            />
+            <Tooltip title="返回列表">
+              <Button
+                type="text"
+                icon={<ArrowLeftOutlined />}
+                onClick={handleBackToList}
+                className="mark-panel-back-btn"
+              />
+            </Tooltip>
             <span className="mark-panel-label">标记详情</span>
           </div>
           {renderPanelHeaderActions({ showNavigate: true, showCollapse: true })}
@@ -628,14 +641,15 @@ DOM 路径: ${domPath}`;
               <div style={{ flex: 1, minWidth: 0 }}>
                 <DomPathBreadcrumb domPath={selectedMark.domPath || selectedMark.selector} />
               </div>
-              <Button
-                type="text"
-                size="small"
-                icon={<NodeIndexOutlined />}
-                onClick={() => onMarkRelinkStart(selectedMark.id)}
-                title="修改绑定"
-                disabled={readonly}
-              />
+              <Tooltip title="修改绑定">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<NodeIndexOutlined />}
+                  onClick={() => onMarkRelinkStart(selectedMark.id)}
+                  disabled={readonly}
+                />
+              </Tooltip>
             </div>
           ) : null}
           {missingMarkIdSet.has(selectedMark.id) ? (
@@ -717,23 +731,25 @@ DOM 路径: ${domPath}`;
                     <div className="mark-detail-header-actions">
                       {!readonly ? (
                         <>
-                          <Button
-                            type="text"
-                            size="small"
-                            icon={<EditOutlined />}
-                            onClick={handleStartEdit}
-                            title="编辑"
-                            className="mark-detail-icon-button"
-                          />
-                          <Button
-                            type="text"
-                            size="small"
-                            danger
-                            icon={<DeleteOutlined />}
-                            onClick={handleDeleteMark}
-                            title="删除"
-                            className="mark-detail-icon-button"
-                          />
+                          <Tooltip title="编辑">
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<EditOutlined />}
+                              onClick={handleStartEdit}
+                              className="mark-detail-icon-button"
+                            />
+                          </Tooltip>
+                          <Tooltip title="删除">
+                            <Button
+                              type="text"
+                              size="small"
+                              danger
+                              icon={<DeleteOutlined />}
+                              onClick={handleDeleteMark}
+                              className="mark-detail-icon-button"
+                            />
+                          </Tooltip>
                         </>
                       ) : null}
                     </div>
