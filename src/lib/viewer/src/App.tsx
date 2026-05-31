@@ -1200,6 +1200,7 @@ function AppContent() {
                 onPrdRename={handlePrdRename}
                 onPrdDuplicate={handlePrdDuplicate}
                 onPrdDelete={handlePrdDelete}
+                readonly={Boolean(checkpoint.activePreview)}
               />
             </Sider>
             {!siderCollapsed && (
