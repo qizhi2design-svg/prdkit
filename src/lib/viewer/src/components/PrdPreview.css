@@ -137,7 +137,7 @@
 .prd-preview-editor .cm-scroller {
   font-family: var(--font-family-base);
   font-size: 14px;
-  line-height: var(--line-height-loose);
+  line-height: 1.75;
 }
 
 .prd-preview-editor .cm-gutters {
@@ -169,6 +169,7 @@
 
 .prd-preview-editor .cm-line {
   color: var(--color-text-primary);
+  line-height: 1.75;
 }
 
 .prd-preview-editor .cm-md-heading .tok-heading,
@@ -269,13 +270,13 @@
 }
 
 .prd-preview-block.is-selectable:hover {
-  background: rgba(22, 119, 255, 0.06);
-  box-shadow: inset 2px 0 0 rgba(22, 119, 255, 0.18), inset 0 0 0 1px rgba(22, 119, 255, 0.12);
+  background: rgba(47, 122, 114, 0.06);
+  box-shadow: inset 2px 0 0 rgba(47, 122, 114, 0.18), inset 0 0 0 1px rgba(47, 122, 114, 0.12);
 }
 
 .prd-preview-block.is-selected {
-  background: rgba(22, 119, 255, 0.12);
-  box-shadow: inset 4px 0 0 #1677ff, inset 0 0 0 1px rgba(22, 119, 255, 0.18);
+  background: rgba(47, 122, 114, 0.1);
+  box-shadow: inset 4px 0 0 #2f7a72, inset 0 0 0 1px rgba(47, 122, 114, 0.16);
 }
 
 .prd-preview-block > :first-child {

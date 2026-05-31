@@ -16,6 +16,7 @@ const viewerTheme = EditorView.theme({
   '&.cm-focused': { outline: 'none' },
   '.cm-scroller': {
     fontFamily: 'var(--font-family-base)',
+    fontSize: '14px',
     lineHeight: '1.75',
     paddingTop: '24px',
   },
@@ -73,7 +74,7 @@ const viewerTheme = EditorView.theme({
     justifyContent: 'flex-end',
     boxSizing: 'border-box',
     color: 'inherit',
-    fontSize: '11px',
+    fontSize: '12px',
     padding: '0 6px 0 10px',
     minWidth: '28px',
   },
@@ -81,6 +82,7 @@ const viewerTheme = EditorView.theme({
     padding: '0 16px 24px 10px',
     caretColor: '#2f7a72',
     fontFamily: 'var(--font-family-base)',
+    fontSize: '14px',
   },
   '.cm-line': {
     padding: '0 2px',
@@ -88,33 +90,23 @@ const viewerTheme = EditorView.theme({
   '.cm-md-heading': {
     color: '#2f2a24',
     fontWeight: '700',
-    letterSpacing: '-0.01em',
+    fontSize: '14px',
+    lineHeight: '1.75',
+    letterSpacing: '0',
   },
   '.cm-md-heading-1': {
-    fontSize: '2rem',
-    lineHeight: '1.3',
-    marginTop: '10px',
-    marginBottom: '8px',
+    boxShadow: 'inset 0 -1px 0 rgba(47, 122, 114, 0.16)',
   },
   '.cm-md-heading-2': {
-    fontSize: '1.55rem',
-    lineHeight: '1.4',
-    marginTop: '8px',
-    marginBottom: '6px',
+    color: '#36524e',
   },
   '.cm-md-heading-3': {
-    fontSize: '1.2rem',
-    lineHeight: '1.45',
-    marginTop: '6px',
-  },
-  '.cm-md-heading-4, .cm-md-heading-5, .cm-md-heading-6': {
-    fontSize: '1rem',
-    lineHeight: '1.5',
+    color: '#4d625f',
   },
   '.cm-md-blockquote': {
     paddingLeft: '12px',
-    borderLeft: '3px solid rgba(22, 119, 255, 0.3)',
-    backgroundColor: 'rgba(22, 119, 255, 0.05)',
+    borderLeft: '3px solid rgba(47, 122, 114, 0.22)',
+    backgroundColor: 'rgba(47, 122, 114, 0.06)',
     color: '#5f6f65',
   },
   '.cm-md-list-line': {
@@ -122,13 +114,14 @@ const viewerTheme = EditorView.theme({
   },
   '.cm-md-table-line': {
     fontFamily: 'var(--font-family-code)',
-    fontSize: '13px',
-    backgroundColor: 'rgba(246, 241, 232, 0.62)',
+    fontSize: 'inherit',
+    lineHeight: 'inherit',
+    backgroundColor: 'rgba(246, 241, 232, 0.72)',
   },
   '.cm-md-table-header': {
     fontWeight: '600',
     color: '#2f2a24',
-    backgroundColor: 'rgba(232, 224, 213, 0.82)',
+    backgroundColor: 'rgba(232, 224, 213, 0.88)',
   },
   '.cm-md-table-divider': {
     color: '#b6a894',
@@ -143,24 +136,24 @@ const viewerTheme = EditorView.theme({
   '.cm-md-codeblock-line': {
     backgroundColor: '#f4efe7',
     fontFamily: 'var(--font-family-code)',
+    fontSize: 'inherit',
+    lineHeight: 'inherit',
   },
   '.cm-md-codeblock-start': {
     borderTopLeftRadius: '8px',
     borderTopRightRadius: '8px',
-    marginTop: '4px',
   },
   '.cm-md-codeblock-end': {
     borderBottomLeftRadius: '8px',
     borderBottomRightRadius: '8px',
-    marginBottom: '4px',
   },
   '.cm-md-context-hover': {
-    backgroundColor: 'rgba(22, 119, 255, 0.1)',
-    boxShadow: 'inset 2px 0 0 rgba(22, 119, 255, 0.26), inset 0 0 0 1px rgba(22, 119, 255, 0.16)',
+    backgroundColor: 'rgba(47, 122, 114, 0.08)',
+    boxShadow: 'inset 2px 0 0 rgba(47, 122, 114, 0.24), inset 0 0 0 1px rgba(47, 122, 114, 0.14)',
   },
   '.cm-md-context-selected': {
-    backgroundColor: 'rgba(22, 119, 255, 0.18)',
-    boxShadow: 'inset 4px 0 0 #1677ff, inset 0 0 0 1px rgba(22, 119, 255, 0.24)',
+    backgroundColor: 'rgba(47, 122, 114, 0.13)',
+    boxShadow: 'inset 4px 0 0 #2f7a72, inset 0 0 0 1px rgba(47, 122, 114, 0.2)',
   },
   '.cm-md-context-start': {
     borderTopLeftRadius: '8px',
@@ -171,10 +164,10 @@ const viewerTheme = EditorView.theme({
     borderBottomRightRadius: '8px',
   },
   '.cm-md-context-selected.cm-md-context-start': {
-    boxShadow: 'inset 4px 0 0 #1677ff, inset 0 1px 0 rgba(22, 119, 255, 0.34), inset 0 0 0 1px rgba(22, 119, 255, 0.24)',
+    boxShadow: 'inset 4px 0 0 #2f7a72, inset 0 1px 0 rgba(47, 122, 114, 0.28), inset 0 0 0 1px rgba(47, 122, 114, 0.2)',
   },
   '.cm-md-context-selected.cm-md-context-end': {
-    boxShadow: 'inset 4px 0 0 #1677ff, inset 0 -1px 0 rgba(22, 119, 255, 0.34), inset 0 0 0 1px rgba(22, 119, 255, 0.24)',
+    boxShadow: 'inset 4px 0 0 #2f7a72, inset 0 -1px 0 rgba(47, 122, 114, 0.28), inset 0 0 0 1px rgba(47, 122, 114, 0.2)',
   },
   '.cm-placeholder': {
     color: '#b2a79a',
