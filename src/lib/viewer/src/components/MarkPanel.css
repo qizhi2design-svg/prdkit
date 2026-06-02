@@ -663,11 +663,16 @@
   display: flex;
   justify-content: center;
   overflow-x: auto;
+  padding: var(--spacing-3);
+  background: #ffffff;
+  border-radius: var(--radius-lg);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
 }
 
 .mermaid-container svg {
   max-width: 100%;
   height: auto;
+  background: #ffffff;
 }
 
 .mermaid-loading {

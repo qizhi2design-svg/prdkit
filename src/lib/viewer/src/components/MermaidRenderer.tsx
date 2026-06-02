@@ -62,6 +62,19 @@ function normalizeMermaidCode(input: string): string {
   return trimmed;
 }
 
+function withWhiteSvgBackground(svg: string): string {
+  if (!svg.trim()) return svg;
+
+  if (svg.includes('data-prdkit-mermaid-bg="white"')) {
+    return svg;
+  }
+
+  return svg.replace(
+    /(<svg\b[^>]*>)/i,
+    '$1<rect data-prdkit-mermaid-bg="white" width="100%" height="100%" fill="#ffffff"></rect>'
+  );
+}
+
 type RenderState =
   | { status: "loading" }
   | { status: "ready"; svg: string }
@@ -90,14 +103,17 @@ export default function MermaidRenderer({ code, previewable = true }: MermaidRen
           startOnLoad: false,
           theme: "default",
           securityLevel: "loose",
+          themeVariables: {
+            background: "#ffffff",
+          },
         });
 
         const { svg } = await mermaid.render(id, normalizedCode);
+        const svgWithBg = withWhiteSvgBackground(svg);
         if (!cancelled) {
-          svgRef.current = svg;
-          setState({ status: "ready", svg });
+          svgRef.current = svgWithBg;
+          setState({ status: "ready", svg: svgWithBg });
 
-          const svgWithBg = svg;
           const blob = new Blob([svgWithBg], { type: "image/svg+xml" });
           objectUrl = URL.createObjectURL(blob);
           blobUrlRef.current = objectUrl;
